@@ -77,7 +77,7 @@ export async function generateLocalImages(
         jobNotes: request.jobNotes ?? "",
         seed: request.seed ?? "",
         results: results.map((result) => result.name),
-        generator: "image-cockpit.local-procedural-v1"
+        generator: "zai-cockpit.local-procedural-v1"
       },
       null,
       2
@@ -424,7 +424,7 @@ function clampInteger(value: number, min: number, max: number) {
 }
 
 function createRng(seed: string) {
-  const digest = createHash("sha256").update(seed || "image-cockpit").digest();
+  const digest = createHash("sha256").update(seed || "zai-cockpit").digest();
   let state = digest.readUInt32LE(0) || 0x9e3779b9;
   return () => {
     state |= 0;

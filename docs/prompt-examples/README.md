@@ -1,6 +1,6 @@
 # Pixel-Art Prompt Examples
 
-Image Cockpitのピクセルアート生成で使うprompt例の参照置き場です。
+Zai Cockpitのピクセルアート生成で使うprompt例の参照置き場です。
 UIに組み込む前の候補や、手元で試験生成するときのコピー元として使います。
 
 ## Prompt Lists

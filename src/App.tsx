@@ -129,7 +129,7 @@ import {
   isStorageResetSearch,
   loadPersistedState,
   MAX_USER_ANIMATION_LIBRARY_ITEMS,
-  PENDING_CODEX_JOB_STORAGE_KEY,
+  PENDING_ZAI_JOB_STORAGE_KEY,
   prependHistoryItemWithDedupe,
   preflightLocalStateStorage,
   readLocalStateSummaries,
@@ -150,22 +150,22 @@ import type {
   AnimationPackV2Rect,
   AnimationNormalizationCorrection,
   AnimationQualityReportV2,
-  CodexArtifactStatus,
-  CodexFailureKind,
-  CodexJobDiagnostic,
-  CodexJobLogResponse,
+  ZaiArtifactStatus,
+  ZaiFailureKind,
+  ZaiJobDiagnostic,
+  ZaiJobLogResponse,
   GridSettings,
   HistoryItem,
   ImageCockpitApiHealth,
   ImageCockpitDevSupervisorHealth,
-  CodexJobResponse,
-  CodexJobStatusResponse,
-  CodexOutboxImportResponse,
-  CodexOutboxResult,
-  CodexResultQualityClassification,
-  CodexRunnerPreflight,
-  CodexRunnerPreflightResponse,
-  CodexRunnerStatus,
+  ZaiJobResponse,
+  ZaiJobStatusResponse,
+  ZaiOutboxImportResponse,
+  ZaiOutboxResult,
+  ZaiResultQualityClassification,
+  ZaiRunnerPreflight,
+  ZaiRunnerPreflightResponse,
+  ZaiRunnerStatus,
   EffectAnimationMetadata,
   EffectLoopMode,
   EffectQualityRank,
@@ -183,8 +183,8 @@ const SAMPLE_URL = "/samples/forest-mage-sheet.png";
 const CANVAS_WIDTH = 920;
 const CANVAS_HEIGHT = 520;
 const IMAGE_DISPLAY_PADDING = 44;
-const LANGUAGE_STORAGE_KEY = "image-cockpit.language";
-const JOB_NOTIFICATION_STORAGE_KEY = "image-cockpit.jobNotifications";
+const LANGUAGE_STORAGE_KEY = "zai-cockpit.language";
+const JOB_NOTIFICATION_STORAGE_KEY = "zai-cockpit.jobNotifications";
 const SHOW_LOW_PRIORITY_CONTROLS = false;
 const SHOW_SPRITE_ACTIONS_PANEL = false;
 // public/samples stays bundled for README demos, release audit fixtures, and import QA while the official library UI is hidden.
@@ -193,12 +193,12 @@ const ANIMATION_FRAME_COUNT = 8;
 const ANIMATION_DIRECTION_COUNT = 5;
 const ANIMATION_CELL_SIZE = 256;
 const MIN_ANIMATION_CELL_SIZE = ANIMATION_CELL_SIZE;
-const MAX_ACTIVE_CODEX_JOBS = 3;
-const MAX_ACTIVE_STANDARD_ANIMATION_CODEX_JOBS = MAX_ACTIVE_CODEX_JOBS;
-const CODEX_LOG_POLL_INTERVAL_MS = 2000;
-const CODEX_CAPACITY_POLL_INTERVAL_MS = 1000;
-const CODEX_LOG_TAIL_BYTES = 32768;
-const CODEX_LOG_HISTORY_LIMIT = MAX_ACTIVE_CODEX_JOBS;
+const MAX_ACTIVE_ZAI_JOBS = 3;
+const MAX_ACTIVE_STANDARD_ANIMATION_ZAI_JOBS = MAX_ACTIVE_ZAI_JOBS;
+const ZAI_LOG_POLL_INTERVAL_MS = 2000;
+const ZAI_CAPACITY_POLL_INTERVAL_MS = 1000;
+const ZAI_LOG_TAIL_BYTES = 32768;
+const ZAI_LOG_HISTORY_LIMIT = MAX_ACTIVE_ZAI_JOBS;
 const DEFAULT_SUPERVISOR_PORT = 8793;
 const COCKPIT_HEALTH_POLL_INTERVAL_MS = 15000;
 export const INITIAL_HISTORY_RENDER_COUNT = 100;
@@ -207,7 +207,7 @@ const HISTORY_SCROLL_LOAD_THRESHOLD_PX = 160;
 const ANIMATION_SHEET_GRID: GridSettings = { columns: ANIMATION_FRAME_COUNT, rows: ANIMATION_DIRECTION_COUNT, gutter: 0 };
 export type AnimationDirectionId = "front" | "front three-quarter" | "side" | "back three-quarter" | "back";
 const ANIMATION_DIRECTIONS: AnimationDirectionId[] = ["front", "front three-quarter", "side", "back three-quarter", "back"];
-const DIRECTION_SPLIT_ANIMATION_SCHEMA = "image-cockpit.direction-split-animation.v1";
+const DIRECTION_SPLIT_ANIMATION_SCHEMA = "zai-cockpit.direction-split-animation.v1";
 const DIRECTION_SPLIT_ANIMATION_GRID: GridSettings = motionFrameGrid(ANIMATION_FRAME_COUNT);
 const DIRECTION_SPLIT_ANIMATION_FILE_SLUGS = ["front", "front-three-quarter", "side", "back-three-quarter", "back"];
 const DIRECTION_SPLIT_ANIMATION_RESULT_COUNT = ANIMATION_DIRECTION_COUNT;
@@ -376,8 +376,8 @@ type BaseLanguage = "ja" | "en";
 type LocalizedText = Record<BaseLanguage, string> & Partial<Record<Language, string>>;
 type AnimationGenerationMode = "standard" | "hatch-pet" | "directional-hatch-pet";
 type AnimationChromaKeyName = "green" | "magenta";
-type CodexJobQueueState = "queued" | "running" | "evaluating";
-type CodexJobProgressPhase = "queued" | "starting" | "generating" | "checking" | "extended";
+type ZaiJobQueueState = "queued" | "running" | "evaluating";
+type ZaiJobProgressPhase = "queued" | "starting" | "generating" | "checking" | "extended";
 
 interface AnimationChromaKey {
   name: AnimationChromaKeyName;
@@ -463,8 +463,8 @@ interface EffectLayoutOption {
   rows(frameCount: number): number;
 }
 
-const CODEX_PROGRESS_TICK_MS = 1000;
-const CODEX_PROGRESS_ESTIMATE_MS: Record<WorkflowMode | "default", number> = {
+const ZAI_PROGRESS_TICK_MS = 1000;
+const ZAI_PROGRESS_ESTIMATE_MS: Record<WorkflowMode | "default", number> = {
   "image-generate": 8 * 60 * 1000,
   "image-edit": 10 * 60 * 1000,
   "sprite-generate": 30 * 60 * 1000,
@@ -797,24 +797,24 @@ interface DirectionSplitSelection {
   qualityFailed: boolean;
   hasDirectionFiles: boolean;
   bronzeCandidate: boolean;
-  artifactStatus?: CodexArtifactStatus;
-  manifestResult?: CodexOutboxResult;
+  artifactStatus?: ZaiArtifactStatus;
+  manifestResult?: ZaiOutboxResult;
   directions: string[];
-  directionResults: CodexOutboxResult[];
+  directionResults: ZaiOutboxResult[];
   missingDirections: string[];
 }
 
 interface ReadyDirectionSplitArtifact {
   jobId: string;
-  manifestResult: CodexOutboxResult;
-  directionResults: CodexOutboxResult[];
-  jobResults: CodexOutboxResult[];
+  manifestResult: ZaiOutboxResult;
+  directionResults: ZaiOutboxResult[];
+  jobResults: ZaiOutboxResult[];
   selection: DirectionSplitSelection;
   modifiedAt: string;
 }
 
 type DirectionSplitImportContext = Pick<
-  CodexJobQueueItem,
+  ZaiJobQueueItem,
   "id" | "actionName" | "cell" | "chromaKey" | "sourceImageId" | "sourceImageName" | "directions" | "motionRecipe" | "framesPerDirection" | "generationProfile" | "sourceFingerprint"
 >;
 
@@ -859,7 +859,7 @@ interface EffectAnimationJobContext extends EffectAnimationMetadata {
   negativePrompt: string;
 }
 
-interface PendingCodexJob {
+interface PendingZaiJob {
   id: string;
   path: string;
   createdAt: string;
@@ -886,7 +886,7 @@ interface PendingCodexJob {
   effectContext?: EffectAnimationJobContext;
 }
 
-interface CodexJobDraft {
+interface ZaiJobDraft {
   workflowMode: WorkflowMode | null;
   prompt: string;
   negativePrompt: string;
@@ -931,14 +931,14 @@ interface CodexJobDraft {
   effectContext?: EffectAnimationJobContext;
 }
 
-interface CodexJobQueueItem {
+interface ZaiJobQueueItem {
   id: string;
-  state: CodexJobQueueState;
+  state: ZaiJobQueueState;
   label: string;
   createdAt: string;
   path?: string;
   outboxPath?: string;
-  request?: CodexJobDraft;
+  request?: ZaiJobDraft;
   queuedAt?: string;
   workflowMode?: WorkflowMode;
   actionName?: string;
@@ -964,7 +964,7 @@ interface ImportLatestOptions {
   background?: boolean;
   newerThan?: string;
   quietEmpty?: boolean;
-  job?: CodexJobQueueItem;
+  job?: ZaiJobQueueItem;
   throwOnError?: boolean;
   failOnIncompleteDirectionSplit?: boolean;
   limit?: number;
@@ -977,15 +977,15 @@ interface ImageEditComparison {
 }
 
 interface DirectionSplitTournamentCandidateEvaluation {
-  job: CodexJobQueueItem;
-  status: CodexRunnerStatus;
+  job: ZaiJobQueueItem;
+  status: ZaiRunnerStatus;
   ready: boolean;
   score: number;
   warningCount: number;
   manifest: DirectionSplitAnimationManifest | null;
-  manifestResult?: CodexOutboxResult;
-  directionResults: CodexOutboxResult[];
-  importedResults: CodexOutboxImportResponse[];
+  manifestResult?: ZaiOutboxResult;
+  directionResults: ZaiOutboxResult[];
+  importedResults: ZaiOutboxImportResponse[];
   animationQuality?: AnimationQualityReportV2;
   error?: string;
 }
@@ -1001,17 +1001,17 @@ class DirectionSplitQualityError extends Error {
 }
 
 interface AnimationTournamentStatusEntry {
-  job: CodexJobQueueItem;
-  status: CodexRunnerStatus | null;
+  job: ZaiJobQueueItem;
+  status: ZaiRunnerStatus | null;
 }
 
 interface AnimationTournamentTerminalStatusEntry {
-  job: CodexJobQueueItem;
-  status: CodexRunnerStatus;
+  job: ZaiJobQueueItem;
+  status: ZaiRunnerStatus;
 }
 
 interface AnimationTournamentManifestClient {
-  schema: "image-cockpit.animation-tournament.v1";
+  schema: "zai-cockpit.animation-tournament.v1";
   schemaVersion: 1;
   tournamentId: string;
   idempotencyKey: string;
@@ -1129,16 +1129,16 @@ interface AnimationTournamentWinnerDecision {
   scoreGap?: number;
 }
 
-interface CodexFailureNotice {
+interface ZaiFailureNotice {
   id: string;
   jobId: string;
   label: string;
   createdAt: string;
   workflowMode?: WorkflowMode;
-  retryJob?: CodexJobQueueItem;
+  retryJob?: ZaiJobQueueItem;
   lastOutboxFingerprint?: string;
   lastImportAttemptAt?: string;
-  diagnostic: CodexJobDiagnostic;
+  diagnostic: ZaiJobDiagnostic;
 }
 
 export type CockpitHealthState = "checking" | "ok" | "warning" | "broken" | "repairing";
@@ -1169,7 +1169,7 @@ interface EnvironmentReportInput {
   timezoneOffsetMinutes: number;
   localTime: string;
   apiHealth?: ImageCockpitApiHealth;
-  runner?: CodexRunnerPreflight | null;
+  runner?: ZaiRunnerPreflight | null;
   supervisor?: ImageCockpitDevSupervisorHealth;
   providerId: ProviderId;
   workflowMode: WorkflowMode;
@@ -1181,7 +1181,7 @@ interface EnvironmentReportInput {
   activeJobCount: number;
   queuedJobCount: number;
   lastJobId?: string;
-  lastFailure?: Pick<CodexFailureNotice, "jobId" | "label" | "diagnostic">;
+  lastFailure?: Pick<ZaiFailureNotice, "jobId" | "label" | "diagnostic">;
   lastResult?: Pick<HistoryItem, "provider" | "source" | "name" | "size" | "outboxImportKey"> & {
     mimeType?: string;
     dimensions?: string;
@@ -1196,10 +1196,10 @@ interface EnvironmentReport {
   markdown: string;
 }
 
-interface CodexJobLogItem {
+interface ZaiJobLogItem {
   jobId: string;
   label: string;
-  state: CodexJobQueueState | CodexRunnerStatus["state"];
+  state: ZaiJobQueueState | ZaiRunnerStatus["state"];
   createdAt: string;
   text: string;
   exists: boolean;
@@ -1271,7 +1271,7 @@ const baseUiCopy = {
     animationStandardSheetBody: "Generate 8 animation frames for each selected direction.",
     animationStandardLockedSize: "Fixed cells: 256 x 256 px.",
     animationHatchPet: "hatch-pet",
-    animationHatchPetBody: "Experimental Codex pet atlas: 8 x 9, 192 x 208 cells, pet.json-ready.",
+    animationHatchPetBody: "Experimental Zai pet atlas: 8 x 9, 192 x 208 cells, pet.json-ready.",
     animationDirectionalHatchPet: "5-Direction hatch-pet",
     animationDirectionalHatchPetBody: "Generate five separate hatch-pet atlases, one for each direction.",
     animationStepMotionTitle: "2. Choose Motion",
@@ -1283,14 +1283,14 @@ const baseUiCopy = {
     animationSingleDirection: "Single direction",
     animationSingleDirectionHint: "Choose one direction. Side remains the default.",
     animationStepGenerateTitle: "3. Generate",
-    animationStepGenerateBody: "Send the uploaded source to Codex and generate chroma-key direction frames.",
-    hatchPetGenerateBody: "Send the uploaded source to Codex and try the hatch-pet workflow for a Codex pet atlas.",
+    animationStepGenerateBody: "Send the uploaded source to Zai and generate chroma-key direction frames.",
+    hatchPetGenerateBody: "Send the uploaded source to Zai and try the hatch-pet workflow for a Zai pet atlas.",
     hatchPetLockedSize: "hatch-pet locks the atlas to 1536 x 1872 with 192 x 208 cells.",
-    directionalHatchPetGenerateBody: "Send the uploaded source to Codex and generate five direction-specific hatch-pet atlases.",
+    directionalHatchPetGenerateBody: "Send the uploaded source to Zai and generate five direction-specific hatch-pet atlases.",
     directionalHatchPetLockedSize: "Creates 5 files, each 1536 x 1872 with 192 x 208 cells, then combines them for preview/export.",
     animationStepDownloadTitle: "4. Download",
     animationStepDownloadBody: "Preview and export the transparent animated GIF, animated WebP, and sprite sheet.",
-    hatchPetDownloadBody: "Export each Codex pet state as animated GIF/WebP, or download the full pet atlas.",
+    hatchPetDownloadBody: "Export each Zai pet state as animated GIF/WebP, or download the full pet atlas.",
     directionalHatchPetDownloadBody: "Preview one animated state per direction, or download the combined 5-direction hatch-pet atlas.",
     uploadPixelArt: "Upload Pixel Art",
     selectedSource: "Selected source",
@@ -1376,9 +1376,9 @@ const baseUiCopy = {
     imageEditRegionAdded: "Edit region added",
     editImage: "Edit Image",
     statusUsesImport: "uses Import or drag and drop",
-    statusCodexJobWritten: "Codex job written",
-    statusCodexJobError: "Could not create Codex handoff job",
-    statusInboxEmpty: "No image files found in the Codex outbox",
+    statusZaiJobWritten: "Zai job written",
+    statusZaiJobError: "Could not create Zai handoff job",
+    statusInboxEmpty: "No image files found in the Zai outbox",
     statusInboxImported: "Imported from Local Inbox",
     statusInboxError: "Could not import from Local Inbox",
     statusLocalGenerated: "Generated locally",
@@ -1386,60 +1386,60 @@ const baseUiCopy = {
     statusAnimationSourceRequired: "Upload or select a pixel-art source before generating animation",
     statusAnimationGenerated: "Animation generated",
     statusAnimationFinalNotEditable: "Animation outputs are final artifacts. Select a generated or edited image to edit.",
-    statusCodexJobPending: "Waiting for Codex to return an image",
-    statusCodexRunnerUnavailable: "Codex runner unavailable. Return an outbox image, then use Import Latest",
-    statusCodexRunnerFailed: "Codex runner stopped before returning an image",
-    statusCodexRunnerCompletedNoImage: "Codex runner completed, but no returned image was found",
+    statusZaiJobPending: "Waiting for Zai to return an image",
+    statusZaiRunnerUnavailable: "Zai runner unavailable. Return an outbox image, then use Import Latest",
+    statusZaiRunnerFailed: "Zai runner stopped before returning an image",
+    statusZaiRunnerCompletedNoImage: "Zai runner completed, but no returned image was found",
     jobNotifications: "Notify when done",
-    jobNotificationDone: "Codex job complete",
-    jobNotificationFailed: "Codex job needs attention",
-    codexFailureTitle: "Generation failed",
-    codexFailurePolicyMessage: "The image could not be generated. It may have been blocked by safety or usage-policy checks.",
-    codexFailurePolicySuggestion: "Revise the prompt to remove sensitive, explicit, or disallowed details, then try again.",
-    codexFailureImagegenUnavailableTitle: "Image generation unavailable",
-    codexFailureImagegenUnavailableMessage: "Image generation is not available in this Codex environment.",
-    codexFailureImagegenUnavailableSuggestion: "Use manual handoff or another provider, then return an image to the outbox.",
-    codexFailureUsageLimitTitle: "Codex usage limit reached",
-    codexFailureUsageLimitMessage: "Codex could not run this generation because the configured account hit its usage limit.",
-    codexFailureUsageLimitSuggestion: "Wait for the usage window to reset, upgrade the account, or switch to a runner/provider with available capacity.",
-    codexFailureRunnerFailedTitle: "Codex runner failed",
-    codexFailureRunnerFailedMessage: "Codex runner failed before returning an image.",
-    codexFailureRunnerFailedSuggestion: "Check the runner setup or retry with a simpler prompt.",
-    codexFailureImportFailedTitle: "Outbox import failed",
-    codexFailureDirectionSplitImportFailedTitle: "Direction split import failed",
-    codexFailureImportFailedMessage: "The completed Codex job returned outbox files, but the app could not import them.",
-    codexFailureImportFailedReason: "Reason",
-    codexFailureImportFailedSuggestion: "Use Import Latest after freeing browser storage, or retry the job. The outbox files were not deleted.",
-    codexFailureNoImageTitle: "No image returned",
-    codexFailureNoImageMessage: "Codex runner completed, but no returned image was found.",
-    codexFailureNoImageSuggestion: "Retry the job, or place a returned image with the job id prefix in the outbox.",
-    codexFailureUnknownMessage: "The image could not be generated, and no specific reason was returned.",
-    codexFailureUnknownSuggestion: "Retry with a simpler prompt or use manual handoff.",
-    codexFailureRetryHint: "Retry suggestion",
-    codexFailureRetryImport: "Retry import",
-    codexLogTitle: "Codex Log",
-    codexLogLive: "stdout / stderr tail",
-    codexLogEmpty: "No Codex log yet",
-    codexLogWaiting: "Waiting for Codex log output...",
-    codexLogElapsed: "Elapsed",
-    codexLogUpdated: "Updated",
-    codexLogNoOutput: "No output yet. Codex may be preparing image generation.",
-    codexLogTruncated: "Showing latest log tail",
-    codexLogCollapse: "Collapse logs",
-    codexLogExpand: "Expand logs",
-    codexLogFullscreen: "Full screen logs",
-    codexLogExitFullscreen: "Exit full screen",
-    runnerChecking: "Codex runner: checking",
-    runnerReady: "Codex runner: ready",
-    runnerMock: "Codex runner: mock/test",
-    runnerDisabled: "Codex runner: manual handoff",
-    runnerUnavailable: "Codex runner: unavailable",
+    jobNotificationDone: "Zai job complete",
+    jobNotificationFailed: "Zai job needs attention",
+    zaiFailureTitle: "Generation failed",
+    zaiFailurePolicyMessage: "The image could not be generated. It may have been blocked by safety or usage-policy checks.",
+    zaiFailurePolicySuggestion: "Revise the prompt to remove sensitive, explicit, or disallowed details, then try again.",
+    zaiFailureImagegenUnavailableTitle: "Image generation unavailable",
+    zaiFailureImagegenUnavailableMessage: "Image generation is not available in this Zai environment.",
+    zaiFailureImagegenUnavailableSuggestion: "Use manual handoff or another provider, then return an image to the outbox.",
+    zaiFailureUsageLimitTitle: "Zai usage limit reached",
+    zaiFailureUsageLimitMessage: "Zai could not run this generation because the configured account hit its usage limit.",
+    zaiFailureUsageLimitSuggestion: "Wait for the usage window to reset, upgrade the account, or switch to a runner/provider with available capacity.",
+    zaiFailureRunnerFailedTitle: "Zai runner failed",
+    zaiFailureRunnerFailedMessage: "Zai runner failed before returning an image.",
+    zaiFailureRunnerFailedSuggestion: "Check the runner setup or retry with a simpler prompt.",
+    zaiFailureImportFailedTitle: "Outbox import failed",
+    zaiFailureDirectionSplitImportFailedTitle: "Direction split import failed",
+    zaiFailureImportFailedMessage: "The completed Zai job returned outbox files, but the app could not import them.",
+    zaiFailureImportFailedReason: "Reason",
+    zaiFailureImportFailedSuggestion: "Use Import Latest after freeing browser storage, or retry the job. The outbox files were not deleted.",
+    zaiFailureNoImageTitle: "No image returned",
+    zaiFailureNoImageMessage: "Zai runner completed, but no returned image was found.",
+    zaiFailureNoImageSuggestion: "Retry the job, or place a returned image with the job id prefix in the outbox.",
+    zaiFailureUnknownMessage: "The image could not be generated, and no specific reason was returned.",
+    zaiFailureUnknownSuggestion: "Retry with a simpler prompt or use manual handoff.",
+    zaiFailureRetryHint: "Retry suggestion",
+    zaiFailureRetryImport: "Retry import",
+    zaiLogTitle: "Zai Log",
+    zaiLogLive: "stdout / stderr tail",
+    zaiLogEmpty: "No Zai log yet",
+    zaiLogWaiting: "Waiting for Zai log output...",
+    zaiLogElapsed: "Elapsed",
+    zaiLogUpdated: "Updated",
+    zaiLogNoOutput: "No output yet. Zai may be preparing image generation.",
+    zaiLogTruncated: "Showing latest log tail",
+    zaiLogCollapse: "Collapse logs",
+    zaiLogExpand: "Expand logs",
+    zaiLogFullscreen: "Full screen logs",
+    zaiLogExitFullscreen: "Exit full screen",
+    runnerChecking: "Zai runner: checking",
+    runnerReady: "Zai runner: ready",
+    runnerMock: "Zai runner: mock/test",
+    runnerDisabled: "Zai runner: manual handoff",
+    runnerUnavailable: "Zai runner: unavailable",
     statusSelectedAsFrame: "Selected image added as a sprite frame",
     statusChromaApplied: "Chroma key applied to selected frame",
-    createCodexJob: "Create Codex Job",
+    createZaiJob: "Create Zai Job",
     generateLocalImage: "Generate Pixel Art",
     generateLocalSprite: "Generate Animation",
-    waitingForCodexResult: "Waiting for Codex Result",
+    waitingForZaiResult: "Waiting for Zai Result",
     importLatest: "Import Latest",
     importFile: "Import File",
     currentWorkflow: "Current workflow",
@@ -1451,7 +1451,7 @@ const baseUiCopy = {
     addFrame: "Add Frame",
     annotatedPng: "Annotated PNG",
     jobNotes: "Edit Notes",
-    jobNotesPlaceholder: "What should Codex preserve, fix, crop, split, or export?"
+    jobNotesPlaceholder: "What should Zai preserve, fix, crop, split, or export?"
   },
   ja: {
     language: "言語",
@@ -1513,7 +1513,7 @@ const baseUiCopy = {
     animationStandardSheetBody: "選択した各方向に8フレームのゲーム用アニメーションを生成します。",
     animationStandardLockedSize: "1セルは256 x 256 px固定です。",
     animationHatchPet: "hatch-pet",
-    animationHatchPetBody: "実験版のCodex pet atlas。8 x 9、192 x 208セル、pet.json対応です。",
+    animationHatchPetBody: "実験版のZai pet atlas。8 x 9、192 x 208セル、pet.json対応です。",
     animationDirectionalHatchPet: "5方向hatch-pet",
     animationDirectionalHatchPetBody: "5方向それぞれにhatch-pet atlasを生成します。",
     animationStepMotionTitle: "2. 動きを選ぶ",
@@ -1526,13 +1526,13 @@ const baseUiCopy = {
     animationSingleDirectionHint: "1方向だけ生成します。初期値は横です。",
     animationStepGenerateTitle: "3. 生成する",
     animationStepGenerateBody: "アップロード画像からanimation sheetとtimeline framesを生成します。",
-    hatchPetGenerateBody: "アップロード画像をCodexに渡し、hatch-pet工程でCodex pet atlasを試作します。",
+    hatchPetGenerateBody: "アップロード画像をZaiに渡し、hatch-pet工程でZai pet atlasを試作します。",
     hatchPetLockedSize: "hatch-petは1536 x 1872、192 x 208セルに固定します。",
-    directionalHatchPetGenerateBody: "アップロード画像をCodexに渡し、方向別のhatch-pet atlasを5枚生成します。",
+    directionalHatchPetGenerateBody: "アップロード画像をZaiに渡し、方向別のhatch-pet atlasを5枚生成します。",
     directionalHatchPetLockedSize: "1536 x 1872、192 x 208セルのatlasを5枚作り、preview/export用に結合します。",
     animationStepDownloadTitle: "4. ダウンロード",
     animationStepDownloadBody: "生成結果をanimated GIF、animated WebP、sprite sheetで書き出します。",
-    hatchPetDownloadBody: "Codex petの各状態をアニメGIF/WebPで書き出し、全体atlasもダウンロードできます。",
+    hatchPetDownloadBody: "Zai petの各状態をアニメGIF/WebPで書き出し、全体atlasもダウンロードできます。",
     directionalHatchPetDownloadBody: "方向ごとに代表stateをアニメGIF/WebPで確認し、結合済み5方向hatch-pet atlasもダウンロードできます。",
     uploadPixelArt: "ピクセルアートをアップロード",
     selectedSource: "選択中の元画像",
@@ -1618,9 +1618,9 @@ const baseUiCopy = {
     imageEditRegionAdded: "編集範囲を追加しました",
     editImage: "画像編集",
     statusUsesImport: "はImportまたはドラッグ&ドロップを使います",
-    statusCodexJobWritten: "Codexジョブを書き込みました",
-    statusCodexJobError: "Codex handoffジョブを作成できませんでした",
-    statusInboxEmpty: "Codex outboxに画像ファイルが見つかりません",
+    statusZaiJobWritten: "Zaiジョブを書き込みました",
+    statusZaiJobError: "Zai handoffジョブを作成できませんでした",
+    statusInboxEmpty: "Zai outboxに画像ファイルが見つかりません",
     statusInboxImported: "Local Inboxから取り込みました",
     statusInboxError: "Local Inboxから取り込めませんでした",
     statusLocalGenerated: "ローカル生成しました",
@@ -1628,60 +1628,60 @@ const baseUiCopy = {
     statusAnimationSourceRequired: "アニメーション生成の前にピクセルアートをアップロードするか、生成結果を選択してください",
     statusAnimationGenerated: "アニメーションを生成しました",
     statusAnimationFinalNotEditable: "アニメーション結果は最終成果物です。編集する場合は生成画像または編集後画像を選択してください",
-    statusCodexJobPending: "Codexから画像が戻るのを待っています",
-    statusCodexRunnerUnavailable: "Codex runner起動不可。outboxへ画像を戻したらImport Latestを押してください",
-    statusCodexRunnerFailed: "Codex runnerが画像を返す前に停止しました",
-    statusCodexRunnerCompletedNoImage: "Codex runnerは完了しましたが、戻り画像が見つかりません",
+    statusZaiJobPending: "Zaiから画像が戻るのを待っています",
+    statusZaiRunnerUnavailable: "Zai runner起動不可。outboxへ画像を戻したらImport Latestを押してください",
+    statusZaiRunnerFailed: "Zai runnerが画像を返す前に停止しました",
+    statusZaiRunnerCompletedNoImage: "Zai runnerは完了しましたが、戻り画像が見つかりません",
     jobNotifications: "完了を通知",
-    jobNotificationDone: "Codexジョブ完了",
-    jobNotificationFailed: "Codexジョブ要確認",
-    codexFailureTitle: "生成できませんでした",
-    codexFailurePolicyMessage: "安全または利用ポリシーの確認により、この画像は生成できなかった可能性があります。",
-    codexFailurePolicySuggestion: "センシティブ、露骨、または許可されない可能性のある表現を避けてpromptを調整し、再試行してください。",
-    codexFailureImagegenUnavailableTitle: "imagegenを利用できません",
-    codexFailureImagegenUnavailableMessage: "このCodex環境ではimagegenを利用できません。",
-    codexFailureImagegenUnavailableSuggestion: "手動handoffまたは別providerを使い、outboxへ画像を戻してください。",
-    codexFailureUsageLimitTitle: "Codex利用上限に達しました",
-    codexFailureUsageLimitMessage: "設定中のアカウントが利用上限に達しているため、Codexがこの生成を実行できませんでした。",
-    codexFailureUsageLimitSuggestion: "利用枠のリセットを待つか、アカウントをアップグレードするか、利用可能な別runner/providerへ切り替えてください。",
-    codexFailureRunnerFailedTitle: "Codex runnerが失敗しました",
-    codexFailureRunnerFailedMessage: "Codex runnerが画像を返す前に失敗しました。",
-    codexFailureRunnerFailedSuggestion: "runner設定を確認するか、promptを簡単にして再試行してください。",
-    codexFailureImportFailedTitle: "outbox取り込みに失敗しました",
-    codexFailureDirectionSplitImportFailedTitle: "Direction split import failed",
-    codexFailureImportFailedMessage: "完了したCodex jobのoutboxファイルはありますが、アプリで取り込めませんでした。",
-    codexFailureImportFailedReason: "理由",
-    codexFailureImportFailedSuggestion: "ブラウザ保存容量を空けてImport Latestを押すか、jobを再試行してください。outboxファイルは削除していません。",
-    codexFailureNoImageTitle: "戻り画像が見つかりません",
-    codexFailureNoImageMessage: "Codex runnerは完了しましたが、戻り画像が見つかりませんでした。",
-    codexFailureNoImageSuggestion: "ジョブを再試行するか、job id prefix付きの画像をoutboxへ置いてください。",
-    codexFailureUnknownMessage: "画像を生成できませんでしたが、具体的な理由は返されませんでした。",
-    codexFailureUnknownSuggestion: "promptを簡単にして再試行するか、手動handoffを使ってください。",
-    codexFailureRetryHint: "再試行ヒント",
-    codexFailureRetryImport: "再取り込み",
-    codexLogTitle: "Codexログ",
-    codexLogLive: "stdout / stderr の末尾",
-    codexLogEmpty: "まだCodexログはありません",
-    codexLogWaiting: "Codexのログ出力を待っています...",
-    codexLogElapsed: "経過",
-    codexLogUpdated: "更新",
-    codexLogNoOutput: "まだ出力がありません。Codexが画像生成の準備中かもしれません。",
-    codexLogTruncated: "最新ログの末尾を表示中",
-    codexLogCollapse: "ログを閉じる",
-    codexLogExpand: "ログを開く",
-    codexLogFullscreen: "ログを全画面で見る",
-    codexLogExitFullscreen: "全画面を閉じる",
-    runnerChecking: "Codex runner: 確認中",
-    runnerReady: "Codex runner: 使用可能",
-    runnerMock: "Codex runner: mock/test",
-    runnerDisabled: "Codex runner: 手動受け渡し",
-    runnerUnavailable: "Codex runner: 起動不可",
+    jobNotificationDone: "Zaiジョブ完了",
+    jobNotificationFailed: "Zaiジョブ要確認",
+    zaiFailureTitle: "生成できませんでした",
+    zaiFailurePolicyMessage: "安全または利用ポリシーの確認により、この画像は生成できなかった可能性があります。",
+    zaiFailurePolicySuggestion: "センシティブ、露骨、または許可されない可能性のある表現を避けてpromptを調整し、再試行してください。",
+    zaiFailureImagegenUnavailableTitle: "imagegenを利用できません",
+    zaiFailureImagegenUnavailableMessage: "このZai環境ではimagegenを利用できません。",
+    zaiFailureImagegenUnavailableSuggestion: "手動handoffまたは別providerを使い、outboxへ画像を戻してください。",
+    zaiFailureUsageLimitTitle: "Zai利用上限に達しました",
+    zaiFailureUsageLimitMessage: "設定中のアカウントが利用上限に達しているため、Zaiがこの生成を実行できませんでした。",
+    zaiFailureUsageLimitSuggestion: "利用枠のリセットを待つか、アカウントをアップグレードするか、利用可能な別runner/providerへ切り替えてください。",
+    zaiFailureRunnerFailedTitle: "Zai runnerが失敗しました",
+    zaiFailureRunnerFailedMessage: "Zai runnerが画像を返す前に失敗しました。",
+    zaiFailureRunnerFailedSuggestion: "runner設定を確認するか、promptを簡単にして再試行してください。",
+    zaiFailureImportFailedTitle: "outbox取り込みに失敗しました",
+    zaiFailureDirectionSplitImportFailedTitle: "Direction split import failed",
+    zaiFailureImportFailedMessage: "完了したZai jobのoutboxファイルはありますが、アプリで取り込めませんでした。",
+    zaiFailureImportFailedReason: "理由",
+    zaiFailureImportFailedSuggestion: "ブラウザ保存容量を空けてImport Latestを押すか、jobを再試行してください。outboxファイルは削除していません。",
+    zaiFailureNoImageTitle: "戻り画像が見つかりません",
+    zaiFailureNoImageMessage: "Zai runnerは完了しましたが、戻り画像が見つかりませんでした。",
+    zaiFailureNoImageSuggestion: "ジョブを再試行するか、job id prefix付きの画像をoutboxへ置いてください。",
+    zaiFailureUnknownMessage: "画像を生成できませんでしたが、具体的な理由は返されませんでした。",
+    zaiFailureUnknownSuggestion: "promptを簡単にして再試行するか、手動handoffを使ってください。",
+    zaiFailureRetryHint: "再試行ヒント",
+    zaiFailureRetryImport: "再取り込み",
+    zaiLogTitle: "Zaiログ",
+    zaiLogLive: "stdout / stderr の末尾",
+    zaiLogEmpty: "まだZaiログはありません",
+    zaiLogWaiting: "Zaiのログ出力を待っています...",
+    zaiLogElapsed: "経過",
+    zaiLogUpdated: "更新",
+    zaiLogNoOutput: "まだ出力がありません。Zaiが画像生成の準備中かもしれません。",
+    zaiLogTruncated: "最新ログの末尾を表示中",
+    zaiLogCollapse: "ログを閉じる",
+    zaiLogExpand: "ログを開く",
+    zaiLogFullscreen: "ログを全画面で見る",
+    zaiLogExitFullscreen: "全画面を閉じる",
+    runnerChecking: "Zai runner: 確認中",
+    runnerReady: "Zai runner: 使用可能",
+    runnerMock: "Zai runner: mock/test",
+    runnerDisabled: "Zai runner: 手動受け渡し",
+    runnerUnavailable: "Zai runner: 起動不可",
     statusSelectedAsFrame: "選択画像をスプライトフレームに追加しました",
     statusChromaApplied: "選択フレームにクロマキーを適用しました",
-    createCodexJob: "Codexジョブ作成",
+    createZaiJob: "Zaiジョブ作成",
     generateLocalImage: "ピクセルアート生成",
     generateLocalSprite: "アニメーション生成",
-    waitingForCodexResult: "Codex結果待ち",
+    waitingForZaiResult: "Zai結果待ち",
     importLatest: "最新を取り込み",
     importFile: "ファイル取り込み",
     currentWorkflow: "現在のワークフロー",
@@ -1693,7 +1693,7 @@ const baseUiCopy = {
     addFrame: "フレーム追加",
     annotatedPng: "注釈PNG",
     jobNotes: "編集メモ",
-    jobNotesPlaceholder: "Codexに残してほしい点、直してほしい点、切り出し方、出力形式を書きます"
+    jobNotesPlaceholder: "Zaiに残してほしい点、直してほしい点、切り出し方、出力形式を書きます"
   }
 } satisfies Record<BaseLanguage, Record<string, string>>;
 
@@ -1769,11 +1769,11 @@ const uiCopy = {
     editImage: "编辑图像",
     statusAnimationSourceRequired: "生成动画前请上传或选择像素艺术来源",
     statusAnimationGenerated: "动画已生成",
-    codexFailureTitle: "生成失败",
-    createCodexJob: "创建 Codex 作业",
+    zaiFailureTitle: "生成失败",
+    createZaiJob: "创建 Zai 作业",
     generateLocalImage: "生成像素艺术",
     generateLocalSprite: "生成动画",
-    waitingForCodexResult: "等待 Codex 结果",
+    waitingForZaiResult: "等待 Zai 结果",
     importLatest: "导入最新结果",
     importFile: "导入文件",
     currentWorkflow: "当前工作流",
@@ -1849,11 +1849,11 @@ const uiCopy = {
     editImage: "編輯圖像",
     statusAnimationSourceRequired: "生成動畫前請上傳或選擇像素藝術來源",
     statusAnimationGenerated: "動畫已生成",
-    codexFailureTitle: "生成失敗",
-    createCodexJob: "建立 Codex 作業",
+    zaiFailureTitle: "生成失敗",
+    createZaiJob: "建立 Zai 作業",
     generateLocalImage: "生成像素藝術",
     generateLocalSprite: "生成動畫",
-    waitingForCodexResult: "等待 Codex 結果",
+    waitingForZaiResult: "等待 Zai 結果",
     importLatest: "匯入最新結果",
     importFile: "匯入檔案",
     currentWorkflow: "目前工作流程",
@@ -1919,11 +1919,11 @@ const uiCopy = {
     editImage: "이미지 편집",
     statusAnimationSourceRequired: "애니메이션 생성 전에 픽셀 아트 원본을 업로드하거나 선택하세요",
     statusAnimationGenerated: "애니메이션 생성 완료",
-    codexFailureTitle: "생성 실패",
-    createCodexJob: "Codex 작업 만들기",
+    zaiFailureTitle: "생성 실패",
+    createZaiJob: "Zai 작업 만들기",
     generateLocalImage: "픽셀 아트 생성",
     generateLocalSprite: "애니메이션 생성",
-    waitingForCodexResult: "Codex 결과 대기 중",
+    waitingForZaiResult: "Zai 결과 대기 중",
     importLatest: "최신 결과 가져오기",
     importFile: "파일 가져오기",
     currentWorkflow: "현재 워크플로",
@@ -1989,11 +1989,11 @@ const uiCopy = {
     editImage: "Редактировать изображение",
     statusAnimationSourceRequired: "Перед созданием анимации загрузите или выберите пиксель-арт",
     statusAnimationGenerated: "Анимация создана",
-    codexFailureTitle: "Не удалось создать",
-    createCodexJob: "Создать задание Codex",
+    zaiFailureTitle: "Не удалось создать",
+    createZaiJob: "Создать задание Zai",
     generateLocalImage: "Создать пиксель-арт",
     generateLocalSprite: "Создать анимацию",
-    waitingForCodexResult: "Ожидание результата Codex",
+    waitingForZaiResult: "Ожидание результата Zai",
     importLatest: "Импортировать последнее",
     importFile: "Импортировать файл",
     currentWorkflow: "Текущий процесс",
@@ -2042,8 +2042,8 @@ const uiCopy = {
     uploadImageForEdit: "Subir imagen",
     editImage: "Editar imagen",
     statusAnimationGenerated: "Animación generada",
-    codexFailureTitle: "Error al generar",
-    createCodexJob: "Crear trabajo Codex",
+    zaiFailureTitle: "Error al generar",
+    createZaiJob: "Crear trabajo Zai",
     generateLocalImage: "Generar pixel art",
     generateLocalSprite: "Generar animación",
     importLatest: "Importar último resultado",
@@ -2092,8 +2092,8 @@ const uiCopy = {
     uploadImageForEdit: "Enviar imagem",
     editImage: "Editar imagem",
     statusAnimationGenerated: "Animação gerada",
-    codexFailureTitle: "Falha na geração",
-    createCodexJob: "Criar job Codex",
+    zaiFailureTitle: "Falha na geração",
+    createZaiJob: "Criar job Zai",
     generateLocalImage: "Gerar pixel art",
     generateLocalSprite: "Gerar animação",
     importLatest: "Importar resultado mais recente",
@@ -2142,8 +2142,8 @@ const uiCopy = {
     uploadImageForEdit: "Bild hochladen",
     editImage: "Bild bearbeiten",
     statusAnimationGenerated: "Animation erstellt",
-    codexFailureTitle: "Erstellung fehlgeschlagen",
-    createCodexJob: "Codex-Job erstellen",
+    zaiFailureTitle: "Erstellung fehlgeschlagen",
+    createZaiJob: "Zai-Job erstellen",
     generateLocalImage: "Pixel-Art erstellen",
     generateLocalSprite: "Animation erstellen",
     importLatest: "Neuestes Ergebnis importieren",
@@ -2192,8 +2192,8 @@ const uiCopy = {
     uploadImageForEdit: "Importer une image",
     editImage: "Modifier l'image",
     statusAnimationGenerated: "Animation générée",
-    codexFailureTitle: "Échec de la génération",
-    createCodexJob: "Créer une tâche Codex",
+    zaiFailureTitle: "Échec de la génération",
+    createZaiJob: "Créer une tâche Zai",
     generateLocalImage: "Générer du pixel art",
     generateLocalSprite: "Générer l'animation",
     importLatest: "Importer le dernier résultat",
@@ -2242,8 +2242,8 @@ const uiCopy = {
     uploadImageForEdit: "Unggah gambar",
     editImage: "Edit gambar",
     statusAnimationGenerated: "Animasi dibuat",
-    codexFailureTitle: "Pembuatan gagal",
-    createCodexJob: "Buat job Codex",
+    zaiFailureTitle: "Pembuatan gagal",
+    createZaiJob: "Buat job Zai",
     generateLocalImage: "Buat pixel art",
     generateLocalSprite: "Buat animasi",
     importLatest: "Impor hasil terbaru",
@@ -2292,8 +2292,8 @@ const uiCopy = {
     uploadImageForEdit: "Görsel yükle",
     editImage: "Görsel düzenle",
     statusAnimationGenerated: "Animasyon üretildi",
-    codexFailureTitle: "Oluşturma başarısız",
-    createCodexJob: "Codex işi oluştur",
+    zaiFailureTitle: "Oluşturma başarısız",
+    createZaiJob: "Zai işi oluştur",
     generateLocalImage: "Piksel sanat üret",
     generateLocalSprite: "Animasyon üret",
     importLatest: "En son sonucu içe aktar",
@@ -2342,8 +2342,8 @@ const uiCopy = {
     uploadImageForEdit: "Tải ảnh lên",
     editImage: "Chỉnh sửa ảnh",
     statusAnimationGenerated: "Đã tạo hoạt ảnh",
-    codexFailureTitle: "Tạo thất bại",
-    createCodexJob: "Tạo job Codex",
+    zaiFailureTitle: "Tạo thất bại",
+    createZaiJob: "Tạo job Zai",
     generateLocalImage: "Tạo pixel art",
     generateLocalSprite: "Tạo hoạt ảnh",
     importLatest: "Nhập kết quả mới nhất",
@@ -2392,8 +2392,8 @@ const uiCopy = {
     uploadImageForEdit: "Prześlij obraz",
     editImage: "Edytuj obraz",
     statusAnimationGenerated: "Animacja wygenerowana",
-    codexFailureTitle: "Generowanie nie powiodło się",
-    createCodexJob: "Utwórz zadanie Codex",
+    zaiFailureTitle: "Generowanie nie powiodło się",
+    createZaiJob: "Utwórz zadanie Zai",
     generateLocalImage: "Generuj pixel art",
     generateLocalSprite: "Generuj animację",
     importLatest: "Importuj najnowszy wynik",
@@ -2442,8 +2442,8 @@ const uiCopy = {
     uploadImageForEdit: "Carica immagine",
     editImage: "Modifica immagine",
     statusAnimationGenerated: "Animazione generata",
-    codexFailureTitle: "Generazione non riuscita",
-    createCodexJob: "Crea job Codex",
+    zaiFailureTitle: "Generazione non riuscita",
+    createZaiJob: "Crea job Zai",
     generateLocalImage: "Genera pixel art",
     generateLocalSprite: "Genera animazione",
     importLatest: "Importa risultato più recente",
@@ -2467,23 +2467,23 @@ const baseWorkflowCopy = {
   en: {
     "image-generate": {
       label: "Pixel Art Generation",
-      detail: "Send the prompt to local Codex imagegen and return the generated image to the cockpit.",
-      status: "Generate pixel art through the local Codex imagegen handoff"
+      detail: "Send the prompt to local Zai imagegen and return the generated image to the cockpit.",
+      status: "Generate pixel art through the local Zai imagegen handoff"
     },
     "image-edit": {
       label: "Image Editing",
-      detail: "Select numbered rectangles on an image, comment on each region, then ask Codex to edit it.",
-      status: "Select numbered edit regions, add comments, then create a Codex handoff job"
+      detail: "Select numbered rectangles on an image, comment on each region, then ask Zai to edit it.",
+      status: "Select numbered edit regions, add comments, then create a Zai handoff job"
     },
     "sprite-generate": {
       label: "Animation Generation",
-      detail: "Upload or select pixel art, then ask Codex for direction-split animation frames.",
+      detail: "Upload or select pixel art, then ask Zai for direction-split animation frames.",
       status: "Upload or select pixel art, then generate animation frames"
     },
     "effect-animation": {
       label: "Effect Animation",
       detail: "Generate transparent VFX sheets for slashes, sparks, casts, projectiles, and impacts.",
-      status: "Set effect type, frames, layout, and QC rules before creating a Codex handoff job"
+      status: "Set effect type, frames, layout, and QC rules before creating a Zai handoff job"
     },
     "sprite-edit": {
       label: "4. Sprite Sheet Editing",
@@ -2494,13 +2494,13 @@ const baseWorkflowCopy = {
   ja: {
     "image-generate": {
       label: "ピクセルアートの生成",
-      detail: "プロンプトをローカルCodex imagegenへ渡し、生成画像をcockpitへ戻します。",
-      status: "ローカルCodex imagegen受け渡しでピクセルアートを生成します"
+      detail: "プロンプトをローカルZai imagegenへ渡し、生成画像をcockpitへ戻します。",
+      status: "ローカルZai imagegen受け渡しでピクセルアートを生成します"
     },
     "image-edit": {
       label: "画像編集",
-      detail: "画像を矩形選択して番号を付け、番号ごとのコメントをCodexへ渡します。",
-      status: "番号付き編集範囲とコメントを作ってから、Codex受け渡しジョブを作成します"
+      detail: "画像を矩形選択して番号を付け、番号ごとのコメントをZaiへ渡します。",
+      status: "番号付き編集範囲とコメントを作ってから、Zai受け渡しジョブを作成します"
     },
     "sprite-generate": {
       label: "アニメーションの生成",
@@ -2510,7 +2510,7 @@ const baseWorkflowCopy = {
     "effect-animation": {
       label: "エフェクトアニメーション",
       detail: "斬撃、火花、詠唱、飛び道具、着弾の透過VFXシートを生成します。",
-      status: "effect type、frames、layout、QC条件を決めてCodex受け渡しジョブを作成します"
+      status: "effect type、frames、layout、QC条件を決めてZai受け渡しジョブを作成します"
     },
     "sprite-edit": {
       label: "4. スプライトシート編集",
@@ -2523,81 +2523,81 @@ const baseWorkflowCopy = {
 const workflowCopy = {
   ...baseWorkflowCopy,
   "zh-CN": withWorkflowCopy({
-    "image-generate": { label: "像素艺术生成", detail: "将提示词发送到本地 Codex imagegen，并把生成图像带回 cockpit。", status: "通过本地 Codex imagegen 生成像素艺术" },
-    "image-edit": { label: "图像编辑", detail: "在图像上选择编号矩形、添加评论，然后请求 Codex 编辑。", status: "选择编号编辑区域并创建 Codex 交接作业" },
-    "sprite-generate": { label: "动画生成", detail: "上传或选择像素艺术，然后让 Codex 生成按方向拆分的动画帧。", status: "上传或选择像素艺术，然后生成动画帧" },
+    "image-generate": { label: "像素艺术生成", detail: "将提示词发送到本地 Zai imagegen，并把生成图像带回 cockpit。", status: "通过本地 Zai imagegen 生成像素艺术" },
+    "image-edit": { label: "图像编辑", detail: "在图像上选择编号矩形、添加评论，然后请求 Zai 编辑。", status: "选择编号编辑区域并创建 Zai 交接作业" },
+    "sprite-generate": { label: "动画生成", detail: "上传或选择像素艺术，然后让 Zai 生成按方向拆分的动画帧。", status: "上传或选择像素艺术，然后生成动画帧" },
     "sprite-edit": { label: "4. 精灵表编辑" }
   }),
   "zh-TW": withWorkflowCopy({
-    "image-generate": { label: "像素藝術生成", detail: "將提示詞送到本地 Codex imagegen，並把生成圖像帶回 cockpit。", status: "透過本地 Codex imagegen 生成像素藝術" },
-    "image-edit": { label: "圖像編輯", detail: "在圖像上選擇編號矩形、加入註解，然後請 Codex 編輯。", status: "選擇編號編輯區域並建立 Codex 交接作業" },
-    "sprite-generate": { label: "動畫生成", detail: "上傳或選擇像素藝術，然後讓 Codex 生成依方向拆分的動畫影格。", status: "上傳或選擇像素藝術，然後生成動畫影格" },
+    "image-generate": { label: "像素藝術生成", detail: "將提示詞送到本地 Zai imagegen，並把生成圖像帶回 cockpit。", status: "透過本地 Zai imagegen 生成像素藝術" },
+    "image-edit": { label: "圖像編輯", detail: "在圖像上選擇編號矩形、加入註解，然後請 Zai 編輯。", status: "選擇編號編輯區域並建立 Zai 交接作業" },
+    "sprite-generate": { label: "動畫生成", detail: "上傳或選擇像素藝術，然後讓 Zai 生成依方向拆分的動畫影格。", status: "上傳或選擇像素藝術，然後生成動畫影格" },
     "sprite-edit": { label: "4. 精靈表編輯" }
   }),
   ko: withWorkflowCopy({
-    "image-generate": { label: "픽셀 아트 생성", detail: "프롬프트를 로컬 Codex imagegen에 보내고 생성 이미지를 cockpit으로 가져옵니다.", status: "로컬 Codex imagegen으로 픽셀 아트를 생성합니다" },
-    "image-edit": { label: "이미지 편집", detail: "이미지에 번호가 있는 사각형을 선택하고 영역별 코멘트를 Codex에 전달합니다.", status: "번호가 있는 편집 영역과 코멘트로 Codex 작업을 만듭니다" },
-    "sprite-generate": { label: "애니메이션 생성", detail: "픽셀 아트를 업로드하거나 선택한 뒤 Codex에 방향별 애니메이션 프레임을 요청합니다.", status: "픽셀 아트를 업로드하거나 선택한 뒤 애니메이션 프레임을 생성합니다" },
+    "image-generate": { label: "픽셀 아트 생성", detail: "프롬프트를 로컬 Zai imagegen에 보내고 생성 이미지를 cockpit으로 가져옵니다.", status: "로컬 Zai imagegen으로 픽셀 아트를 생성합니다" },
+    "image-edit": { label: "이미지 편집", detail: "이미지에 번호가 있는 사각형을 선택하고 영역별 코멘트를 Zai에 전달합니다.", status: "번호가 있는 편집 영역과 코멘트로 Zai 작업을 만듭니다" },
+    "sprite-generate": { label: "애니메이션 생성", detail: "픽셀 아트를 업로드하거나 선택한 뒤 Zai에 방향별 애니메이션 프레임을 요청합니다.", status: "픽셀 아트를 업로드하거나 선택한 뒤 애니메이션 프레임을 생성합니다" },
     "sprite-edit": { label: "4. 스프라이트 시트 편집" }
   }),
   ru: withWorkflowCopy({
-    "image-generate": { label: "Генерация пиксель-арта", detail: "Отправьте промпт в локальный Codex imagegen и верните созданное изображение в cockpit.", status: "Создание пиксель-арта через локальный Codex imagegen" },
-    "image-edit": { label: "Редактирование изображения", detail: "Выделите нумерованные прямоугольники, добавьте комментарии и попросите Codex отредактировать изображение.", status: "Создайте области правки и задание Codex" },
-    "sprite-generate": { label: "Генерация анимации", detail: "Загрузите или выберите пиксель-арт, затем попросите Codex создать кадры анимации по направлениям.", status: "Загрузите или выберите пиксель-арт, затем создайте кадры анимации" },
+    "image-generate": { label: "Генерация пиксель-арта", detail: "Отправьте промпт в локальный Zai imagegen и верните созданное изображение в cockpit.", status: "Создание пиксель-арта через локальный Zai imagegen" },
+    "image-edit": { label: "Редактирование изображения", detail: "Выделите нумерованные прямоугольники, добавьте комментарии и попросите Zai отредактировать изображение.", status: "Создайте области правки и задание Zai" },
+    "sprite-generate": { label: "Генерация анимации", detail: "Загрузите или выберите пиксель-арт, затем попросите Zai создать кадры анимации по направлениям.", status: "Загрузите или выберите пиксель-арт, затем создайте кадры анимации" },
     "sprite-edit": { label: "4. Редактирование спрайт-листа" }
   }),
   es: withWorkflowCopy({
-    "image-generate": { label: "Generación de pixel art", detail: "Envía el prompt a Codex imagegen local y devuelve la imagen generada al cockpit.", status: "Genera pixel art con el handoff local de Codex imagegen" },
-    "image-edit": { label: "Edición de imagen", detail: "Marca rectángulos numerados, comenta cada región y pide a Codex que edite la imagen.", status: "Crea regiones numeradas y un trabajo Codex" },
-    "sprite-generate": { label: "Generación de animación", detail: "Sube o selecciona pixel art y pide a Codex fotogramas separados por dirección.", status: "Sube o selecciona pixel art y genera fotogramas" },
+    "image-generate": { label: "Generación de pixel art", detail: "Envía el prompt a Zai imagegen local y devuelve la imagen generada al cockpit.", status: "Genera pixel art con el handoff local de Zai imagegen" },
+    "image-edit": { label: "Edición de imagen", detail: "Marca rectángulos numerados, comenta cada región y pide a Zai que edite la imagen.", status: "Crea regiones numeradas y un trabajo Zai" },
+    "sprite-generate": { label: "Generación de animación", detail: "Sube o selecciona pixel art y pide a Zai fotogramas separados por dirección.", status: "Sube o selecciona pixel art y genera fotogramas" },
     "sprite-edit": { label: "4. Edición de sprite sheet" }
   }),
   "pt-BR": withWorkflowCopy({
-    "image-generate": { label: "Geração de pixel art", detail: "Envie o prompt para o Codex imagegen local e retorne a imagem gerada ao cockpit.", status: "Gere pixel art pelo handoff local do Codex imagegen" },
-    "image-edit": { label: "Edição de imagem", detail: "Selecione retângulos numerados, comente cada região e peça a edição ao Codex.", status: "Crie regiões numeradas e um job Codex" },
-    "sprite-generate": { label: "Geração de animação", detail: "Envie ou selecione pixel art e peça ao Codex quadros separados por direção.", status: "Envie ou selecione pixel art e gere os quadros" },
+    "image-generate": { label: "Geração de pixel art", detail: "Envie o prompt para o Zai imagegen local e retorne a imagem gerada ao cockpit.", status: "Gere pixel art pelo handoff local do Zai imagegen" },
+    "image-edit": { label: "Edição de imagem", detail: "Selecione retângulos numerados, comente cada região e peça a edição ao Zai.", status: "Crie regiões numeradas e um job Zai" },
+    "sprite-generate": { label: "Geração de animação", detail: "Envie ou selecione pixel art e peça ao Zai quadros separados por direção.", status: "Envie ou selecione pixel art e gere os quadros" },
     "sprite-edit": { label: "4. Edição de sprite sheet" }
   }),
   de: withWorkflowCopy({
-    "image-generate": { label: "Pixel-Art-Erstellung", detail: "Sende den Prompt an lokales Codex imagegen und hole das Bild zurück ins Cockpit.", status: "Pixel-Art über lokales Codex imagegen erstellen" },
-    "image-edit": { label: "Bildbearbeitung", detail: "Markiere nummerierte Rechtecke, kommentiere sie und lasse Codex das Bild bearbeiten.", status: "Nummerierte Bereiche und einen Codex-Job erstellen" },
+    "image-generate": { label: "Pixel-Art-Erstellung", detail: "Sende den Prompt an lokales Zai imagegen und hole das Bild zurück ins Cockpit.", status: "Pixel-Art über lokales Zai imagegen erstellen" },
+    "image-edit": { label: "Bildbearbeitung", detail: "Markiere nummerierte Rechtecke, kommentiere sie und lasse Zai das Bild bearbeiten.", status: "Nummerierte Bereiche und einen Zai-Job erstellen" },
     "sprite-generate": { label: "Animation erstellen", detail: "Lade Pixel-Art hoch oder wähle sie aus und fordere richtungsgetrennte Animationsframes an.", status: "Pixel-Art auswählen und Animationsframes erstellen" },
     "sprite-edit": { label: "4. Sprite-Sheet bearbeiten" }
   }),
   fr: withWorkflowCopy({
-    "image-generate": { label: "Génération de pixel art", detail: "Envoyez le prompt à Codex imagegen local et ramenez l'image générée dans le cockpit.", status: "Générer du pixel art via le handoff Codex local" },
-    "image-edit": { label: "Édition d'image", detail: "Sélectionnez des rectangles numérotés, commentez chaque zone, puis demandez l'édition à Codex.", status: "Créer des zones numérotées et une tâche Codex" },
+    "image-generate": { label: "Génération de pixel art", detail: "Envoyez le prompt à Zai imagegen local et ramenez l'image générée dans le cockpit.", status: "Générer du pixel art via le handoff Zai local" },
+    "image-edit": { label: "Édition d'image", detail: "Sélectionnez des rectangles numérotés, commentez chaque zone, puis demandez l'édition à Zai.", status: "Créer des zones numérotées et une tâche Zai" },
     "sprite-generate": { label: "Génération d'animation", detail: "Importez ou sélectionnez du pixel art, puis demandez des images séparées par direction.", status: "Importer ou sélectionner du pixel art, puis générer les images" },
     "sprite-edit": { label: "4. Édition de sprite sheet" }
   }),
   id: withWorkflowCopy({
-    "image-generate": { label: "Pembuatan pixel art", detail: "Kirim prompt ke Codex imagegen lokal dan kembalikan gambar ke cockpit.", status: "Buat pixel art melalui handoff Codex imagegen lokal" },
-    "image-edit": { label: "Pengeditan gambar", detail: "Pilih kotak bernomor, beri komentar, lalu minta Codex mengedit gambar.", status: "Buat area edit bernomor dan job Codex" },
-    "sprite-generate": { label: "Pembuatan animasi", detail: "Unggah atau pilih pixel art, lalu minta frame animasi yang dipisah per arah dari Codex.", status: "Unggah atau pilih pixel art, lalu buat frame animasi" },
+    "image-generate": { label: "Pembuatan pixel art", detail: "Kirim prompt ke Zai imagegen lokal dan kembalikan gambar ke cockpit.", status: "Buat pixel art melalui handoff Zai imagegen lokal" },
+    "image-edit": { label: "Pengeditan gambar", detail: "Pilih kotak bernomor, beri komentar, lalu minta Zai mengedit gambar.", status: "Buat area edit bernomor dan job Zai" },
+    "sprite-generate": { label: "Pembuatan animasi", detail: "Unggah atau pilih pixel art, lalu minta frame animasi yang dipisah per arah dari Zai.", status: "Unggah atau pilih pixel art, lalu buat frame animasi" },
     "sprite-edit": { label: "4. Edit sprite sheet" }
   }),
   tr: withWorkflowCopy({
-    "image-generate": { label: "Piksel sanat üretimi", detail: "Promptu yerel Codex imagegen'e gönderip üretilen görseli cockpit'e döndürür.", status: "Yerel Codex imagegen ile piksel sanat üret" },
-    "image-edit": { label: "Görsel düzenleme", detail: "Görselde numaralı dikdörtgenler seçin, yorum ekleyin ve Codex'ten düzenleme isteyin.", status: "Numaralı düzenleme alanları ve Codex işi oluştur" },
-    "sprite-generate": { label: "Animasyon üretimi", detail: "Piksel sanatı yükleyin veya seçin, Codex'ten yönlere ayrılmış animasyon kareleri isteyin.", status: "Piksel sanat seçip animasyon kareleri üret" },
+    "image-generate": { label: "Piksel sanat üretimi", detail: "Promptu yerel Zai imagegen'e gönderip üretilen görseli cockpit'e döndürür.", status: "Yerel Zai imagegen ile piksel sanat üret" },
+    "image-edit": { label: "Görsel düzenleme", detail: "Görselde numaralı dikdörtgenler seçin, yorum ekleyin ve Zai'ten düzenleme isteyin.", status: "Numaralı düzenleme alanları ve Zai işi oluştur" },
+    "sprite-generate": { label: "Animasyon üretimi", detail: "Piksel sanatı yükleyin veya seçin, Zai'ten yönlere ayrılmış animasyon kareleri isteyin.", status: "Piksel sanat seçip animasyon kareleri üret" },
     "sprite-edit": { label: "4. Sprite sheet düzenleme" }
   }),
   vi: withWorkflowCopy({
-    "image-generate": { label: "Tạo pixel art", detail: "Gửi prompt tới Codex imagegen cục bộ và đưa ảnh đã tạo về cockpit.", status: "Tạo pixel art qua handoff Codex imagegen cục bộ" },
-    "image-edit": { label: "Chỉnh sửa hình ảnh", detail: "Chọn vùng chữ nhật có số, thêm nhận xét, rồi yêu cầu Codex chỉnh sửa.", status: "Tạo vùng chỉnh sửa có số và job Codex" },
-    "sprite-generate": { label: "Tạo hoạt ảnh", detail: "Tải lên hoặc chọn pixel art, rồi yêu cầu Codex tạo khung hoạt ảnh tách theo hướng.", status: "Tải lên hoặc chọn pixel art rồi tạo khung hoạt ảnh" },
+    "image-generate": { label: "Tạo pixel art", detail: "Gửi prompt tới Zai imagegen cục bộ và đưa ảnh đã tạo về cockpit.", status: "Tạo pixel art qua handoff Zai imagegen cục bộ" },
+    "image-edit": { label: "Chỉnh sửa hình ảnh", detail: "Chọn vùng chữ nhật có số, thêm nhận xét, rồi yêu cầu Zai chỉnh sửa.", status: "Tạo vùng chỉnh sửa có số và job Zai" },
+    "sprite-generate": { label: "Tạo hoạt ảnh", detail: "Tải lên hoặc chọn pixel art, rồi yêu cầu Zai tạo khung hoạt ảnh tách theo hướng.", status: "Tải lên hoặc chọn pixel art rồi tạo khung hoạt ảnh" },
     "sprite-edit": { label: "4. Chỉnh sửa sprite sheet" }
   }),
   pl: withWorkflowCopy({
-    "image-generate": { label: "Generowanie pixel art", detail: "Wyślij prompt do lokalnego Codex imagegen i zwróć obraz do cockpit.", status: "Generuj pixel art przez lokalny handoff Codex imagegen" },
-    "image-edit": { label: "Edycja obrazu", detail: "Zaznacz numerowane prostokąty, dodaj komentarze i poproś Codex o edycję.", status: "Utwórz numerowane obszary i zadanie Codex" },
-    "sprite-generate": { label: "Generowanie animacji", detail: "Prześlij lub wybierz pixel art, a potem poproś Codex o klatki rozdzielone według kierunku.", status: "Prześlij lub wybierz pixel art i generuj klatki" },
+    "image-generate": { label: "Generowanie pixel art", detail: "Wyślij prompt do lokalnego Zai imagegen i zwróć obraz do cockpit.", status: "Generuj pixel art przez lokalny handoff Zai imagegen" },
+    "image-edit": { label: "Edycja obrazu", detail: "Zaznacz numerowane prostokąty, dodaj komentarze i poproś Zai o edycję.", status: "Utwórz numerowane obszary i zadanie Zai" },
+    "sprite-generate": { label: "Generowanie animacji", detail: "Prześlij lub wybierz pixel art, a potem poproś Zai o klatki rozdzielone według kierunku.", status: "Prześlij lub wybierz pixel art i generuj klatki" },
     "sprite-edit": { label: "4. Edycja sprite sheet" }
   }),
   it: withWorkflowCopy({
-    "image-generate": { label: "Generazione pixel art", detail: "Invia il prompt a Codex imagegen locale e riporta l'immagine nel cockpit.", status: "Genera pixel art con handoff locale Codex imagegen" },
-    "image-edit": { label: "Modifica immagine", detail: "Seleziona rettangoli numerati, commenta ogni area e chiedi a Codex di modificare.", status: "Crea aree numerate e un job Codex" },
-    "sprite-generate": { label: "Generazione animazione", detail: "Carica o seleziona pixel art e chiedi a Codex frame separati per direzione.", status: "Carica o seleziona pixel art e genera frame" },
+    "image-generate": { label: "Generazione pixel art", detail: "Invia il prompt a Zai imagegen locale e riporta l'immagine nel cockpit.", status: "Genera pixel art con handoff locale Zai imagegen" },
+    "image-edit": { label: "Modifica immagine", detail: "Seleziona rettangoli numerati, commenta ogni area e chiedi a Zai di modificare.", status: "Crea aree numerate e un job Zai" },
+    "sprite-generate": { label: "Generazione animazione", detail: "Carica o seleziona pixel art e chiedi a Zai frame separati per direzione.", status: "Carica o seleziona pixel art e genera frame" },
     "sprite-edit": { label: "4. Modifica sprite sheet" }
   })
 } satisfies Record<Language, WorkflowCopy>;
@@ -2626,7 +2626,7 @@ const baseWorkflowFormCopy = {
       promptLabel: "Edit Prompt",
       negativeLabel: "Avoid",
       notesLabel: "Edit Notes",
-      notesPlaceholder: "What should Codex preserve, fix, crop, split, or export?"
+      notesPlaceholder: "What should Zai preserve, fix, crop, split, or export?"
     },
     "sprite-generate": {
       promptLabel: "Animation Prompt",
@@ -2658,7 +2658,7 @@ const baseWorkflowFormCopy = {
       promptLabel: "編集プロンプト",
       negativeLabel: "避けたい要素",
       notesLabel: "編集メモ",
-      notesPlaceholder: "Codexに残してほしい点、直してほしい点、切り出し方、出力形式を書きます"
+      notesPlaceholder: "Zaiに残してほしい点、直してほしい点、切り出し方、出力形式を書きます"
     },
     "sprite-generate": {
       promptLabel: "アニメーションプロンプト",
@@ -3044,8 +3044,8 @@ function effectQualityRankAllowsDownload(rank: EffectQualityRank | undefined) {
 const fallbackProviders: ProviderStatus[] = [
   { id: "local-file", label: "Local File", enabled: true, message: "Use images from this machine" },
   { id: "local-generator", label: "Local Generator", enabled: true, message: "Generate local PNG images" },
-  { id: "codex-handoff", label: "Codex Handoff", enabled: true, message: "Write local jobs for Codex to pick up" },
-  { id: "local-inbox", label: "Local Inbox", enabled: true, message: "Import results returned by Codex" }
+  { id: "zai-handoff", label: "Zai Handoff", enabled: true, message: "Write local jobs for Zai to pick up" },
+  { id: "local-inbox", label: "Local Inbox", enabled: true, message: "Import results returned by Zai" }
 ];
 
 const workflowOptions: Array<{
@@ -3054,19 +3054,19 @@ const workflowOptions: Array<{
 }> = [
   {
     id: "image-generate",
-    provider: "codex-handoff"
+    provider: "zai-handoff"
   },
   {
     id: "image-edit",
-    provider: "codex-handoff"
+    provider: "zai-handoff"
   },
   {
     id: "sprite-generate",
-    provider: "codex-handoff"
+    provider: "zai-handoff"
   },
   {
     id: "effect-animation",
-    provider: "codex-handoff"
+    provider: "zai-handoff"
   }
 ];
 
@@ -3083,7 +3083,7 @@ const MONSTER_PROMPT_SOURCE = "docs/prompt-examples/monster-prompts.md";
 const MONSTER_NOTES = `${MONSTER_PROMPT_SOURCE}: full-body animation-ready monster asset.`;
 const MONSTER_GIRL_CATEGORY = { en: "Monster Girl Chibi", ja: "モンスター娘ちび" };
 const MONSTER_GIRL_PROMPT_SOURCE = "docs/prompt-examples/monster-girl-prompts.md";
-const MONSTER_GIRL_NOTES = `${MONSTER_GIRL_PROMPT_SOURCE}: cute two-head-tall monster girl source character for Image Cockpit animation testing.`;
+const MONSTER_GIRL_NOTES = `${MONSTER_GIRL_PROMPT_SOURCE}: cute two-head-tall monster girl source character for Zai Cockpit animation testing.`;
 const ANIMAL_CATEGORY = { en: "Animals", ja: "動物" };
 const ANIMAL_PROMPT_SOURCE = "docs/prompt-examples/animal-prompts.md";
 const ANIMAL_NOTES = `${ANIMAL_PROMPT_SOURCE}: isolated full-body animal asset with a transparent background.`;
@@ -4167,11 +4167,11 @@ function hasDebugOutboxResultMarker(filterName: string) {
   return /(^|[-.])debug([-.]|$)/.test(filterName);
 }
 
-function isStaticImageResult(result: CodexOutboxResult) {
+function isStaticImageResult(result: ZaiOutboxResult) {
   return !shouldIgnoreOutboxResultName(result.name) && result.mimeType.startsWith("image/") && result.mimeType !== "image/gif";
 }
 
-function clientQualityGateForOutboxResult(result: Pick<CodexOutboxResult, "name" | "qualityGate">) {
+function clientQualityGateForOutboxResult(result: Pick<ZaiOutboxResult, "name" | "qualityGate">) {
   if (result.qualityGate) return result.qualityGate;
   const filterName = normalizeOutboxResultNameForFiltering(result.name);
   if (filterName.includes("bronze-candidate")) {
@@ -4194,14 +4194,14 @@ function clientQualityGateForOutboxResult(result: Pick<CodexOutboxResult, "name"
   };
 }
 
-export function isUsableOutboxResult(result: Pick<CodexOutboxResult, "name" | "qualityGate">) {
+export function isUsableOutboxResult(result: Pick<ZaiOutboxResult, "name" | "qualityGate">) {
   const gate = clientQualityGateForOutboxResult(result);
   return gate.classification === "usable-final" && gate.historyAllowed !== false && gate.downloadAllowed !== false;
 }
 
 export function directionSplitJobIdFromOutboxResultName(name: string) {
   const baseName = name.split(/[\\/]/).pop() ?? name;
-  if (!baseName.toLowerCase().startsWith("codex-job-")) return "";
+  if (!baseName.toLowerCase().startsWith("zai-job-")) return "";
   if (/-manifest\.json$/i.test(baseName)) return baseName.replace(/-manifest\.json$/i, "");
   const withoutExtension = baseName.replace(/\.[^.]+$/, "");
   const matchedSlug = DIRECTION_SPLIT_ANIMATION_FILE_SLUGS
@@ -4217,12 +4217,12 @@ export function isDirectionSplitComponentOutboxName(name: string) {
   return Boolean(directionSplitJobIdFromOutboxResultName(baseName));
 }
 
-export function isGenericStaticImageResult(result: CodexOutboxResult) {
+export function isGenericStaticImageResult(result: ZaiOutboxResult) {
   return isStaticImageResult(result) && !isDirectionSplitComponentOutboxName(result.name) && isUsableOutboxResult(result);
 }
 
 export function selectDirectionSplitAnimationResults(
-  results: CodexOutboxResult[],
+  results: ZaiOutboxResult[],
   jobId: string,
   manifest: DirectionSplitAnimationManifest | null = null,
   expectedDirections?: readonly string[]
@@ -4272,12 +4272,12 @@ export function selectDirectionSplitAnimationResults(
     artifactStatus,
     manifestResult,
     directions,
-    directionResults: byDirection.filter((result): result is CodexOutboxResult => Boolean(result)),
+    directionResults: byDirection.filter((result): result is ZaiOutboxResult => Boolean(result)),
     missingDirections
   };
 }
 
-function directionSplitDirectionsFromArtifactStatus(artifactStatus?: CodexArtifactStatus) {
+function directionSplitDirectionsFromArtifactStatus(artifactStatus?: ZaiArtifactStatus) {
   const directionIndexes = new Set(
     (artifactStatus?.files ?? [])
       .map((name) => directionSplitResultDirectionIndex(name, artifactStatus?.jobId ?? ""))
@@ -4286,7 +4286,7 @@ function directionSplitDirectionsFromArtifactStatus(artifactStatus?: CodexArtifa
   return ANIMATION_DIRECTIONS.filter((_, index) => directionIndexes.has(index));
 }
 
-export function findReadyDirectionSplitArtifacts(results: CodexOutboxResult[]): ReadyDirectionSplitArtifact[] {
+export function findReadyDirectionSplitArtifacts(results: ZaiOutboxResult[]): ReadyDirectionSplitArtifact[] {
   const manifests = results
     .filter((result) => !shouldIgnoreOutboxResultName(result.name))
     .filter((result) => /-manifest\.json$/i.test(result.name))
@@ -4320,11 +4320,11 @@ export function findReadyDirectionSplitArtifacts(results: CodexOutboxResult[]): 
   });
 }
 
-export function findLatestReadyDirectionSplitArtifact(results: CodexOutboxResult[]) {
+export function findLatestReadyDirectionSplitArtifact(results: ZaiOutboxResult[]) {
   return findReadyDirectionSplitArtifacts(results)[0];
 }
 
-function outboxResultModifiedTime(result: Pick<CodexOutboxResult, "modifiedAt">) {
+function outboxResultModifiedTime(result: Pick<ZaiOutboxResult, "modifiedAt">) {
   const value = Date.parse(result.modifiedAt);
   return Number.isFinite(value) ? value : 0;
 }
@@ -4368,15 +4368,15 @@ function directionSplitAnimationFileSet(jobIdPrefix: string, directions: readonl
   return directions.map((direction) => `${jobIdPrefix}-${animationDirectionSlug(direction)}.png`);
 }
 
-function isStandardDirectionSplitJob(job: Pick<CodexJobQueueItem, "workflowMode" | "spriteVariant">) {
+function isStandardDirectionSplitJob(job: Pick<ZaiJobQueueItem, "workflowMode" | "spriteVariant">) {
   return job.workflowMode === "sprite-generate" && (job.spriteVariant ?? "standard") === "standard";
 }
 
-function isStandardDirectionSplitDraft(draft: Pick<CodexJobDraft, "resultWorkflowMode" | "resultSpriteVariant">) {
+function isStandardDirectionSplitDraft(draft: Pick<ZaiJobDraft, "resultWorkflowMode" | "resultSpriteVariant">) {
   return draft.resultWorkflowMode === "sprite-generate" && (draft.resultSpriteVariant ?? "standard") === "standard";
 }
 
-function isAnimationTournamentJob(job: Pick<CodexJobQueueItem, "workflowMode" | "spriteVariant" | "tournamentId">) {
+function isAnimationTournamentJob(job: Pick<ZaiJobQueueItem, "workflowMode" | "spriteVariant" | "tournamentId">) {
   return Boolean(job.tournamentId) && isStandardDirectionSplitJob(job);
 }
 
@@ -4390,19 +4390,19 @@ function animationDirectionPresetLabel(id: AnimationDirectionPresetId, copy: UiC
   return copy.animationDirectionFive;
 }
 
-function activeCodexJobCount(jobs: CodexJobQueueItem[], startingQueuedJobIds: Set<string>) {
+function activeZaiJobCount(jobs: ZaiJobQueueItem[], startingQueuedJobIds: Set<string>) {
   return jobs.filter((job) => job.state === "running" || startingQueuedJobIds.has(job.id)).length;
 }
 
-function effectiveCodexRunnerCount(
-  jobs: CodexJobQueueItem[],
+function effectiveZaiRunnerCount(
+  jobs: ZaiJobQueueItem[],
   startingQueuedJobIds: Set<string>,
   serverActiveRunnerCount: number
 ) {
-  return Math.max(activeCodexJobCount(jobs, startingQueuedJobIds), serverActiveRunnerCount);
+  return Math.max(activeZaiJobCount(jobs, startingQueuedJobIds), serverActiveRunnerCount);
 }
 
-function activeStandardDirectionSplitJobCount(jobs: CodexJobQueueItem[], startingQueuedJobIds: Set<string>) {
+function activeStandardDirectionSplitJobCount(jobs: ZaiJobQueueItem[], startingQueuedJobIds: Set<string>) {
   return jobs.filter((job) => (job.state === "running" || startingQueuedJobIds.has(job.id)) && isStandardDirectionSplitJob(job)).length;
 }
 
@@ -4411,11 +4411,11 @@ function reservedAnimationInitialCandidateSlots(reservations: Map<string, number
 }
 
 function animationInitialAdmissionMessage(language: Language, occupiedSlots: number) {
-  const normalizedOccupiedSlots = Math.min(MAX_ACTIVE_CODEX_JOBS, Math.max(0, occupiedSlots));
+  const normalizedOccupiedSlots = Math.min(MAX_ACTIVE_ZAI_JOBS, Math.max(0, occupiedSlots));
   if (language === "ja") {
-    return `アニメーション生成には3枠すべての空きが必要です。現在 ${normalizedOccupiedSlots}/${MAX_ACTIVE_CODEX_JOBS} 枠を使用中です。実行中のジョブが完了してから開始してください。`;
+    return `アニメーション生成には3枠すべての空きが必要です。現在 ${normalizedOccupiedSlots}/${MAX_ACTIVE_ZAI_JOBS} 枠を使用中です。実行中のジョブが完了してから開始してください。`;
   }
-  return `Animation Generation requires all ${MAX_ACTIVE_CODEX_JOBS} runner slots to be free. ${normalizedOccupiedSlots}/${MAX_ACTIVE_CODEX_JOBS} slots are currently in use. Wait for the running jobs to finish.`;
+  return `Animation Generation requires all ${MAX_ACTIVE_ZAI_JOBS} runner slots to be free. ${normalizedOccupiedSlots}/${MAX_ACTIVE_ZAI_JOBS} slots are currently in use. Wait for the running jobs to finish.`;
 }
 
 async function animationTournamentApiError(response: Response, language: Language) {
@@ -4441,7 +4441,7 @@ async function animationTournamentApiError(response: Response, language: Languag
 export function summarizeCockpitHealthStatus(hasApiHealth: boolean, mismatches: readonly string[], unimportedResults: number) {
   const state: CockpitHealthState = !hasApiHealth ? "broken" : mismatches.length > 0 ? "warning" : "ok";
   const message = !hasApiHealth
-    ? "Cockpit connection issue: API route is not Image Cockpit."
+    ? "Cockpit connection issue: API route is not Zai Cockpit."
     : mismatches.length > 0
       ? mismatches[0] ?? "Cockpit warning."
       : unimportedResults > 0
@@ -4450,16 +4450,16 @@ export function summarizeCockpitHealthStatus(hasApiHealth: boolean, mismatches: 
   return { state, message };
 }
 
-function canStartCodexJobDraft(
-  draft: CodexJobDraft,
-  jobs: CodexJobQueueItem[],
+function canStartZaiJobDraft(
+  draft: ZaiJobDraft,
+  jobs: ZaiJobQueueItem[],
   startingQueuedJobIds: Set<string>,
   reservedTournamentStarts = 0,
   serverActiveRunnerCount = 0
 ) {
-  if (effectiveCodexRunnerCount(jobs, startingQueuedJobIds, serverActiveRunnerCount) + reservedTournamentStarts >= MAX_ACTIVE_CODEX_JOBS) return false;
+  if (effectiveZaiRunnerCount(jobs, startingQueuedJobIds, serverActiveRunnerCount) + reservedTournamentStarts >= MAX_ACTIVE_ZAI_JOBS) return false;
   if (!isStandardDirectionSplitDraft(draft)) return true;
-  return Math.max(activeStandardDirectionSplitJobCount(jobs, startingQueuedJobIds), serverActiveRunnerCount) + reservedTournamentStarts < MAX_ACTIVE_STANDARD_ANIMATION_CODEX_JOBS;
+  return Math.max(activeStandardDirectionSplitJobCount(jobs, startingQueuedJobIds), serverActiveRunnerCount) + reservedTournamentStarts < MAX_ACTIVE_STANDARD_ANIMATION_ZAI_JOBS;
 }
 
 function isSingleDirectionIntermediateSheet(width: number, height: number, cell: SpriteAction["cell"]) {
@@ -4488,7 +4488,7 @@ function normalizeDirectionSplitSourceCanvas(image: HTMLImageElement, expectedWi
   return canvas;
 }
 
-function parseDirectionSplitAnimationManifest(imported: CodexOutboxImportResponse) {
+function parseDirectionSplitAnimationManifest(imported: ZaiOutboxImportResponse) {
   const text = textFromDataUrl(imported.dataUrl);
   const parsed = JSON.parse(text) as DirectionSplitAnimationManifest;
   if (parsed.schema !== DIRECTION_SPLIT_ANIMATION_SCHEMA) {
@@ -4530,11 +4530,11 @@ function textFromDataUrl(dataUrl: string) {
   return decodeURIComponent(payload);
 }
 
-export function shouldReportCompletedCodexImportFailure(status: CodexRunnerStatus | undefined, imported: boolean) {
+export function shouldReportCompletedZaiImportFailure(status: ZaiRunnerStatus | undefined, imported: boolean) {
   return Boolean(status && status.state === "completed" && !status.diagnostic && !imported);
 }
 
-export function summarizeCodexImportFailureReason(error: unknown, fallback = "Import Latest did not complete.") {
+export function summarizeZaiImportFailureReason(error: unknown, fallback = "Import Latest did not complete.") {
   const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   const firstLine = (raw || fallback).split(/\r?\n/)[0]?.trim() || fallback;
   return firstLine
@@ -4557,7 +4557,7 @@ export function buildOutboxImportKey(
   return `${kind}:${jobId}:${fileSignature}`;
 }
 
-export function fingerprintOutboxResults(results: CodexOutboxResult[], jobId?: string, newerThan?: string) {
+export function fingerprintOutboxResults(results: ZaiOutboxResult[], jobId?: string, newerThan?: string) {
   const newerThanTime = newerThan ? Date.parse(newerThan) : Number.NEGATIVE_INFINITY;
   return results
     .filter((result) => !shouldIgnoreOutboxResultName(result.name))
@@ -4669,7 +4669,7 @@ export function buildImageCockpitEnvironmentReport(input: EnvironmentReportInput
     }
   };
 
-  const markdown = redactEnvironmentReportText(`## Image Cockpit Environment Report
+  const markdown = redactEnvironmentReportText(`## Zai Cockpit Environment Report
 
 - App version: ${report.app.version}
 - App URL: ${report.app.url}
@@ -4686,7 +4686,7 @@ export function buildImageCockpitEnvironmentReport(input: EnvironmentReportInput
 - API port: ${report.api.port ?? "unknown"}
 - Handoff readable: inbox=${report.api.inboxReadable}, outbox=${report.api.outboxReadable}, status=${report.api.statusReadable}, logs=${report.api.logsReadable}
 
-### Codex Runner
+### Zai Runner
 
 - Autorun: ${report.runner.autorun}
 - Runner state: ${report.runner.state}
@@ -4710,7 +4710,7 @@ export function buildImageCockpitEnvironmentReport(input: EnvironmentReportInput
 
 ### Notes
 
-- ChatGPT image generation availability and local Codex runner imagegen availability are separate states.
+- ChatGPT image generation availability and local Zai runner imagegen availability are separate states.
 - I did not include prompts, images, API keys, tokens, full logs, or full outbox listings in this report.
 `);
 
@@ -4788,12 +4788,12 @@ function App() {
   const [showAnimationPresetExamples, setShowAnimationPresetExamples] = useState(false);
   const [showAnimationAdvancedSettings, setShowAnimationAdvancedSettings] = useState(false);
   const [showAnimationActivity, setShowAnimationActivity] = useState(false);
-  const [providerId, setProviderId] = useState<ProviderId>("codex-handoff");
+  const [providerId, setProviderId] = useState<ProviderId>("zai-handoff");
   const [animationGenerationMode, setAnimationGenerationMode] = useState<AnimationGenerationMode>("standard");
   const [animationSourceId, setAnimationSourceId] = useState("");
   const [animationSourceFingerprint, setAnimationSourceFingerprint] = useState("");
   const [providers, setProviders] = useState<ProviderStatus[]>(fallbackProviders);
-  const [runnerPreflight, setRunnerPreflight] = useState<CodexRunnerPreflight | null>(null);
+  const [runnerPreflight, setRunnerPreflight] = useState<ZaiRunnerPreflight | null>(null);
   const [cockpitHealth, setCockpitHealth] = useState<CockpitHealthReport>({
     state: "checking",
     checkedAt: "",
@@ -4823,8 +4823,8 @@ function App() {
   const [isCockpitRepairing, setIsCockpitRepairing] = useState(false);
   const [isRecoveringOutboxResults, setIsRecoveringOutboxResults] = useState(false);
   const [isDedupingHistory, setIsDedupingHistory] = useState(false);
-  const [codexJobs, setCodexJobs] = useState<CodexJobQueueItem[]>([]);
-  const [serverActiveCodexRunnerCount, setServerActiveCodexRunnerCount] = useState(0);
+  const [zaiJobs, setZaiJobs] = useState<ZaiJobQueueItem[]>([]);
+  const [serverActiveZaiRunnerCount, setServerActiveZaiRunnerCount] = useState(0);
   const gifPreviewUrl = "";
   const [animationDirectionPreviews, setAnimationDirectionPreviews] = useState<AnimationDirectionPreview[]>([]);
   const [isAnimationPreviewBuilding, setIsAnimationPreviewBuilding] = useState(false);
@@ -4861,10 +4861,10 @@ function App() {
   const [showEffectAdvancedSettings, setShowEffectAdvancedSettings] = useState(false);
   const [showVfxCompositeStage, setShowVfxCompositeStage] = useState(false);
   const [imageEditComparison, setImageEditComparison] = useState<ImageEditComparison | null>(null);
-  const [codexFailureNotices, setCodexFailureNotices] = useState<CodexFailureNotice[]>([]);
-  const [codexJobLogs, setCodexJobLogs] = useState<CodexJobLogItem[]>([]);
-  const [codexLogsCollapsed, setCodexLogsCollapsed] = useState(false);
-  const [codexLogsFullscreen, setCodexLogsFullscreen] = useState(false);
+  const [zaiFailureNotices, setZaiFailureNotices] = useState<ZaiFailureNotice[]>([]);
+  const [zaiJobLogs, setZaiJobLogs] = useState<ZaiJobLogItem[]>([]);
+  const [zaiLogsCollapsed, setZaiLogsCollapsed] = useState(false);
+  const [zaiLogsFullscreen, setZaiLogsFullscreen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(() => shouldOpenSettingsFromSearch(window.location.search));
   const [settingsTab, setSettingsTab] = useState<SettingsTab>(() => settingsTabFromSearch(window.location.search));
   const [settingsCopyStatus, setSettingsCopyStatus] = useState("");
@@ -4897,7 +4897,7 @@ function App() {
   const lastPointerEventAtRef = useRef(0);
   const originalDocumentTitleRef = useRef(document.title);
   const documentTitleResetTimerRef = useRef<number | null>(null);
-  const settingsAutoDismissedRef = useRef(sessionStorage.getItem("image-cockpit.settings.dismissed") === "1");
+  const settingsAutoDismissedRef = useRef(sessionStorage.getItem("zai-cockpit.settings.dismissed") === "1");
   const copy = uiCopy[language];
 
   const selected = useMemo(
@@ -4931,7 +4931,7 @@ function App() {
     const selectedMime = selected?.dataUrl.match(/^data:([^;,]+)/)?.[1];
     const storageEstimate = storageScreen.preflight?.estimate;
     return buildImageCockpitEnvironmentReport({
-      appVersion: "0.2.1",
+      appVersion: "0.1.0",
       appUrl: window.location.origin,
       route: `${window.location.pathname}${window.location.search}`,
       userAgent: navigator.userAgent,
@@ -4954,10 +4954,10 @@ function App() {
       storagePressure: storageScreen.preflight?.pressure,
       storageUsageBytes: storageEstimate?.usage,
       storageQuotaBytes: storageEstimate?.quota,
-      activeJobCount: codexJobs.filter((job) => job.state === "running").length,
-      queuedJobCount: codexJobs.filter((job) => job.state === "queued").length,
-      lastJobId: codexJobs[0]?.id ?? codexFailureNotices[0]?.jobId,
-      lastFailure: codexFailureNotices[0],
+      activeJobCount: zaiJobs.filter((job) => job.state === "running").length,
+      queuedJobCount: zaiJobs.filter((job) => job.state === "queued").length,
+      lastJobId: zaiJobs[0]?.id ?? zaiFailureNotices[0]?.jobId,
+      lastFailure: zaiFailureNotices[0],
       lastResult: selected
         ? {
             provider: selected.provider,
@@ -4973,7 +4973,7 @@ function App() {
         : undefined,
       imagegenSmoke: imagegenSmokeState
     });
-  }, [cockpitHealth.api, cockpitHealth.supervisor, codexFailureNotices, codexJobs, imagegenSmokeState, providerId, runnerPreflight, selected, storageScreen, workflowMode]);
+  }, [cockpitHealth.api, cockpitHealth.supervisor, zaiFailureNotices, zaiJobs, imagegenSmokeState, providerId, runnerPreflight, selected, storageScreen, workflowMode]);
 
   useEffect(() => {
     setDownloadModalOpen(false);
@@ -5337,7 +5337,7 @@ function App() {
         setFrames([]);
         setActions(normalizeAnimationActions(defaultActions));
         setUserAnimationLibrary([]);
-        setCodexJobs([]);
+        setZaiJobs([]);
         setStorageScreen({ mode: "reset", preflight, summaries, message: "Local state reset is ready." });
         setStatus("Local state reset is ready. No large browser state was loaded.");
         setStorageHydrated(true);
@@ -5349,7 +5349,7 @@ function App() {
         setFrames([]);
         setActions(normalizeAnimationActions(defaultActions));
         setUserAnimationLibrary([]);
-        setCodexJobs([]);
+        setZaiJobs([]);
         setStorageScreen({
           mode: preflight.safeModeRequested ? "safe" : "recovery",
           preflight,
@@ -5371,7 +5371,7 @@ function App() {
         setFrames(remappedFrames.frames);
         setActions(normalizeAnimationActions(persisted.actions));
         setUserAnimationLibrary(persisted.animationLibrary.slice(0, MAX_USER_ANIMATION_LIBRARY_ITEMS));
-        setCodexJobs(loadPendingCodexJobs());
+        setZaiJobs(loadPendingZaiJobs());
         setStorageScreen({
           mode: "normal",
           preflight,
@@ -5392,7 +5392,7 @@ function App() {
         setFrames([]);
         setActions(normalizeAnimationActions(defaultActions));
         setUserAnimationLibrary([]);
-        setCodexJobs([]);
+        setZaiJobs([]);
         setStorageScreen({
           mode: "recovery",
           preflight,
@@ -5435,8 +5435,8 @@ function App() {
     };
   }, []);
   useEffect(() => {
-    if (canPersistLocalState) savePendingCodexJobs(codexJobs);
-  }, [canPersistLocalState, codexJobs]);
+    if (canPersistLocalState) savePendingZaiJobs(zaiJobs);
+  }, [canPersistLocalState, zaiJobs]);
 
   useEffect(() => {
     if (!storageHydrated || serverTournamentRestoreStartedRef.current) return;
@@ -5444,7 +5444,7 @@ function App() {
     let cancelled = false;
 
     const restore = async () => {
-      const response = await fetch("/api/codex/tournaments");
+      const response = await fetch("/api/zai/tournaments");
       if (!response.ok) throw new Error(await response.text());
       const manifests = ((await response.json()) as { tournaments: AnimationTournamentManifestClient[] }).tournaments;
       if (cancelled) return;
@@ -5457,8 +5457,8 @@ function App() {
         [...resumableManifests, ...recentTerminalManifests]
           .map((manifest) => ({ manifest, restoredAt: new Date().toISOString() }))
       );
-      const existingIds = new Set(codexJobs.map((job) => job.id));
-      const restored: CodexJobQueueItem[] = [];
+      const existingIds = new Set(zaiJobs.map((job) => job.id));
+      const restored: ZaiJobQueueItem[] = [];
       for (const manifest of resumableManifests) {
         for (const candidate of manifest.candidates) {
           if (
@@ -5478,7 +5478,7 @@ function App() {
         }
       }
       if (restored.length > 0 && !cancelled) {
-        setCodexJobs((current) => [...current, ...restored.filter((job) => !current.some((item) => item.id === job.id))]);
+        setZaiJobs((current) => [...current, ...restored.filter((job) => !current.some((item) => item.id === job.id))]);
       }
       const acceptedSmartRaceManifests = manifests.filter(
         (manifest) =>
@@ -5491,7 +5491,7 @@ function App() {
         if (cancelled || !manifest.winnerCandidateId) return;
         recoveredAcceptedTournamentIdsRef.current.add(manifest.tournamentId);
         try {
-          const reconciled = await publishCodexTournamentWinner(
+          const reconciled = await publishZaiTournamentWinner(
             manifest.tournamentId,
             manifest.winnerCandidateId,
             undefined,
@@ -5532,10 +5532,10 @@ function App() {
 
   useEffect(() => {
     if (!storageHydrated || animationTournamentMonitors.length === 0) return;
-    const activeRunnerCount = effectiveCodexRunnerCount(
-      codexJobs,
+    const activeRunnerCount = effectiveZaiRunnerCount(
+      zaiJobs,
       startingQueuedJobIdsRef.current,
-      serverActiveCodexRunnerCount
+      serverActiveZaiRunnerCount
     );
     const reservedRunnerCount = reservedAnimationInitialCandidateSlots(startingPersistedTournamentCandidatesRef.current);
     if (activeRunnerCount > 0 || reservedRunnerCount > 0) return;
@@ -5557,7 +5557,7 @@ function App() {
       initialCandidateCount: manifest.initialCandidateCount,
       activeRunnerCount,
       reservedRunnerCount,
-      maxActiveRunnerCount: MAX_ACTIVE_CODEX_JOBS
+      maxActiveRunnerCount: MAX_ACTIVE_ZAI_JOBS
     });
     if (!admission.allowed) return;
 
@@ -5565,13 +5565,13 @@ function App() {
     void startPersistedTournamentInitialCandidates(manifest)
       .catch((error) => setStatus(error instanceof Error ? error.message : "Could not resume the initial animation candidate wave."))
       .finally(() => startingPersistedTournamentCandidatesRef.current.delete(manifest.tournamentId));
-  }, [animationTournamentMonitors, codexJobs, serverActiveCodexRunnerCount, storageHydrated]);
+  }, [animationTournamentMonitors, zaiJobs, serverActiveZaiRunnerCount, storageHydrated]);
 
   useEffect(() => {
     if (settingsOpen || settingsAutoDismissedRef.current) return;
     const hasStorageProblem = storageScreen.mode === "safe" || storageScreen.mode === "recovery" || storageScreen.mode === "reset";
     const hasApiProblem = cockpitHealth.state === "broken";
-    const hasImagegenProblem = codexFailureNotices.some((notice) =>
+    const hasImagegenProblem = zaiFailureNotices.some((notice) =>
       notice.diagnostic.kind === "imagegen_unavailable" || notice.diagnostic.kind === "no_image_returned"
     );
     if (hasStorageProblem) {
@@ -5581,7 +5581,7 @@ function App() {
       setSettingsTab("diagnostics");
       setSettingsOpen(true);
     }
-  }, [cockpitHealth.state, codexFailureNotices, settingsOpen, storageScreen.mode]);
+  }, [cockpitHealth.state, zaiFailureNotices, settingsOpen, storageScreen.mode]);
 
   function openSettings(tab: SettingsTab = "general") {
     setSettingsTab(tab);
@@ -5591,7 +5591,7 @@ function App() {
 
   function closeSettings() {
     settingsAutoDismissedRef.current = true;
-    sessionStorage.setItem("image-cockpit.settings.dismissed", "1");
+    sessionStorage.setItem("zai-cockpit.settings.dismissed", "1");
     setSettingsOpen(false);
   }
 
@@ -5615,45 +5615,45 @@ function App() {
   }
 
   useEffect(() => {
-    if (!codexLogsFullscreen) return;
+    if (!zaiLogsFullscreen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCodexLogsFullscreen(false);
+      if (event.key === "Escape") setZaiLogsFullscreen(false);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [codexLogsFullscreen]);
+  }, [zaiLogsFullscreen]);
 
   useEffect(() => {
-    if (providerId !== "codex-handoff") return;
-    const runningJobs = codexJobs.filter((job) => job.state === "running");
+    if (providerId !== "zai-handoff") return;
+    const runningJobs = zaiJobs.filter((job) => job.state === "running");
     if (runningJobs.length === 0) return;
     let cancelled = false;
 
-    const pollCodexLogs = async () => {
+    const pollZaiLogs = async () => {
       const logItems = await Promise.all(
         runningJobs.map(async (job) => {
           try {
-            const log = await loadCodexJobLog(job.id);
-            return createCodexJobLogItem(job, log, "running");
+            const log = await loadZaiJobLog(job.id);
+            return createZaiJobLogItem(job, log, "running");
           } catch (error) {
-            return createCodexJobLogItem(job, undefined, "running", error instanceof Error ? error.message : "Could not read Codex log");
+            return createZaiJobLogItem(job, undefined, "running", error instanceof Error ? error.message : "Could not read Zai log");
           }
         })
       );
-      if (!cancelled) setCodexJobLogs((current) => mergeCodexJobLogs(current, logItems));
+      if (!cancelled) setZaiJobLogs((current) => mergeZaiJobLogs(current, logItems));
     };
 
-    void pollCodexLogs();
-    const intervalId = window.setInterval(() => void pollCodexLogs(), CODEX_LOG_POLL_INTERVAL_MS);
+    void pollZaiLogs();
+    const intervalId = window.setInterval(() => void pollZaiLogs(), ZAI_LOG_POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [codexJobs, providerId]);
+  }, [zaiJobs, providerId]);
 
-  function enterCodexLogsFullscreen() {
-    setCodexLogsCollapsed(false);
-    setCodexLogsFullscreen(true);
+  function enterZaiLogsFullscreen() {
+    setZaiLogsCollapsed(false);
+    setZaiLogsFullscreen(true);
   }
 
   useEffect(() => {
@@ -5664,26 +5664,26 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (providerId !== "codex-handoff") {
-      setServerActiveCodexRunnerCount(0);
+    if (providerId !== "zai-handoff") {
+      setServerActiveZaiRunnerCount(0);
       return;
     }
     let cancelled = false;
     const pollCapacity = async () => {
       try {
-        const response = await fetch("/api/codex/capacity");
+        const response = await fetch("/api/zai/capacity");
         if (!response.ok) return;
         const payload = (await response.json()) as { capacity?: { active?: unknown } };
         const active = typeof payload.capacity?.active === "number"
-          ? Math.min(MAX_ACTIVE_CODEX_JOBS, Math.max(0, Math.floor(payload.capacity.active)))
+          ? Math.min(MAX_ACTIVE_ZAI_JOBS, Math.max(0, Math.floor(payload.capacity.active)))
           : 0;
-        if (!cancelled) setServerActiveCodexRunnerCount(active);
+        if (!cancelled) setServerActiveZaiRunnerCount(active);
       } catch {
         // The next poll retries; server admission remains the final authority.
       }
     };
     void pollCapacity();
-    const intervalId = window.setInterval(() => void pollCapacity(), CODEX_CAPACITY_POLL_INTERVAL_MS);
+    const intervalId = window.setInterval(() => void pollCapacity(), ZAI_CAPACITY_POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
@@ -5692,7 +5692,7 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    loadCodexRunnerPreflight()
+    loadZaiRunnerPreflight()
       .then((runner) => {
         if (!cancelled) setRunnerPreflight(runner);
       })
@@ -5700,12 +5700,12 @@ function App() {
         if (!cancelled) {
           setRunnerPreflight({
             state: "unavailable",
-            message: "Could not read Codex runner preflight status.",
+            message: "Could not read Zai runner preflight status.",
             command: "",
             checkedAt: new Date().toISOString(),
             autorun: false,
-            sandbox: "",
-            approval: ""
+            runnerScript: "",
+            endpointMode: ""
           });
         }
       });
@@ -5842,15 +5842,15 @@ function App() {
   }, [frames, selectedEffectAction, selectedEffectExportReady]);
 
   useEffect(() => {
-    const pollableJobs = codexJobs.filter((job) => job.state === "running" || job.state === "evaluating");
+    const pollableJobs = zaiJobs.filter((job) => job.state === "running" || job.state === "evaluating");
     if (pollableJobs.length === 0) return;
     let cancelled = false;
 
     const pollForReturnedImages = async () => {
-      const tournamentGroups = new Map<string, CodexJobQueueItem[]>();
-      const individualJobs: CodexJobQueueItem[] = [];
-      const directionRepairJobs: CodexJobQueueItem[] = [];
-      for (const job of codexJobs) {
+      const tournamentGroups = new Map<string, ZaiJobQueueItem[]>();
+      const individualJobs: ZaiJobQueueItem[] = [];
+      const directionRepairJobs: ZaiJobQueueItem[] = [];
+      for (const job of zaiJobs) {
         if (isAnimationTournamentJob(job) && job.tournamentId && job.repairDirections?.length) {
           directionRepairJobs.push(job);
         } else if (isAnimationTournamentJob(job) && job.tournamentId) {
@@ -5863,24 +5863,24 @@ function App() {
       }
 
       const outcomes = await Promise.all([
-        ...individualJobs.map((job) => pollCodexJobForReturnedImage(job, () => cancelled).catch((error) => {
+        ...individualJobs.map((job) => pollZaiJobForReturnedImage(job, () => cancelled).catch((error) => {
           if (!cancelled) setStatus(error instanceof Error ? error.message : copy.statusInboxError);
           return "pending";
         })),
-        ...directionRepairJobs.map((job) => pollCodexDirectionRepair(job, () => cancelled).catch((error) => {
+        ...directionRepairJobs.map((job) => pollZaiDirectionRepair(job, () => cancelled).catch((error) => {
           if (!cancelled) setStatus(error instanceof Error ? error.message : `Direction Repair failed: ${job.id}`);
           return "pending";
         })),
         ...Array.from(tournamentGroups.entries())
           .filter(([, jobs]) => jobs.some((job) => job.state === "running" || job.state === "evaluating"))
-          .map(([tournamentId, jobs]) => pollCodexAnimationTournament(tournamentId, jobs).catch((error) => {
+          .map(([tournamentId, jobs]) => pollZaiAnimationTournament(tournamentId, jobs).catch((error) => {
             if (!cancelled) setStatus(error instanceof Error ? error.message : `Animation tournament failed: ${tournamentId}`);
             return "pending";
           }))
       ]);
 
-      if (!cancelled && outcomes.every((outcome) => outcome === "pending") && !codexJobs.some((job) => job.state === "queued")) {
-        setStatus(`${copy.statusCodexJobPending}: ${pollableJobs.map((job) => job.id).join(", ")}`);
+      if (!cancelled && outcomes.every((outcome) => outcome === "pending") && !zaiJobs.some((job) => job.state === "queued")) {
+        setStatus(`${copy.statusZaiJobPending}: ${pollableJobs.map((job) => job.id).join(", ")}`);
       }
     };
 
@@ -5890,17 +5890,17 @@ function App() {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [codexJobs, language]);
+  }, [zaiJobs, language]);
 
-  async function pollCodexJobForReturnedImage(job: CodexJobQueueItem, isCancelled: () => boolean) {
-    let runnerStatus: CodexRunnerStatus | null | undefined;
+  async function pollZaiJobForReturnedImage(job: ZaiJobQueueItem, isCancelled: () => boolean) {
+    let runnerStatus: ZaiRunnerStatus | null | undefined;
     try {
-      runnerStatus = await loadCodexRunnerStatus(job.id);
+      runnerStatus = await loadZaiRunnerStatus(job.id);
     } catch {
       return "pending";
     }
     if (isCancelled()) return "cancelled";
-    if (runnerStatus && shouldWaitForCodexRunner(runnerStatus)) return "pending";
+    if (runnerStatus && shouldWaitForZaiRunner(runnerStatus)) return "pending";
 
     let importError: unknown;
     const imported = await importLatestOutboxResult({
@@ -5916,24 +5916,24 @@ function App() {
     });
     if (isCancelled() || imported) return imported ? "imported" : "cancelled";
 
-    if (runnerStatus && !shouldWaitForCodexRunner(runnerStatus)) {
+    if (runnerStatus && !shouldWaitForZaiRunner(runnerStatus)) {
       if (importError && isStandardDirectionSplitJob(job)) {
-        const diagnostic = recordCodexImportFailure(job, importError);
-        removeCodexJob(job.id, runnerStatus.state);
+        const diagnostic = recordZaiImportFailure(job, importError);
+        removeZaiJob(job.id, runnerStatus.state);
         setStatus(`${diagnostic.title}: ${job.id}`);
         return "terminal";
       }
-      if (shouldReportCompletedCodexImportFailure(runnerStatus, imported)) {
-        const diagnostic = recordCodexImportFailure(
+      if (shouldReportCompletedZaiImportFailure(runnerStatus, imported)) {
+        const diagnostic = recordZaiImportFailure(
           job,
           importError ?? new Error("No matching outbox result could be imported after the runner completed.")
         );
-        removeCodexJob(job.id, "completed");
+        removeZaiJob(job.id, "completed");
         setStatus(`${diagnostic.title}: ${job.id}`);
         return "terminal";
       }
-      recordCodexFailure(job, runnerStatus);
-      removeCodexJob(job.id, runnerStatus.state);
+      recordZaiFailure(job, runnerStatus);
+      removeZaiJob(job.id, runnerStatus.state);
       setStatus(`${runnerStatusMessage(runnerStatus, copy)}: ${job.id}`);
       return "terminal";
     }
@@ -5941,40 +5941,40 @@ function App() {
     return "pending";
   }
 
-  async function pollCodexDirectionRepair(job: CodexJobQueueItem, isCancelled: () => boolean) {
+  async function pollZaiDirectionRepair(job: ZaiJobQueueItem, isCancelled: () => boolean) {
     if (!job.tournamentId) return "terminal";
-    const runnerStatus = await loadCodexRunnerStatus(job.id);
+    const runnerStatus = await loadZaiRunnerStatus(job.id);
     if (isCancelled()) return "cancelled";
-    if (shouldWaitForCodexRunner(runnerStatus ?? undefined)) return "pending";
+    if (shouldWaitForZaiRunner(runnerStatus ?? undefined)) return "pending";
     const evaluation = await evaluateDirectionSplitTournamentCandidate(job, runnerStatus);
     if (isCancelled()) return "cancelled";
     if (!evaluation.ready && isTransientAnimationTournamentEvaluationError(evaluation.error)) return "pending";
-    await recordCodexAnimationTournamentEvaluation(job.tournamentId, evaluation);
-    const manifest = await loadCodexAnimationTournament(job.tournamentId);
+    await recordZaiAnimationTournamentEvaluation(job.tournamentId, evaluation);
+    const manifest = await loadZaiAnimationTournament(job.tournamentId);
     updateAnimationTournamentMonitor(manifest);
-    clearCodexFailureNotice(job.id);
-    removeCodexJob(job.id, runnerStatus?.state ?? (evaluation.ready ? "completed" : "failed"), { notify: false });
+    clearZaiFailureNotice(job.id);
+    removeZaiJob(job.id, runnerStatus?.state ?? (evaluation.ready ? "completed" : "failed"), { notify: false });
     if (evaluation.ready) {
       setStatus(`Direction Repair ready for review: ${job.repairDirections?.join(", ")}. Untargeted directions remain locked until acceptance.`);
     } else {
-      recordCodexImportFailure(job, new Error(`Direction Repair failed Quality Gate v2: ${evaluation.error ?? "no usable repair artifact"}`));
+      recordZaiImportFailure(job, new Error(`Direction Repair failed Quality Gate v2: ${evaluation.error ?? "no usable repair artifact"}`));
       setStatus(`Direction Repair failed: ${evaluation.error ?? job.id}`);
     }
     return "terminal";
   }
 
-  async function pollCodexAnimationTournament(tournamentId: string, jobs: CodexJobQueueItem[]) {
+  async function pollZaiAnimationTournament(tournamentId: string, jobs: ZaiJobQueueItem[]) {
     if (pollingAnimationTournamentIdsRef.current.has(tournamentId)) return "pending";
     pollingAnimationTournamentIdsRef.current.add(tournamentId);
     try {
-      return await pollCodexAnimationTournamentUnlocked(tournamentId, jobs);
+      return await pollZaiAnimationTournamentUnlocked(tournamentId, jobs);
     } finally {
       pollingAnimationTournamentIdsRef.current.delete(tournamentId);
     }
   }
 
-  async function pollCodexAnimationTournamentUnlocked(tournamentId: string, jobs: CodexJobQueueItem[]) {
-    const manifest = await loadCodexAnimationTournament(tournamentId).catch(() => legacyAnimationTournamentManifest(tournamentId, jobs));
+  async function pollZaiAnimationTournamentUnlocked(tournamentId: string, jobs: ZaiJobQueueItem[]) {
+    const manifest = await loadZaiAnimationTournament(tournamentId).catch(() => legacyAnimationTournamentManifest(tournamentId, jobs));
     const isLegacyTournament = manifest.idempotencyKey.startsWith("legacy:");
     if (!isLegacyTournament) updateAnimationTournamentMonitor(manifest);
     const expectedCount = manifest.maximumCandidateCount;
@@ -6007,11 +6007,11 @@ function App() {
       await Promise.all(
         evaluations
           .filter((evaluation) => !transientEvaluations.includes(evaluation))
-          .map((evaluation) => recordCodexAnimationTournamentEvaluation(tournamentId, evaluation))
+          .map((evaluation) => recordZaiAnimationTournamentEvaluation(tournamentId, evaluation))
       );
     }
     const terminalJobIds = new Set(terminalStatuses.map(({ job }) => job.id));
-    setCodexJobs((current) => current.map((job) =>
+    setZaiJobs((current) => current.map((job) =>
       terminalJobIds.has(job.id) && job.state === "running"
         ? { ...job, state: "evaluating" }
         : job
@@ -6019,12 +6019,12 @@ function App() {
     if (transientEvaluations.length > 0) return "pending";
 
     if (manifest.pilotMode && !manifest.pilotWinnerId) {
-      const refreshedPilot = await loadCodexAnimationTournament(tournamentId);
+      const refreshedPilot = await loadZaiAnimationTournament(tournamentId);
       updateAnimationTournamentMonitor(refreshedPilot);
       if (refreshedPilot.state === "pilot-review" || (refreshedPilot.state === "failed" && refreshedPilot.pilotState === "failed")) {
         statuses.forEach(({ job, status }) => {
-          clearCodexFailureNotice(job.id);
-          removeCodexJob(job.id, status?.state ?? (refreshedPilot.state === "failed" ? "failed" : "completed"), { notify: false });
+          clearZaiFailureNotice(job.id);
+          removeZaiJob(job.id, status?.state ?? (refreshedPilot.state === "failed" ? "failed" : "completed"), { notify: false });
         });
         setStatus(refreshedPilot.state === "pilot-review"
           ? `Motion Pilot A/B/C is ready for human review: ${refreshedPilot.pilotDirection}. Choose a winner to expand or use Balanced fallback.`
@@ -6035,7 +6035,7 @@ function App() {
 
     const readyEvaluations = evaluations.filter((evaluation) => evaluation.ready);
     const activeCandidateCount = statuses.filter(
-      ({ job, status }) => job.state === "queued" || shouldWaitForCodexRunner(status ?? undefined)
+      ({ job, status }) => job.state === "queued" || shouldWaitForZaiRunner(status ?? undefined)
     ).length;
     const activeCandidate = activeCandidateCount > 0;
 
@@ -6043,15 +6043,15 @@ function App() {
       if (activeCandidate) return "pending";
       const winner = sortTournamentEvaluationsByScore(readyEvaluations)[0];
       return winner
-        ? finalizeCodexAnimationTournamentWinner(tournamentId, winner, statuses, [winner], expectedCount)
-        : failCodexAnimationTournament(tournamentId, statuses, evaluations, expectedCount);
+        ? finalizeZaiAnimationTournamentWinner(tournamentId, winner, statuses, [winner], expectedCount)
+        : failZaiAnimationTournament(tournamentId, statuses, evaluations, expectedCount);
     }
 
     if (profile === "balanced") {
       const initialEvaluations = evaluations.filter((evaluation) => (evaluation.job.tournamentCandidateIndex ?? 0) < manifest.initialCandidateCount);
       const initialActive = statuses.some(({ job, status }) =>
         (job.tournamentCandidateIndex ?? 0) < manifest.initialCandidateCount &&
-        (job.state === "queued" || shouldWaitForCodexRunner(status ?? undefined))
+        (job.state === "queued" || shouldWaitForZaiRunner(status ?? undefined))
       );
       if (initialEvaluations.length < manifest.initialCandidateCount || initialActive) return "pending";
       const decision = shouldStartBalancedAdditionalCandidate(initialEvaluations);
@@ -6068,7 +6068,7 @@ function App() {
       }
       if (adaptiveCandidate?.jobId) {
         const adaptiveStatus = statuses.find(({ job }) => job.id === adaptiveCandidate.jobId);
-        if (!adaptiveStatus || shouldWaitForCodexRunner(adaptiveStatus.status ?? undefined)) return "pending";
+        if (!adaptiveStatus || shouldWaitForZaiRunner(adaptiveStatus.status ?? undefined)) return "pending";
       }
     }
 
@@ -6093,12 +6093,12 @@ function App() {
         ? rankedReadyEvaluations.find((evaluation) => evaluation.candidateIndex === decision.winnerCandidateIndex)
         : rankedReadyEvaluations[0];
       if (!winner) {
-        return failCodexAnimationTournament(tournamentId, statuses, evaluations, expectedCount);
+        return failZaiAnimationTournament(tournamentId, statuses, evaluations, expectedCount);
       }
       const runnerUp = rankedReadyEvaluations.find(
         (evaluation) => evaluation.candidateIndex !== winner.candidateIndex
       );
-      return finalizeCodexAnimationTournamentWinner(
+      return finalizeZaiAnimationTournamentWinner(
         tournamentId,
         winner,
         statuses,
@@ -6119,18 +6119,18 @@ function App() {
     const comparedEvaluations = sortTournamentEvaluationsByScore(readyEvaluations);
     const winner = comparedEvaluations[0];
     if (!winner) {
-      return failCodexAnimationTournament(tournamentId, statuses, evaluations, expectedCount);
+      return failZaiAnimationTournament(tournamentId, statuses, evaluations, expectedCount);
     }
 
-    return finalizeCodexAnimationTournamentWinner(tournamentId, winner, statuses, comparedEvaluations, expectedCount);
+    return finalizeZaiAnimationTournamentWinner(tournamentId, winner, statuses, comparedEvaluations, expectedCount);
   }
 
-  function legacyAnimationTournamentManifest(tournamentId: string, jobs: CodexJobQueueItem[]): AnimationTournamentManifestClient {
+  function legacyAnimationTournamentManifest(tournamentId: string, jobs: ZaiJobQueueItem[]): AnimationTournamentManifestClient {
     const now = new Date().toISOString();
     const expectedCount = jobs[0]?.tournamentCandidateCount ?? Math.max(1, jobs.length);
     const directions = jobs[0]?.directions ?? ANIMATION_DIRECTIONS;
     return {
-      schema: "image-cockpit.animation-tournament.v1",
+      schema: "zai-cockpit.animation-tournament.v1",
       schemaVersion: 1,
       tournamentId,
       idempotencyKey: `legacy:${tournamentId}`,
@@ -6160,8 +6160,8 @@ function App() {
     };
   }
 
-  async function loadCodexAnimationTournament(tournamentId: string) {
-    const response = await fetch(`/api/codex/tournaments/${encodeURIComponent(tournamentId)}`);
+  async function loadZaiAnimationTournament(tournamentId: string) {
+    const response = await fetch(`/api/zai/tournaments/${encodeURIComponent(tournamentId)}`);
     if (!response.ok) throw new Error(await response.text());
     return ((await response.json()) as { tournament: AnimationTournamentManifestClient }).tournament;
   }
@@ -6282,7 +6282,7 @@ function App() {
 
   async function saveAnimationHumanReview(review: AnimationHumanReview) {
     if (!animationReviewManifest) throw new Error("Animation Review tournament is not open.");
-    const response = await fetch(`/api/codex/tournaments/${encodeURIComponent(animationReviewManifest.tournamentId)}/review`, {
+    const response = await fetch(`/api/zai/tournaments/${encodeURIComponent(animationReviewManifest.tournamentId)}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ review })
@@ -6297,41 +6297,41 @@ function App() {
   async function adoptAnimationReviewWinner(jobId: string) {
     if (!animationReviewManifest) throw new Error("Animation Review tournament is not open.");
     if (animationReviewManifest.pilotMode && animationReviewManifest.state === "pilot-review") {
-      const activeCount = effectiveCodexRunnerCount(
-        codexJobs,
+      const activeCount = effectiveZaiRunnerCount(
+        zaiJobs,
         startingQueuedJobIdsRef.current,
-        serverActiveCodexRunnerCount
+        serverActiveZaiRunnerCount
       );
-      if (activeCount >= MAX_ACTIVE_CODEX_JOBS) {
-        throw new Error(`Runner slots are full (${activeCount}/${MAX_ACTIVE_CODEX_JOBS}). The Pilot expansion will stay in review until a slot is free.`);
+      if (activeCount >= MAX_ACTIVE_ZAI_JOBS) {
+        throw new Error(`Runner slots are full (${activeCount}/${MAX_ACTIVE_ZAI_JOBS}). The Pilot expansion will stay in review until a slot is free.`);
       }
-      const response = await fetch(`/api/codex/tournaments/${encodeURIComponent(animationReviewManifest.tournamentId)}/pilot/expand`, {
+      const response = await fetch(`/api/zai/tournaments/${encodeURIComponent(animationReviewManifest.tournamentId)}/pilot/expand`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobId })
       });
       if (!response.ok) throw new Error(await response.text());
-      const payload = (await response.json()) as { job: CodexJobResponse; tournament: AnimationTournamentManifestClient };
+      const payload = (await response.json()) as { job: ZaiJobResponse; tournament: AnimationTournamentManifestClient };
       updateAnimationTournamentMonitor(payload.tournament);
       setAnimationReviewManifest(payload.tournament);
       const expansion = payload.tournament.candidates.find((candidate) => candidate.jobId === payload.job.id);
       if (!expansion) throw new Error("Motion Pilot expansion candidate was not registered.");
       const queueItem = tournamentQueueItemFromManifest(payload.tournament, expansion.index, payload.job);
-      if (shouldWaitForCodexRunner(payload.job.runner)) {
-        setCodexJobs((current) => current.some((job) => job.id === queueItem.id) ? current : [...current, queueItem]);
+      if (shouldWaitForZaiRunner(payload.job.runner)) {
+        setZaiJobs((current) => current.some((job) => job.id === queueItem.id) ? current : [...current, queueItem]);
       }
       setStatus(`Motion Pilot winner adopted: ${jobId}. Expanding ${payload.tournament.expansionDirectionIds?.join(", ")}.`);
       closeAnimationReviewCockpit();
       return;
     }
-    const payload = await publishCodexTournamentWinner(animationReviewManifest.tournamentId, jobId);
+    const payload = await publishZaiTournamentWinner(animationReviewManifest.tournamentId, jobId);
     updateAnimationTournamentMonitor(payload.tournament);
     await refreshAcceptedTournamentArtifact(payload.tournament);
     setStatus(`Manual tournament winner adopted: ${jobId}`);
   }
 
   async function fallbackMotionPilotFromUi(manifest: AnimationTournamentManifestClient, reason = "human review requested Balanced fallback") {
-    const response = await fetch(`/api/codex/tournaments/${encodeURIComponent(manifest.tournamentId)}/pilot/fallback`, {
+    const response = await fetch(`/api/zai/tournaments/${encodeURIComponent(manifest.tournamentId)}/pilot/fallback`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason })
@@ -6352,8 +6352,8 @@ function App() {
   function tournamentQueueItemFromManifest(
     manifest: AnimationTournamentManifestClient,
     candidateIndex: number,
-    job: Pick<CodexJobResponse, "id" | "path" | "outboxPath" | "createdAt">
-  ): CodexJobQueueItem {
+    job: Pick<ZaiJobResponse, "id" | "path" | "outboxPath" | "createdAt">
+  ): ZaiJobQueueItem {
     const context = manifest.clientContext ?? {};
     const candidate = manifest.candidates[candidateIndex];
     const baseLabel = typeof context.label === "string" ? context.label : "Animation tournament";
@@ -6405,11 +6405,11 @@ function App() {
     };
   }
 
-  async function recordCodexAnimationTournamentEvaluation(
+  async function recordZaiAnimationTournamentEvaluation(
     tournamentId: string,
     evaluation: DirectionSplitTournamentCandidateEvaluation
   ) {
-    const response = await fetch(`/api/codex/tournaments/${encodeURIComponent(tournamentId)}/evaluation`, {
+    const response = await fetch(`/api/zai/tournaments/${encodeURIComponent(tournamentId)}/evaluation`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -6429,21 +6429,21 @@ function App() {
 
   function trackAnimationTournamentJobs(
     manifest: AnimationTournamentManifestClient,
-    jobs: CodexJobResponse[]
+    jobs: ZaiJobResponse[]
   ) {
-    const activeItems: CodexJobQueueItem[] = [];
+    const activeItems: ZaiJobQueueItem[] = [];
     jobs.forEach((job) => {
       const candidateIndex = manifest.candidates.findIndex((candidate) => candidate.jobId === job.id);
       if (candidateIndex < 0) return;
       const queueItem = tournamentQueueItemFromManifest(manifest, candidateIndex, job);
-      if (shouldWaitForCodexRunner(job.runner)) {
+      if (shouldWaitForZaiRunner(job.runner)) {
         activeItems.push(queueItem);
       } else if (job.runner) {
-        recordTerminalCodexRunnerJob(queueItem, job.runner);
+        recordTerminalZaiRunnerJob(queueItem, job.runner);
       }
     });
     if (activeItems.length > 0) {
-      setCodexJobs((current) => [
+      setZaiJobs((current) => [
         ...current,
         ...activeItems.filter((item) => !current.some((job) => job.id === item.id))
       ]);
@@ -6453,14 +6453,14 @@ function App() {
   async function startPersistedTournamentInitialCandidates(
     manifest: AnimationTournamentManifestClient
   ) {
-    const response = await fetch(`/api/codex/tournaments/${encodeURIComponent(manifest.tournamentId)}/initial-candidates`, {
+    const response = await fetch(`/api/zai/tournaments/${encodeURIComponent(manifest.tournamentId)}/initial-candidates`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{}"
     });
     if (!response.ok) throw new Error(await animationTournamentApiError(response, language));
     const payload = (await response.json()) as {
-      jobs: CodexJobResponse[];
+      jobs: ZaiJobResponse[];
       tournament: AnimationTournamentManifestClient;
     };
     updateAnimationTournamentMonitor(payload.tournament);
@@ -6482,17 +6482,17 @@ function App() {
       return;
     }
 
-    const activeRunnerCount = effectiveCodexRunnerCount(
-      codexJobs,
+    const activeRunnerCount = effectiveZaiRunnerCount(
+      zaiJobs,
       startingQueuedJobIdsRef.current,
-      serverActiveCodexRunnerCount
+      serverActiveZaiRunnerCount
     );
     const reservedRunnerCount = reservedAnimationInitialCandidateSlots(startingPersistedTournamentCandidatesRef.current);
     const admission = planAnimationInitialCandidateAdmission({
       initialCandidateCount: manifest.initialCandidateCount,
       activeRunnerCount,
       reservedRunnerCount,
-      maxActiveRunnerCount: MAX_ACTIVE_CODEX_JOBS
+      maxActiveRunnerCount: MAX_ACTIVE_ZAI_JOBS
     });
     if (!admission.allowed) {
       setStatus(animationInitialAdmissionMessage(language, admission.occupiedSlots));
@@ -6519,28 +6519,28 @@ function App() {
     candidateIndex: number,
     reason: string
   ) {
-    const response = await fetch(`/api/codex/tournaments/${encodeURIComponent(manifest.tournamentId)}/candidates`, {
+    const response = await fetch(`/api/zai/tournaments/${encodeURIComponent(manifest.tournamentId)}/candidates`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ candidateIndex, reason })
     });
     if (!response.ok) throw new Error(await response.text());
     const payload = (await response.json()) as {
-      job: CodexJobResponse;
+      job: ZaiJobResponse;
       tournament: AnimationTournamentManifestClient;
     };
     updateAnimationTournamentMonitor(payload.tournament);
     const queueItem = tournamentQueueItemFromManifest(payload.tournament, candidateIndex, payload.job);
-    if (shouldWaitForCodexRunner(payload.job.runner)) {
-      setCodexJobs((current) => current.some((job) => job.id === queueItem.id) ? current : [...current, queueItem]);
+    if (shouldWaitForZaiRunner(payload.job.runner)) {
+      setZaiJobs((current) => current.some((job) => job.id === queueItem.id) ? current : [...current, queueItem]);
     } else if (payload.job.runner) {
-      recordTerminalCodexRunnerJob(queueItem, payload.job.runner);
+      recordTerminalZaiRunnerJob(queueItem, payload.job.runner);
     }
     return queueItem;
   }
 
   async function cancelTournamentFromUi(tournamentId: string) {
-    const response = await fetch(`/api/codex/tournaments/${encodeURIComponent(tournamentId)}/cancel`, {
+    const response = await fetch(`/api/zai/tournaments/${encodeURIComponent(tournamentId)}/cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{}"
@@ -6548,7 +6548,7 @@ function App() {
     if (!response.ok) throw new Error(await response.text());
     const manifest = ((await response.json()) as { tournament: AnimationTournamentManifestClient }).tournament;
     updateAnimationTournamentMonitor(manifest);
-    setCodexJobs((current) => current.filter((job) => job.tournamentId !== tournamentId));
+    setZaiJobs((current) => current.filter((job) => job.tournamentId !== tournamentId));
     setStatus(`Animation tournament cancelled: ${tournamentId}`);
   }
 
@@ -6567,26 +6567,26 @@ function App() {
       setStatus("Select one or more directions to Repair.");
       return;
     }
-    const response = await fetch(`/api/codex/tournaments/${encodeURIComponent(manifest.tournamentId)}/repairs`, {
+    const response = await fetch(`/api/zai/tournaments/${encodeURIComponent(manifest.tournamentId)}/repairs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ directions })
     });
     if (!response.ok) throw new Error(await response.text());
     const payload = (await response.json()) as {
-      job: CodexJobResponse;
+      job: ZaiJobResponse;
       tournament: AnimationTournamentManifestClient;
     };
     updateAnimationTournamentMonitor(payload.tournament);
     const candidate = payload.tournament.candidates.find((item) => item.jobId === payload.job.id);
     if (!candidate) throw new Error("Direction Repair candidate was not persisted.");
     const queueItem = tournamentQueueItemFromManifest(payload.tournament, candidate.index, payload.job);
-    setCodexJobs((current) => current.some((job) => job.id === queueItem.id) ? current : [...current, queueItem]);
+    setZaiJobs((current) => current.some((job) => job.id === queueItem.id) ? current : [...current, queueItem]);
     setStatus(`Direction Repair started: ${directions.join(", ")} (${payload.job.id}).`);
   }
 
   async function acceptDirectionRepairFromUi(manifest: AnimationTournamentManifestClient, repairJobId: string) {
-    const response = await fetch(`/api/codex/tournaments/${encodeURIComponent(manifest.tournamentId)}/repairs/accept`, {
+    const response = await fetch(`/api/zai/tournaments/${encodeURIComponent(manifest.tournamentId)}/repairs/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobId: repairJobId })
@@ -6615,7 +6615,7 @@ function App() {
       path: `server-tournament:${manifest.tournamentId}:${winnerJobId}`,
       createdAt: winner.createdAt ?? manifest.createdAt
     });
-    const acceptedJob: CodexJobQueueItem = {
+    const acceptedJob: ZaiJobQueueItem = {
       ...job,
       directions: normalizeAnimationDirections(manifest.requestedDirections),
       grid: animationSheetGridForDirections(manifest.requestedDirections, job.framesPerDirection ?? ANIMATION_FRAME_COUNT),
@@ -6683,12 +6683,12 @@ function App() {
       const batchMatrixRunId = `batch-matrix_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
       for (const source of sources) {
         for (const preset of presets) {
-          const draft = await buildCodexJobDraft({ animationSource: source, animationPreset: preset, generationProfile: animationGenerationProfile });
+          const draft = await buildZaiJobDraft({ animationSource: source, animationPreset: preset, generationProfile: animationGenerationProfile });
           if (!draft) continue;
-          const tournamentDrafts = buildCodexAnimationTournamentDrafts(draft);
+          const tournamentDrafts = buildZaiAnimationTournamentDrafts(draft);
           const tournamentId = tournamentDrafts[0]?.tournamentId ?? "";
           const definition = animationGenerationProfileDefinition(draft.generationProfile ?? "best");
-          const { tournament: manifest } = await registerCodexAnimationTournament(
+          const { tournament: manifest } = await registerZaiAnimationTournament(
             tournamentId,
             draft,
             definition.initialCandidates,
@@ -6703,24 +6703,24 @@ function App() {
           queuedCandidates += definition.initialCandidates;
         }
       }
-      setStatus(`Batch Matrix queued: ${sources.length} sources × ${presets.length} motions, ${queuedCandidates} initial candidates. Concurrency is capped at ${MAX_ACTIVE_CODEX_JOBS}.`);
+      setStatus(`Batch Matrix queued: ${sources.length} sources × ${presets.length} motions, ${queuedCandidates} initial candidates. Concurrency is capped at ${MAX_ACTIVE_ZAI_JOBS}.`);
     } finally {
       setIsBatchMatrixStarting(false);
     }
   }
 
-  async function loadAnimationTournamentStatuses(jobs: CodexJobQueueItem[]): Promise<AnimationTournamentStatusEntry[]> {
+  async function loadAnimationTournamentStatuses(jobs: ZaiJobQueueItem[]): Promise<AnimationTournamentStatusEntry[]> {
     return Promise.all(
       jobs.map(async (job) => ({
         job,
-        status: await loadCodexRunnerStatus(job.id)
+        status: await loadZaiRunnerStatus(job.id)
       }))
     );
   }
 
   function terminalAnimationTournamentStatuses(statuses: AnimationTournamentStatusEntry[]) {
     return statuses.filter(
-      (entry): entry is AnimationTournamentTerminalStatusEntry => Boolean(entry.status) && !shouldWaitForCodexRunner(entry.status ?? undefined)
+      (entry): entry is AnimationTournamentTerminalStatusEntry => Boolean(entry.status) && !shouldWaitForZaiRunner(entry.status ?? undefined)
     );
   }
 
@@ -6740,7 +6740,7 @@ function App() {
       .sort((left, right) => (left.job.tournamentCandidateIndex ?? 0) - (right.job.tournamentCandidateIndex ?? 0));
   }
 
-  async function finalizeCodexAnimationTournamentWinner(
+  async function finalizeZaiAnimationTournamentWinner(
     tournamentId: string,
     winner: DirectionSplitTournamentCandidateEvaluation,
     statuses: AnimationTournamentStatusEntry[],
@@ -6748,9 +6748,9 @@ function App() {
     expectedCount: number,
     decision?: AnimationTournamentWinnerDecision
   ) {
-    let publishedWinner = await publishCodexTournamentWinner(tournamentId, winner.job.id, decision);
+    let publishedWinner = await publishZaiTournamentWinner(tournamentId, winner.job.id, decision);
     if ((publishedWinner.cancellationResults ?? []).some((result) => !result.ok)) {
-      publishedWinner = await publishCodexTournamentWinner(tournamentId, winner.job.id, decision);
+      publishedWinner = await publishZaiTournamentWinner(tournamentId, winner.job.id, decision);
       const unconfirmedCancellations = (publishedWinner.cancellationResults ?? []).filter((result) => !result.ok);
       if (unconfirmedCancellations.length > 0) {
         throw new Error(
@@ -6771,8 +6771,8 @@ function App() {
     const fallbackCancellationResults = await Promise.all(
       statuses
         .filter(({ job }) => job.id !== winner.job.id && !serverStoppedJobIds.has(job.id))
-        .filter(({ status }) => shouldWaitForCodexRunner(status ?? undefined))
-        .map(({ job }) => cancelCodexJob(job.id).catch(() => null))
+        .filter(({ status }) => shouldWaitForZaiRunner(status ?? undefined))
+        .map(({ job }) => cancelZaiJob(job.id).catch(() => null))
     );
     const cancellationResultsByJob = new Map(
       serverCancellationResults.map((result) => [result.jobId, result] as const)
@@ -6782,11 +6782,11 @@ function App() {
     });
     const cancellationResults = [...cancellationResultsByJob.values()];
     statuses.forEach(({ job, status }) => {
-      clearCodexFailureNotice(job.id);
+      clearZaiFailureNotice(job.id);
       const cancelled = cancellationResults.some((result) => result?.jobId === job.id && result.ok);
-      removeCodexJob(job.id, cancelled ? "failed" : status?.state ?? "completed", { notify: false });
+      removeZaiJob(job.id, cancelled ? "failed" : status?.state ?? "completed", { notify: false });
     });
-    notifyCodexJobFinished(winner.job, "completed");
+    notifyZaiJobFinished(winner.job, "completed");
     const candidateIndex = winner.job.tournamentCandidateIndex ?? 0;
     setStatus(
       `${copy.statusAnimationGenerated}: tournament winner ${tournamentCandidateLabel(candidateIndex, expectedCount)} (${winner.job.id}), score ${Math.round(winner.score)}, warnings ${winner.warningCount}. Compared ${comparedEvaluations.length} usable candidate${comparedEvaluations.length === 1 ? "" : "s"} and cancelled ${cancellationResults.filter((result) => result?.ok).length} remaining runner${cancellationResults.filter((result) => result?.ok).length === 1 ? "" : "s"}. direction-split manifest ok.`
@@ -6794,7 +6794,7 @@ function App() {
     return "imported";
   }
 
-  function failCodexAnimationTournament(
+  function failZaiAnimationTournament(
     tournamentId: string,
     statuses: AnimationTournamentStatusEntry[],
     evaluations: DirectionSplitTournamentCandidateEvaluation[],
@@ -6807,7 +6807,7 @@ function App() {
         : "";
       const reasons = sharedDiagnosticKind
         ? (() => {
-            const failure = codexFailureDisplay(sharedDiagnosticKind, copy, primary.status.diagnostic);
+            const failure = zaiFailureDisplay(sharedDiagnosticKind, copy, primary.status.diagnostic);
             return `all ${evaluations.length}/${expectedCount} candidates: ${failure.title}: ${failure.message}`;
           })()
         : evaluations
@@ -6818,7 +6818,7 @@ function App() {
             })
             .join("; ");
       const hasQualityGateFailure = /quality gate|chroma key|direction split qa failed|transparency damage|quarantined/i.test(reasons);
-      recordCodexImportFailure(
+      recordZaiImportFailure(
         primary.job,
         new Error(
           hasQualityGateFailure
@@ -6826,15 +6826,15 @@ function App() {
             : `Needs review candidate: all animation tournament candidates failed. ${reasons}. Raw direction files are still available in hidden candidate work folders.`
         )
       );
-      notifyCodexJobFinished(primary.job, "failed");
+      notifyZaiJobFinished(primary.job, "failed");
     }
-    statuses.forEach(({ job, status }) => removeCodexJob(job.id, status?.state ?? "failed", { notify: false }));
+    statuses.forEach(({ job, status }) => removeZaiJob(job.id, status?.state ?? "failed", { notify: false }));
     setStatus(`Animation tournament failed: ${tournamentId}`);
     return "terminal";
   }
 
   useEffect(() => {
-    const retryableNotices = codexFailureNotices.filter(
+    const retryableNotices = zaiFailureNotices.filter(
       (notice) => notice.diagnostic.kind === "import_failed" && notice.retryJob
     );
     if (retryableNotices.length === 0) return;
@@ -6851,14 +6851,14 @@ function App() {
         }
         if (cancelled) continue;
         if (!notice.lastOutboxFingerprint) {
-          updateCodexFailureNoticeOutboxFingerprint(notice.jobId, outboxFingerprint);
+          updateZaiFailureNoticeOutboxFingerprint(notice.jobId, outboxFingerprint);
           continue;
         }
         if (notice.lastOutboxFingerprint === outboxFingerprint) continue;
 
         retryingFailureJobIdsRef.current.add(notice.jobId);
         try {
-          updateCodexFailureNoticeOutboxFingerprint(notice.jobId, outboxFingerprint, new Date().toISOString());
+          updateZaiFailureNoticeOutboxFingerprint(notice.jobId, outboxFingerprint, new Date().toISOString());
           await importLatestOutboxResult({
             background: true,
             newerThan: notice.retryJob.createdAt,
@@ -6879,46 +6879,46 @@ function App() {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [codexFailureNotices, language]);
+  }, [zaiFailureNotices, language]);
 
   useEffect(() => {
     const reservedTournamentStarts = reservedAnimationInitialCandidateSlots(startingPersistedTournamentCandidatesRef.current);
     if (
-      effectiveCodexRunnerCount(codexJobs, startingQueuedJobIdsRef.current, serverActiveCodexRunnerCount) +
+      effectiveZaiRunnerCount(zaiJobs, startingQueuedJobIdsRef.current, serverActiveZaiRunnerCount) +
       reservedTournamentStarts >=
-      MAX_ACTIVE_CODEX_JOBS
+      MAX_ACTIVE_ZAI_JOBS
     ) return;
 
-    const queuedJobsToStart: CodexJobQueueItem[] = [];
+    const queuedJobsToStart: ZaiJobQueueItem[] = [];
     const plannedStartingIds = new Set(startingQueuedJobIdsRef.current);
-    for (const job of codexJobs
+    for (const job of zaiJobs
       .filter((job) => job.state === "queued" && job.request)
     ) {
       if (!job.request) continue;
-      if (!canStartCodexJobDraft(
+      if (!canStartZaiJobDraft(
         job.request,
-        codexJobs,
+        zaiJobs,
         plannedStartingIds,
         reservedTournamentStarts,
-        serverActiveCodexRunnerCount
+        serverActiveZaiRunnerCount
       )) continue;
       queuedJobsToStart.push(job);
       plannedStartingIds.add(job.id);
       if (
-        effectiveCodexRunnerCount(codexJobs, plannedStartingIds, serverActiveCodexRunnerCount) +
+        effectiveZaiRunnerCount(zaiJobs, plannedStartingIds, serverActiveZaiRunnerCount) +
         reservedTournamentStarts >=
-        MAX_ACTIVE_CODEX_JOBS
+        MAX_ACTIVE_ZAI_JOBS
       ) break;
     }
 
     queuedJobsToStart.forEach((job) => {
       if (!job.request || startingQueuedJobIdsRef.current.has(job.id)) return;
       startingQueuedJobIdsRef.current.add(job.id);
-      void submitCodexJobDraft(job.request, job.id).finally(() => {
+      void submitZaiJobDraft(job.request, job.id).finally(() => {
         startingQueuedJobIdsRef.current.delete(job.id);
       });
     });
-  }, [codexJobs, serverActiveCodexRunnerCount]);
+  }, [zaiJobs, serverActiveZaiRunnerCount]);
 
   async function seedSampleWorkspace() {
     const image = await loadImage(SAMPLE_URL);
@@ -7034,19 +7034,19 @@ function App() {
         return;
       }
 
-      if (providerId === "codex-handoff" && workflowMode === "sprite-generate") {
+      if (providerId === "zai-handoff" && workflowMode === "sprite-generate") {
         const profileDefinition = animationGenerationProfileDefinition(animationGenerationProfile);
-        const activeRunnerCount = effectiveCodexRunnerCount(
-          codexJobs,
+        const activeRunnerCount = effectiveZaiRunnerCount(
+          zaiJobs,
           startingQueuedJobIdsRef.current,
-          serverActiveCodexRunnerCount
+          serverActiveZaiRunnerCount
         );
         const reservedRunnerCount = reservedAnimationInitialCandidateSlots(startingPersistedTournamentCandidatesRef.current);
         const admission = planAnimationInitialCandidateAdmission({
           initialCandidateCount: profileDefinition.initialCandidates,
           activeRunnerCount,
           reservedRunnerCount,
-          maxActiveRunnerCount: MAX_ACTIVE_CODEX_JOBS
+          maxActiveRunnerCount: MAX_ACTIVE_ZAI_JOBS
         });
         if (!admission.allowed) {
           setStatus(animationInitialAdmissionMessage(language, admission.occupiedSlots));
@@ -7058,28 +7058,28 @@ function App() {
 
       setIsBusy(true);
       try {
-        const draft = await buildCodexJobDraft();
+        const draft = await buildZaiJobDraft();
         if (!draft) return;
 
         if (isStandardDirectionSplitDraft(draft)) {
-          await submitOrQueueCodexAnimationTournament(draft);
+          await submitOrQueueZaiAnimationTournament(draft);
           return;
         }
 
-        if (!canStartCodexJobDraft(
+        if (!canStartZaiJobDraft(
           draft,
-          codexJobs,
+          zaiJobs,
           startingQueuedJobIdsRef.current,
           0,
-          serverActiveCodexRunnerCount
+          serverActiveZaiRunnerCount
         )) {
-          enqueueCodexJobDraft(draft);
+          enqueueZaiJobDraft(draft);
           return;
         }
 
-        await submitCodexJobDraft(draft);
+        await submitZaiJobDraft(draft);
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : copy.statusCodexJobError);
+        setStatus(error instanceof Error ? error.message : copy.statusZaiJobError);
       } finally {
         setIsBusy(false);
       }
@@ -7091,11 +7091,11 @@ function App() {
     }
   }
 
-  async function buildCodexJobDraft(options?: {
+  async function buildZaiJobDraft(options?: {
     animationSource?: HistoryItem;
     animationPreset?: AnimationPresetExample;
     generationProfile?: AnimationGenerationProfile;
-  }): Promise<CodexJobDraft | null> {
+  }): Promise<ZaiJobDraft | null> {
     const includeSelectedImage = workflowUsesSelectedImage(workflowMode);
     const includeSpriteContext = workflowUsesSpriteContext(workflowMode);
     const isImageEditJob = workflowMode === "image-edit";
@@ -7192,22 +7192,22 @@ function App() {
       ? selectedAnnotations.map((annotation) => annotationWithSourceImageCoordinates(annotation, sourceImageForJob))
       : [];
 
-    const codexPrompt = isEffectJob && currentEffectContext
+    const zaiPrompt = isEffectJob && currentEffectContext
       ? buildEffectAnimationPrompt(currentEffectContext)
       : isAnimationJob
       ? isDirectionalHatchPetAnimationJob
-        ? buildDirectionalHatchPetCodexPrompt({
+        ? buildDirectionalHatchPetZaiPrompt({
             sourceName: sourceImageForJob?.name ?? "",
             motionPrompt: animationMotionPrompt,
             chromaKey: chromaDecision.key
           })
         : isHatchPetAnimationJob
-        ? buildHatchPetCodexPrompt({
+        ? buildHatchPetZaiPrompt({
             sourceName: sourceImageForJob?.name ?? "",
             motionPrompt: animationMotionPrompt,
             chromaKey: chromaDecision.key
           })
-        : buildAnimationCodexPrompt({
+        : buildAnimationZaiPrompt({
             sourceName: sourceImageForJob?.name ?? "",
             motionPrompt: animationMotionPrompt,
             actionName: animationAction.name,
@@ -7219,28 +7219,28 @@ function App() {
             bodyTopology: topologyForJob
           })
       : isImageEditJob
-        ? buildImageEditCodexPrompt({
+        ? buildImageEditZaiPrompt({
             prompt,
             sourceName: sourceImageForJob?.name ?? "",
             annotations: imageEditAnnotations
           })
         : prompt;
-    const codexJobNotes = isEffectJob && currentEffectContext
+    const zaiJobNotes = isEffectJob && currentEffectContext
       ? buildEffectAnimationNotes(currentEffectContext, jobNotes)
       : isAnimationJob
       ? isDirectionalHatchPetAnimationJob
-        ? buildDirectionalHatchPetCodexNotes({
+        ? buildDirectionalHatchPetZaiNotes({
             userNotes: animationPresetNotes,
             chromaKey: chromaDecision.key,
             chromaReason: chromaDecision.reason
           })
         : isHatchPetAnimationJob
-        ? buildHatchPetCodexNotes({
+        ? buildHatchPetZaiNotes({
             userNotes: animationPresetNotes,
             chromaKey: chromaDecision.key,
             chromaReason: chromaDecision.reason
           })
-        : buildAnimationCodexNotes({
+        : buildAnimationZaiNotes({
             userNotes: animationPresetNotes,
             chromaKey: chromaDecision.key,
             chromaReason: chromaDecision.reason,
@@ -7252,7 +7252,7 @@ function App() {
             bodyTopology: topologyForJob
           })
       : isImageEditJob
-        ? buildImageEditCodexNotes({
+        ? buildImageEditZaiNotes({
             userNotes: jobNotes,
             annotations: imageEditAnnotations
           })
@@ -7260,11 +7260,11 @@ function App() {
 
     return {
       workflowMode,
-      prompt: codexPrompt,
+      prompt: zaiPrompt,
       negativePrompt: isEffectJob && currentEffectContext
         ? currentEffectContext.negativePrompt
         : compiledAnimationRecipe?.negativePrompt ?? negativePrompt,
-      jobNotes: codexJobNotes,
+      jobNotes: zaiJobNotes,
       seed,
       size: isDirectionalHatchPetAnimationJob
         ? `${HATCH_PET_CELL.width * HATCH_PET_GRID.columns}x${HATCH_PET_CELL.height * HATCH_PET_GRID.rows} x ${DIRECTIONAL_HATCH_PET_RESULT_COUNT}`
@@ -7294,7 +7294,7 @@ function App() {
             ? HATCH_PET_STATE_ROWS.map((row) => row.id)
             : standardAnimationDirections
         : [],
-      label: codexJobLabel(
+      label: zaiJobLabel(
         workflowMode,
         isEffectJob && currentEffectContext ? currentEffectContext.name : isAnimationJob ? animationMotionPrompt : prompt,
         isEffectJob && currentEffectContext ? currentEffectContext.typeLabel : isAnimationJob ? animationAction.name : undefined
@@ -7316,7 +7316,7 @@ function App() {
     };
   }
 
-  function buildCodexAnimationTournamentDrafts(draft: CodexJobDraft) {
+  function buildZaiAnimationTournamentDrafts(draft: ZaiJobDraft) {
     const tournamentId = createId("anim-tournament");
     const profile = draft.generationProfile ?? "best";
     const profileDefinition = animationGenerationProfileDefinition(profile);
@@ -7327,7 +7327,7 @@ function App() {
         draft.jobNotes,
         `Animation tournament ${tournamentId}, ${tournamentCandidateLabel(index, profileDefinition.maximumCandidates)}, profile ${profile}.`,
         profile === "fast"
-          ? "Generate one efficient candidate. Image Cockpit will not start an automatic fallback candidate."
+          ? "Generate one efficient candidate. Zai Cockpit will not start an automatic fallback candidate."
           : profile === "balanced"
             ? "Generate independently. Candidate C starts only if the first two candidates are failed, warned, low identity, low scoring, or too close to call."
             : "Generate independently. The first completed candidate wins only if it passes the strict solo gate; otherwise Smart Race compares two, then all three if needed."
@@ -7340,13 +7340,13 @@ function App() {
     }));
   }
 
-  async function submitOrQueueCodexAnimationTournament(draft: CodexJobDraft) {
-    const tournamentDrafts = buildCodexAnimationTournamentDrafts(draft);
+  async function submitOrQueueZaiAnimationTournament(draft: ZaiJobDraft) {
+    const tournamentDrafts = buildZaiAnimationTournamentDrafts(draft);
     const tournamentId = tournamentDrafts[0]?.tournamentId ?? "";
     const profile = draft.generationProfile ?? "best";
     const profileDefinition = animationGenerationProfileDefinition(profile);
     const effectiveMotionPilot = motionPilotEnabled && canUseMotionPilot(profile, draft.resultDirections ?? draft.directions);
-    const registration = await registerCodexAnimationTournament(
+    const registration = await registerZaiAnimationTournament(
       tournamentId,
       draft,
       profileDefinition.initialCandidates,
@@ -7370,16 +7370,16 @@ function App() {
     );
   }
 
-  async function registerCodexAnimationTournament(
+  async function registerZaiAnimationTournament(
     tournamentId: string,
-    draft: CodexJobDraft,
+    draft: ZaiJobDraft,
     initialCandidateCount: number,
     maximumCandidateCount: number,
     clientContextExtensions: Record<string, unknown> = {},
     pilotMode = false,
     startInitialCandidates = false
   ) {
-    const response = await fetch("/api/codex/tournaments", {
+    const response = await fetch("/api/zai/tournaments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -7398,7 +7398,7 @@ function App() {
         pilotMode,
         startInitialCandidates,
         pilotDirection: pilotMode ? (draft.resultDirections ?? draft.directions).includes("side") ? "side" : (draft.resultDirections ?? draft.directions)[0] : undefined,
-        jobTemplate: codexJobRequestFromDraft(draft),
+        jobTemplate: zaiJobRequestFromDraft(draft),
         clientContext: {
           label: draft.label,
           workflowMode: draft.resultWorkflowMode,
@@ -7419,12 +7419,12 @@ function App() {
     if (!response.ok) throw new Error(await animationTournamentApiError(response, language));
     const payload = (await response.json()) as {
       tournament: AnimationTournamentManifestClient;
-      jobs?: CodexJobResponse[];
+      jobs?: ZaiJobResponse[];
     };
     return { tournament: payload.tournament, jobs: payload.jobs ?? [] };
   }
 
-  function codexJobRequestFromDraft(draft: CodexJobDraft) {
+  function zaiJobRequestFromDraft(draft: ZaiJobDraft) {
     return {
       workflowMode: draft.workflowMode,
       prompt: draft.prompt,
@@ -7459,10 +7459,10 @@ function App() {
     };
   }
 
-  function enqueueCodexJobDraft(draft: CodexJobDraft) {
+  function enqueueZaiJobDraft(draft: ZaiJobDraft) {
     const queuedAt = new Date().toISOString();
-    const labels = codexJobQueueLabels(language);
-    setCodexJobs((current) => [
+    const labels = zaiJobQueueLabels(language);
+    setZaiJobs((current) => [
       ...current,
       {
         id: createId("queued"),
@@ -7494,13 +7494,13 @@ function App() {
     setStatus(`${labels.queuedStatus}: ${draft.label}`);
   }
 
-  async function submitCodexJobDraft(draft: CodexJobDraft, queuedJobId?: string): Promise<CodexRunnerStatus | null> {
+  async function submitZaiJobDraft(draft: ZaiJobDraft, queuedJobId?: string): Promise<ZaiRunnerStatus | null> {
     setIsBusy(true);
     try {
       const isTournamentCandidate = Boolean(draft.tournamentId) && typeof draft.tournamentCandidateIndex === "number";
       const response = await fetch(isTournamentCandidate
-        ? `/api/codex/tournaments/${encodeURIComponent(draft.tournamentId ?? "")}/candidates`
-        : "/api/codex/jobs", {
+        ? `/api/zai/tournaments/${encodeURIComponent(draft.tournamentId ?? "")}/candidates`
+        : "/api/zai/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(isTournamentCandidate ? {
@@ -7541,14 +7541,14 @@ function App() {
       });
       if (!response.ok) throw new Error(await response.text());
 
-      const responseData = (await response.json()) as CodexJobResponse | { job: CodexJobResponse; tournament?: AnimationTournamentManifestClient };
+      const responseData = (await response.json()) as ZaiJobResponse | { job: ZaiJobResponse; tournament?: AnimationTournamentManifestClient };
       const data = "job" in responseData ? responseData.job : responseData;
       if ("tournament" in responseData && responseData.tournament) updateAnimationTournamentMonitor(responseData.tournament);
       if (draft.resultWorkflowMode === "image-edit") {
         const before = history.find((item) => item.id === draft.resultSourceImageId) ?? selected;
         if (before) setImageEditComparison({ before, jobId: data.id });
       }
-      const submittedJob: CodexJobQueueItem = {
+      const submittedJob: ZaiJobQueueItem = {
         id: data.id,
         path: data.path,
         outboxPath: data.outboxPath,
@@ -7574,62 +7574,62 @@ function App() {
         motionRecipe: draft.motionRecipe,
         effectContext: draft.effectContext
       };
-      if (shouldWaitForCodexRunner(data.runner)) {
-        setCodexJobs((current) => {
+      if (shouldWaitForZaiRunner(data.runner)) {
+        setZaiJobs((current) => {
           const withoutQueued = queuedJobId ? current.filter((job) => job.id !== queuedJobId) : current;
           return [...withoutQueued, submittedJob];
         });
       } else if (queuedJobId) {
-        removeCodexJob(queuedJobId);
+        removeZaiJob(queuedJobId);
       }
-      if (data.runner && !shouldWaitForCodexRunner(data.runner)) {
-        recordTerminalCodexRunnerJob(submittedJob, data.runner);
+      if (data.runner && !shouldWaitForZaiRunner(data.runner)) {
+        recordTerminalZaiRunnerJob(submittedJob, data.runner);
       }
 
-      setStatus(`${copy.statusCodexJobWritten}: ${data.path}. ${runnerStatusMessage(data.runner, copy)}.`);
+      setStatus(`${copy.statusZaiJobWritten}: ${data.path}. ${runnerStatusMessage(data.runner, copy)}.`);
       return data.runner ?? null;
     } catch (error) {
-      if (queuedJobId) removeCodexJob(queuedJobId);
-      setStatus(error instanceof Error ? error.message : copy.statusCodexJobError);
+      if (queuedJobId) removeZaiJob(queuedJobId);
+      setStatus(error instanceof Error ? error.message : copy.statusZaiJobError);
       return null;
     } finally {
       setIsBusy(false);
     }
   }
 
-  function removeCodexJob(jobId: string, finalState?: CodexJobLogItem["state"], options: { notify?: boolean } = {}) {
-    const removedJob = codexJobs.find((job) => job.id === jobId);
-    setCodexJobs((current) => current.filter((job) => job.id !== jobId));
+  function removeZaiJob(jobId: string, finalState?: ZaiJobLogItem["state"], options: { notify?: boolean } = {}) {
+    const removedJob = zaiJobs.find((job) => job.id === jobId);
+    setZaiJobs((current) => current.filter((job) => job.id !== jobId));
     if (!removedJob || !finalState) return;
-    if (options.notify !== false) notifyCodexJobFinished(removedJob, finalState);
+    if (options.notify !== false) notifyZaiJobFinished(removedJob, finalState);
 
-    setCodexJobLogs((logs) =>
-      mergeCodexJobLogs(logs, [
-        createCodexJobLogItem(removedJob, logs.find((item) => item.jobId === jobId), finalState)
+    setZaiJobLogs((logs) =>
+      mergeZaiJobLogs(logs, [
+        createZaiJobLogItem(removedJob, logs.find((item) => item.jobId === jobId), finalState)
       ])
     );
-    void loadCodexJobLog(jobId)
+    void loadZaiJobLog(jobId)
       .then((log) => {
-        setCodexJobLogs((logs) => mergeCodexJobLogs(logs, [createCodexJobLogItem(removedJob, log, finalState)]));
+        setZaiJobLogs((logs) => mergeZaiJobLogs(logs, [createZaiJobLogItem(removedJob, log, finalState)]));
       })
       .catch((error) => {
-        setCodexJobLogs((logs) =>
-          mergeCodexJobLogs(logs, [
-            createCodexJobLogItem(
+        setZaiJobLogs((logs) =>
+          mergeZaiJobLogs(logs, [
+            createZaiJobLogItem(
               removedJob,
               logs.find((item) => item.jobId === jobId),
               finalState,
-              error instanceof Error ? error.message : "Could not read Codex log"
+              error instanceof Error ? error.message : "Could not read Zai log"
             )
           ])
         );
       });
   }
 
-  function recordTerminalCodexRunnerJob(job: CodexJobQueueItem, runnerStatus: CodexRunnerStatus) {
-    setCodexJobLogs((logs) =>
-      mergeCodexJobLogs(logs, [
-        createCodexJobLogItem(job, {
+  function recordTerminalZaiRunnerJob(job: ZaiJobQueueItem, runnerStatus: ZaiRunnerStatus) {
+    setZaiJobLogs((logs) =>
+      mergeZaiJobLogs(logs, [
+        createZaiJobLogItem(job, {
           text: runnerStatus.message,
           exists: Boolean(runnerStatus.logPath),
           modifiedAt: runnerStatus.finishedAt ?? runnerStatus.startedAt ?? new Date().toISOString(),
@@ -7637,17 +7637,17 @@ function App() {
         }, runnerStatus.state)
       ])
     );
-    if (runnerStatus.diagnostic) recordCodexFailure(job, runnerStatus);
+    if (runnerStatus.diagnostic) recordZaiFailure(job, runnerStatus);
     if (runnerStatus.logPath) {
-      void loadCodexJobLog(job.id)
+      void loadZaiJobLog(job.id)
         .then((log) => {
-          setCodexJobLogs((logs) => mergeCodexJobLogs(logs, [createCodexJobLogItem(job, log, runnerStatus.state)]));
+          setZaiJobLogs((logs) => mergeZaiJobLogs(logs, [createZaiJobLogItem(job, log, runnerStatus.state)]));
         })
         .catch(() => undefined);
     }
   }
 
-  function notifyCodexJobFinished(job: Pick<CodexJobQueueItem, "label">, finalState: CodexJobLogItem["state"]) {
+  function notifyZaiJobFinished(job: Pick<ZaiJobQueueItem, "label">, finalState: ZaiJobLogItem["state"]) {
     if (!jobNotificationsEnabled || finalState === "running" || finalState === "queued") return;
     const isSuccess = finalState === "completed";
     const title = isSuccess ? copy.jobNotificationDone : copy.jobNotificationFailed;
@@ -7675,9 +7675,9 @@ function App() {
     }, 9000);
   }
 
-  function recordCodexFailure(job: CodexJobQueueItem, runnerStatus: CodexRunnerStatus) {
+  function recordZaiFailure(job: ZaiJobQueueItem, runnerStatus: ZaiRunnerStatus) {
     if (!runnerStatus.diagnostic) return;
-    const notice: CodexFailureNotice = {
+    const notice: ZaiFailureNotice = {
       id: `${runnerStatus.jobId}-failure`,
       jobId: runnerStatus.jobId,
       label: job.label,
@@ -7685,14 +7685,14 @@ function App() {
       workflowMode: job.workflowMode,
       diagnostic: runnerStatus.diagnostic
     };
-    setCodexFailureNotices((current) =>
+    setZaiFailureNotices((current) =>
       current.some((item) => item.jobId === notice.jobId)
         ? current.map((item) => (item.jobId === notice.jobId ? notice : item))
         : [notice, ...current].slice(0, 12)
     );
   }
 
-  function createCodexFailureRetryJob(job: CodexJobQueueItem): CodexJobQueueItem {
+  function createZaiFailureRetryJob(job: ZaiJobQueueItem): ZaiJobQueueItem {
     return {
       ...job,
       state: "running",
@@ -7700,12 +7700,12 @@ function App() {
     };
   }
 
-  function clearCodexFailureNotice(jobId: string) {
-    setCodexFailureNotices((current) => current.filter((notice) => notice.jobId !== jobId));
+  function clearZaiFailureNotice(jobId: string) {
+    setZaiFailureNotices((current) => current.filter((notice) => notice.jobId !== jobId));
   }
 
-  function updateCodexFailureNoticeOutboxFingerprint(jobId: string, fingerprint: string, attemptedAt?: string) {
-    setCodexFailureNotices((current) =>
+  function updateZaiFailureNoticeOutboxFingerprint(jobId: string, fingerprint: string, attemptedAt?: string) {
+    setZaiFailureNotices((current) =>
       current.map((notice) =>
         notice.jobId === jobId
           ? {
@@ -7718,53 +7718,53 @@ function App() {
     );
   }
 
-  async function loadOutboxFingerprintForJob(job: CodexJobQueueItem) {
-    const response = await fetch("/api/codex/results?limit=200");
+  async function loadOutboxFingerprintForJob(job: ZaiJobQueueItem) {
+    const response = await fetch("/api/zai/results?limit=200");
     if (!response.ok) throw new Error(await response.text());
-    const data = (await response.json()) as { results: CodexOutboxResult[] };
+    const data = (await response.json()) as { results: ZaiOutboxResult[] };
     return fingerprintOutboxResults(data.results, job.id, job.createdAt);
   }
 
-  async function markCodexArtifactQualityGate(
+  async function markZaiArtifactQualityGate(
     jobId: string,
-    classification: Exclude<CodexResultQualityClassification, "usable-final" | "running">,
+    classification: Exclude<ZaiResultQualityClassification, "usable-final" | "running">,
     reason: string,
     code: string
   ) {
     try {
-      const response = await fetch(`/api/codex/artifacts/${encodeURIComponent(jobId)}/quality-gate`, {
+      const response = await fetch(`/api/zai/artifacts/${encodeURIComponent(jobId)}/quality-gate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ classification, reason, code })
       });
-      if (!response.ok) console.warn(`Could not persist Codex quality gate for ${jobId}: ${await response.text()}`);
+      if (!response.ok) console.warn(`Could not persist Zai quality gate for ${jobId}: ${await response.text()}`);
     } catch (error) {
-      console.warn(`Could not persist Codex quality gate for ${jobId}`, error);
+      console.warn(`Could not persist Zai quality gate for ${jobId}`, error);
     }
   }
 
-  async function persistCodexAnimationQuality(jobId: string, animationQuality: AnimationQualityReportV2) {
+  async function persistZaiAnimationQuality(jobId: string, animationQuality: AnimationQualityReportV2) {
     try {
-      const response = await fetch(`/api/codex/artifacts/${encodeURIComponent(jobId)}/animation-quality`, {
+      const response = await fetch(`/api/zai/artifacts/${encodeURIComponent(jobId)}/animation-quality`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ report: animationQuality })
       });
-      if (!response.ok) console.warn(`Could not persist Codex animation quality report for ${jobId}: ${await response.text()}`);
+      if (!response.ok) console.warn(`Could not persist Zai animation quality report for ${jobId}: ${await response.text()}`);
     } catch (error) {
-      console.warn(`Could not persist Codex animation quality report for ${jobId}`, error);
+      console.warn(`Could not persist Zai animation quality report for ${jobId}`, error);
     }
   }
 
-  function recordCodexImportFailure(job: CodexJobQueueItem, error: unknown) {
+  function recordZaiImportFailure(job: ZaiJobQueueItem, error: unknown) {
     if (error instanceof DirectionSplitQualityError) {
-      void persistCodexAnimationQuality(job.id, error.animationQuality);
+      void persistZaiAnimationQuality(job.id, error.animationQuality);
     }
-    const reason = summarizeCodexImportFailureReason(error);
+    const reason = summarizeZaiImportFailureReason(error);
     const isReviewCandidate = isStandardDirectionSplitJob(job) && /bronze candidate|needs review|raw direction candidate/i.test(reason);
     const isQualityGateFailure = isStandardDirectionSplitJob(job) && /quality gate|chroma key|transparency damage|direction split qa failed|quarantined/i.test(reason);
     if (isReviewCandidate || isQualityGateFailure) {
-      void markCodexArtifactQualityGate(
+      void markZaiArtifactQualityGate(
         job.id,
         isReviewCandidate ? "quarantined-candidate" : "quality-failed",
         reason,
@@ -7776,8 +7776,8 @@ function App() {
       : isQualityGateFailure
       ? (language === "ja" ? "素材品質チェックで弾かれました" : "Material quality gate failed")
       : isStandardDirectionSplitJob(job)
-      ? copy.codexFailureDirectionSplitImportFailedTitle
-      : copy.codexFailureImportFailedTitle;
+      ? copy.zaiFailureDirectionSplitImportFailedTitle
+      : copy.zaiFailureImportFailedTitle;
     const suggestion = isReviewCandidate
       ? (language === "ja"
           ? "raw候補を確認、ダウンロード、再取り込み、または再生成してください。"
@@ -7786,23 +7786,23 @@ function App() {
       ? (language === "ja"
           ? "候補はfinalとして保存せず、diagnosticsを確認して再生成してください。"
           : "The candidate was not saved as a final result. Review diagnostics and regenerate the job.")
-      : copy.codexFailureImportFailedSuggestion;
-    const diagnostic: CodexJobDiagnostic = {
+      : copy.zaiFailureImportFailedSuggestion;
+    const diagnostic: ZaiJobDiagnostic = {
       kind: "import_failed",
       title,
-      userMessage: `${copy.codexFailureImportFailedMessage} ${copy.codexFailureImportFailedReason}: ${reason}`,
+      userMessage: `${copy.zaiFailureImportFailedMessage} ${copy.zaiFailureImportFailedReason}: ${reason}`,
       suggestion
     };
-    const notice: CodexFailureNotice = {
+    const notice: ZaiFailureNotice = {
       id: `${job.id}-import-failed`,
       jobId: job.id,
       label: job.label,
       createdAt: new Date().toISOString(),
       workflowMode: job.workflowMode,
-      retryJob: createCodexFailureRetryJob(job),
+      retryJob: createZaiFailureRetryJob(job),
       diagnostic
     };
-    setCodexFailureNotices((current) =>
+    setZaiFailureNotices((current) =>
       current.some((item) => item.jobId === notice.jobId)
         ? current.map((item) => (item.jobId === notice.jobId ? notice : item))
         : [notice, ...current].slice(0, 12)
@@ -7810,7 +7810,7 @@ function App() {
     return diagnostic;
   }
 
-  async function retryCodexFailureImport(notice: CodexFailureNotice) {
+  async function retryZaiFailureImport(notice: ZaiFailureNotice) {
     if (!notice.retryJob || retryingFailureJobIdsRef.current.has(notice.jobId)) return;
     retryingFailureJobIdsRef.current.add(notice.jobId);
     try {
@@ -7823,10 +7823,10 @@ function App() {
         failOnIncompleteDirectionSplit: false
       });
       if (!imported) {
-        setStatus(`${copy.statusCodexJobPending}: ${notice.jobId}`);
+        setStatus(`${copy.statusZaiJobPending}: ${notice.jobId}`);
       }
     } catch (error) {
-      recordCodexImportFailure(notice.retryJob, error);
+      recordZaiImportFailure(notice.retryJob, error);
       setStatus(error instanceof Error ? error.message : copy.statusInboxError);
     } finally {
       retryingFailureJobIdsRef.current.delete(notice.jobId);
@@ -7917,16 +7917,16 @@ function App() {
   }
 
   async function loadOutboxResults(limit = 200) {
-    const response = await fetch(`/api/codex/results?limit=${limit}`);
+    const response = await fetch(`/api/zai/results?limit=${limit}`);
     if (!response.ok) throw new Error(await response.text());
-    return (await response.json()) as { outboxPath: string; results: CodexOutboxResult[] };
+    return (await response.json()) as { outboxPath: string; results: ZaiOutboxResult[] };
   }
 
-  function isRecoverableOutboxImageResult(result: CodexOutboxResult) {
+  function isRecoverableOutboxImageResult(result: ZaiOutboxResult) {
     return isGenericStaticImageResult(result);
   }
 
-  function isOutboxResultAlreadyImported(result: CodexOutboxResult) {
+  function isOutboxResultAlreadyImported(result: ZaiOutboxResult) {
     const singleKey = buildOutboxImportKey("single", result.name);
     return historyRef.current.some(
       (item) =>
@@ -7959,7 +7959,7 @@ function App() {
     return Boolean(findImportedDirectionSplitArtifact(artifact));
   }
 
-  function countUnimportedOutboxResults(results: CodexOutboxResult[]) {
+  function countUnimportedOutboxResults(results: ZaiOutboxResult[]) {
     const directionSplitCount = findReadyDirectionSplitArtifacts(results).filter(
       (artifact) => !isDirectionSplitArtifactAlreadyImported(artifact)
     ).length;
@@ -8052,19 +8052,19 @@ function App() {
 
     try {
       apiHealth = await fetchJsonWithTimeout<ImageCockpitApiHealth>("/api/health");
-      if (apiHealth.app !== "image-cockpit" || apiHealth.role !== "api") {
-        mismatches.push("API route mismatch: /api/health did not return Image Cockpit API metadata.");
+      if (apiHealth.app !== "zai-cockpit" || apiHealth.role !== "api") {
+        mismatches.push("API route mismatch: /api/health did not return Zai Cockpit API metadata.");
         apiHealth = undefined;
       }
     } catch {
-      mismatches.push("API route mismatch or unavailable: /api/health is not responding as Image Cockpit.");
+      mismatches.push("API route mismatch or unavailable: /api/health is not responding as Zai Cockpit.");
     }
 
     if (apiHealth) {
       try {
         const providersResponse = await fetchJsonWithTimeout<{ providers?: ProviderStatus[] }>("/api/providers");
         const providerIds = new Set((providersResponse.providers ?? []).map((provider) => provider.id));
-        if (!providerIds.has("codex-handoff") || !providerIds.has("local-inbox")) {
+        if (!providerIds.has("zai-handoff") || !providerIds.has("local-inbox")) {
           mismatches.push("API provider schema mismatch.");
         }
       } catch {
@@ -8104,7 +8104,7 @@ function App() {
 
   async function repairCockpit() {
     const confirmed = window.confirm(
-      "Cockpitを修復します。Vite/API/supervisorの整合性だけを確認し、repo、outbox画像、status、logsは削除しません。running Codex jobは停止しません。"
+      "Cockpitを修復します。Vite/API/supervisorの整合性だけを確認し、repo、outbox画像、status、logsは削除しません。running Zai jobは停止しません。"
     );
     if (!confirmed) return;
 
@@ -8231,7 +8231,7 @@ function App() {
     setStatus(`${copy.statusAnimationGenerated}: ${sheetName}. ${formatFramesAddedStatus(newFrames.length, animationAction.name, language)}`);
   }
 
-  async function importAnimationSheetResult(imported: CodexOutboxImportResponse, pendingJob: CodexJobQueueItem) {
+  async function importAnimationSheetResult(imported: ZaiOutboxImportResponse, pendingJob: ZaiJobQueueItem) {
     const actionName = pendingJob.actionName ?? activeAction.name;
     const spriteVariant = pendingJob.spriteVariant ?? "standard";
     const spriteGrid = pendingJob.grid ?? ANIMATION_SHEET_GRID;
@@ -8290,7 +8290,7 @@ function App() {
     setStatus(`${copy.statusAnimationGenerated}: ${item.name}. ${formatFramesAddedStatus(newFrames.length, actionName, language)}`);
   }
 
-  async function importDirectionalHatchPetResults(importedResults: CodexOutboxImportResponse[], pendingJob: CodexJobQueueItem) {
+  async function importDirectionalHatchPetResults(importedResults: ZaiOutboxImportResponse[], pendingJob: ZaiJobQueueItem) {
     const actionName = pendingJob.actionName ?? directionalHatchPetSpriteAction().name;
     const chromaKey = animationChromaKeys[pendingJob.chromaKey ?? animationChromaKey];
     const transparentAtlases = await Promise.all(
@@ -8372,7 +8372,7 @@ function App() {
   function directionSplitRecoveryJobFromArtifact(
     artifact: ReadyDirectionSplitArtifact,
     manifest: DirectionSplitAnimationManifest | null
-  ): CodexJobQueueItem {
+  ): ZaiJobQueueItem {
     const context = directionSplitImportContextFromArtifact(artifact, manifest);
     return {
       id: context.id,
@@ -8406,30 +8406,30 @@ function App() {
         artifact.manifestResult.name
       );
     } catch (error) {
-      recordCodexImportFailure(directionSplitRecoveryJobFromArtifact(artifact, manifest), error);
+      recordZaiImportFailure(directionSplitRecoveryJobFromArtifact(artifact, manifest), error);
       throw error;
     }
   }
 
-  async function loadCodexJobOutboxResults(jobId: string, limit?: number) {
-    const response = await fetch(`/api/codex/jobs/${encodeURIComponent(jobId)}/results${limit ? `?limit=${limit}` : ""}`);
+  async function loadZaiJobOutboxResults(jobId: string, limit?: number) {
+    const response = await fetch(`/api/zai/jobs/${encodeURIComponent(jobId)}/results${limit ? `?limit=${limit}` : ""}`);
     if (!response.ok) throw new Error(await response.text());
-    return (await response.json()) as { outboxPath: string; results: CodexOutboxResult[] };
+    return (await response.json()) as { outboxPath: string; results: ZaiOutboxResult[] };
   }
 
-  async function fetchCodexJobOutboxResult(jobId: string, name: string) {
-    const response = await fetch(`/api/codex/jobs/${encodeURIComponent(jobId)}/results/${encodeURIComponent(name)}`);
+  async function fetchZaiJobOutboxResult(jobId: string, name: string) {
+    const response = await fetch(`/api/zai/jobs/${encodeURIComponent(jobId)}/results/${encodeURIComponent(name)}`);
     if (!response.ok) throw new Error(await response.text());
-    return (await response.json()) as CodexOutboxImportResponse;
+    return (await response.json()) as ZaiOutboxImportResponse;
   }
 
-  async function publishCodexTournamentWinner(
+  async function publishZaiTournamentWinner(
     tournamentId: string,
     jobId: string,
     decision?: AnimationTournamentWinnerDecision,
     updateMonitor = true
   ) {
-    const response = await fetch(`/api/codex/tournaments/${encodeURIComponent(tournamentId)}/winner`, {
+    const response = await fetch(`/api/zai/tournaments/${encodeURIComponent(tournamentId)}/winner`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobId, decision })
@@ -8440,7 +8440,7 @@ function App() {
       tournamentId: string;
       jobId: string;
       outboxPath: string;
-      results: CodexOutboxResult[];
+      results: ZaiOutboxResult[];
       tournament: AnimationTournamentManifestClient;
       cancellationResults?: Array<{ jobId: string; ok: boolean; message?: string }>;
     };
@@ -8448,19 +8448,19 @@ function App() {
     return payload;
   }
 
-  async function cancelCodexJob(jobId: string) {
-    const response = await fetch(`/api/codex/jobs/${encodeURIComponent(jobId)}/cancel`, {
+  async function cancelZaiJob(jobId: string) {
+    const response = await fetch(`/api/zai/jobs/${encodeURIComponent(jobId)}/cancel`, {
       method: "POST"
     });
     if (!response.ok) throw new Error(await response.text());
-    return (await response.json()) as { ok: boolean; jobId: string; status?: CodexRunnerStatus; message?: string };
+    return (await response.json()) as { ok: boolean; jobId: string; status?: ZaiRunnerStatus; message?: string };
   }
 
   async function evaluateDirectionSplitTournamentCandidate(
-    job: CodexJobQueueItem,
-    status: CodexRunnerStatus | null
+    job: ZaiJobQueueItem,
+    status: ZaiRunnerStatus | null
   ): Promise<DirectionSplitTournamentCandidateEvaluation> {
-    const terminalStatus: CodexRunnerStatus = status ?? {
+    const terminalStatus: ZaiRunnerStatus = status ?? {
       jobId: job.id,
       state: "unknown",
       message: "Runner status could not be loaded."
@@ -8489,11 +8489,11 @@ function App() {
     }
 
     try {
-      const listData = await loadCodexJobOutboxResults(job.id);
+      const listData = await loadZaiJobOutboxResults(job.id);
       const results = listData.results;
       const jobResults = results.filter((result) => !shouldIgnoreOutboxResultName(result.name) && isOutboxResultForJob(result.name, job.id));
       const manifestResult = jobResults.find((result) => isDirectionSplitAnimationManifestName(result.name, job.id));
-      const manifest = manifestResult ? parseDirectionSplitAnimationManifest(await fetchCodexJobOutboxResult(job.id, manifestResult.name)) : null;
+      const manifest = manifestResult ? parseDirectionSplitAnimationManifest(await fetchZaiJobOutboxResult(job.id, manifestResult.name)) : null;
       const selection = selectDirectionSplitAnimationResults(jobResults, job.id, manifest, job.directions);
       if (!selection.ready || !selection.manifestResult || selection.directionResults.length !== selection.directions.length) {
         if (shouldWaitForAnimationTournamentArtifacts(selection)) {
@@ -8515,7 +8515,7 @@ function App() {
         return { ...emptyEvaluation, manifest, manifestResult: selection.manifestResult, directionResults: selection.directionResults, error: reason };
       }
 
-      const importedResults = await Promise.all(selection.directionResults.map((result) => fetchCodexJobOutboxResult(job.id, result.name)));
+      const importedResults = await Promise.all(selection.directionResults.map((result) => fetchZaiJobOutboxResult(job.id, result.name)));
       const actionName = job.actionName ?? manifestActionName(manifest);
       const chromaKey = animationChromaKeys[job.chromaKey ?? manifestChromaKeyName(manifest, animationChromaKey)];
       const sourceDataUrl = historyRef.current.find((item) => item.id === job.sourceImageId)?.dataUrl;
@@ -8530,7 +8530,7 @@ function App() {
         job.motionRecipe,
         candidateFrameCount
       );
-      await persistCodexAnimationQuality(job.id, composed.animationQuality);
+      await persistZaiAnimationQuality(job.id, composed.animationQuality);
       const artifactWarnings = selection.artifactStatus?.warnings?.length ?? 0;
       const warningCount = composed.warnings.length + artifactWarnings;
       const artifactQuality = selection.artifactStatus?.quality;
@@ -8552,7 +8552,7 @@ function App() {
       };
     } catch (error) {
       if (error instanceof DirectionSplitQualityError) {
-        await persistCodexAnimationQuality(job.id, error.animationQuality);
+        await persistZaiAnimationQuality(job.id, error.animationQuality);
       }
       return {
         ...emptyEvaluation,
@@ -8562,7 +8562,7 @@ function App() {
   }
 
   async function importDirectionSplitAnimationResults(
-    importedResults: CodexOutboxImportResponse[],
+    importedResults: ZaiOutboxImportResponse[],
     manifest: DirectionSplitAnimationManifest | null,
     importContext: DirectionSplitImportContext,
     manifestName = ""
@@ -8585,7 +8585,7 @@ function App() {
       importedMotionRecipe,
       importedFrameCount
     );
-    await persistCodexAnimationQuality(importContext.id, composed.animationQuality);
+    await persistZaiAnimationQuality(importContext.id, composed.animationQuality);
     const image = await loadImage(composed.dataUrl);
     const itemName = `${importContext.id}-direction-split-animation-sheet.png`;
     const item: HistoryItem = {
@@ -8667,8 +8667,8 @@ function App() {
   }
 
   async function importDirectionSplitBronzeCandidate(
-    importedResults: CodexOutboxImportResponse[],
-    pendingJob: CodexJobQueueItem,
+    importedResults: ZaiOutboxImportResponse[],
+    pendingJob: ZaiJobQueueItem,
     error: unknown
   ) {
     const firstCandidate = importedResults.find((result) => result.mimeType.startsWith("image/"));
@@ -8697,19 +8697,19 @@ function App() {
     setAnimationGenerationMode("standard");
     setStatus(
       result.added
-        ? `${language === "ja" ? "Bronze候補" : "Bronze candidate"}: ${item.name}. ${summarizeCodexImportFailureReason(error)}`
-        : `${language === "ja" ? "取り込み済みのBronze候補" : "Bronze candidate already imported"}: ${result.item.name}. ${summarizeCodexImportFailureReason(error)}`
+        ? `${language === "ja" ? "Bronze候補" : "Bronze candidate"}: ${item.name}. ${summarizeZaiImportFailureReason(error)}`
+        : `${language === "ja" ? "取り込み済みのBronze候補" : "Bronze candidate already imported"}: ${result.item.name}. ${summarizeZaiImportFailureReason(error)}`
     );
   }
 
   async function fetchOutboxResult(name: string) {
     if (shouldIgnoreOutboxResultName(name)) throw new Error(`Ignored temporary or QA outbox result: ${name}`);
-    const importResponse = await fetch(`/api/codex/results/${encodeURIComponent(name)}`);
+    const importResponse = await fetch(`/api/zai/results/${encodeURIComponent(name)}`);
     if (!importResponse.ok) throw new Error(await importResponse.text());
-    return (await importResponse.json()) as CodexOutboxImportResponse;
+    return (await importResponse.json()) as ZaiOutboxImportResponse;
   }
 
-  function selectEffectAnimationSheetResult(results: CodexOutboxResult[], jobId: string) {
+  function selectEffectAnimationSheetResult(results: ZaiOutboxResult[], jobId: string) {
     const staticResults = results
       .filter((result) => isStaticImageResult(result) && isUsableOutboxResult(result))
       .filter((result) => isOutboxResultForJob(result.name, jobId));
@@ -8725,7 +8725,7 @@ function App() {
       })[0];
   }
 
-  async function importEffectAnimationResult(imported: CodexOutboxImportResponse, pendingJob: CodexJobQueueItem, jobResults: CodexOutboxResult[]) {
+  async function importEffectAnimationResult(imported: ZaiOutboxImportResponse, pendingJob: ZaiJobQueueItem, jobResults: ZaiOutboxResult[]) {
     const context = pendingJob.effectContext ?? effectJobContext;
     const normalized = await normalizeEffectSheetDataUrl(imported.dataUrl, context);
     const itemId = createId("hist");
@@ -8934,7 +8934,7 @@ function App() {
     };
   }
 
-  function selectDirectionalHatchPetResults(results: CodexOutboxResult[], jobId: string) {
+  function selectDirectionalHatchPetResults(results: ZaiOutboxResult[], jobId: string) {
     const staticImageResults = results.filter(isStaticImageResult);
     const sheetCandidates = staticImageResults.filter((result) => !/(?:animated|animation|gif|preview)/i.test(result.name));
     const sortedResults = (sheetCandidates.length >= DIRECTIONAL_HATCH_PET_RESULT_COUNT ? sheetCandidates : staticImageResults)
@@ -8943,7 +8943,7 @@ function App() {
     const byDirection = ANIMATION_DIRECTIONS.map((_, index) =>
       sortedResults.find((result) => directionIndexFromResultName(result.name, jobId) === index)
     );
-    if (byDirection.every(Boolean)) return byDirection.filter((result): result is CodexOutboxResult => Boolean(result));
+    if (byDirection.every(Boolean)) return byDirection.filter((result): result is ZaiOutboxResult => Boolean(result));
     return sortedResults.slice(0, DIRECTIONAL_HATCH_PET_RESULT_COUNT);
   }
 
@@ -8986,9 +8986,9 @@ function App() {
     if (!options.background) setIsBusy(true);
     try {
       const pendingJob = options.job;
-      const listResponse = await fetch(`/api/codex/results${options.limit ? `?limit=${options.limit}` : ""}`);
+      const listResponse = await fetch(`/api/zai/results${options.limit ? `?limit=${options.limit}` : ""}`);
       if (!listResponse.ok) throw new Error(await listResponse.text());
-      const listData = (await listResponse.json()) as { outboxPath: string; results: CodexOutboxResult[] };
+      const listData = (await listResponse.json()) as { outboxPath: string; results: ZaiOutboxResult[] };
       const newerThanTime = options.newerThan ? Date.parse(options.newerThan) : Number.NEGATIVE_INFINITY;
       const jobResults = listData.results.filter((result) => {
         if (shouldIgnoreOutboxResultName(result.name)) return false;
@@ -9001,7 +9001,7 @@ function App() {
         const directionSplitSelection = selectDirectionSplitAnimationResults(jobResults, pendingJob.id, manifest, pendingJob.directions);
         if (directionSplitSelection.detected) {
           if (directionSplitSelection.waitingForFinalManifest) {
-            setStatus(`${copy.statusCodexJobPending}: ${pendingJob.id} (waiting for final manifest)`);
+            setStatus(`${copy.statusZaiJobPending}: ${pendingJob.id} (waiting for final manifest)`);
             return false;
           }
           if (directionSplitSelection.waitingForVerifiedArtifacts) {
@@ -9013,15 +9013,15 @@ function App() {
             ) {
               throw new Error(`Bronze candidate for ${pendingJob.id}: ${reason}. Raw direction files are still available.`);
             }
-            setStatus(`${copy.statusCodexJobPending}: ${pendingJob.id} (${reason})`);
+            setStatus(`${copy.statusZaiJobPending}: ${pendingJob.id} (${reason})`);
             return false;
           }
           if (directionSplitSelection.qualityFailed) {
             const reason = directionSplitSelection.artifactStatus?.qualityGate?.reason ?? directionSplitSelection.artifactStatus?.reason ?? "Animation result failed the material quality gate.";
             const qualityError = new Error(`Animation quality gate failed for ${pendingJob.id}: ${reason}. No history or final download item was added.`);
             if (options.failOnIncompleteDirectionSplit || options.throwOnError) throw qualityError;
-            const diagnostic = recordCodexImportFailure(pendingJob, qualityError);
-            removeCodexJob(pendingJob.id, "completed");
+            const diagnostic = recordZaiImportFailure(pendingJob, qualityError);
+            removeZaiJob(pendingJob.id, "completed");
             setStatus(`${diagnostic.title}: ${pendingJob.id}`);
             return false;
           }
@@ -9030,8 +9030,8 @@ function App() {
             if (options.failOnIncompleteDirectionSplit || options.throwOnError) {
               throw new Error(`Bronze candidate quarantined for ${pendingJob.id}: ${reason}. Raw direction files are available for diagnostics, but no final history or download item was added.`);
             }
-            const diagnostic = recordCodexImportFailure(pendingJob, new Error(`Bronze candidate quarantined for ${pendingJob.id}: ${reason}. Raw direction files are available for diagnostics, but no final history or download item was added.`));
-            removeCodexJob(pendingJob.id, "completed");
+            const diagnostic = recordZaiImportFailure(pendingJob, new Error(`Bronze candidate quarantined for ${pendingJob.id}: ${reason}. Raw direction files are available for diagnostics, but no final history or download item was added.`));
+            removeZaiJob(pendingJob.id, "completed");
             if (!options.quietEmpty) setStatus(`${diagnostic.title}: ${pendingJob.id}`);
             return false;
           }
@@ -9048,16 +9048,16 @@ function App() {
           const importedResults = await Promise.all(directionSplitSelection.directionResults.map((result) => fetchOutboxResult(result.name)));
           try {
             await importDirectionSplitAnimationResults(importedResults, manifest, pendingJob, manifestResult?.name);
-            clearCodexFailureNotice(pendingJob.id);
+            clearZaiFailureNotice(pendingJob.id);
           } catch (error) {
-            const qualityError = new Error(`Animation quality gate failed for ${pendingJob.id}: ${summarizeCodexImportFailureReason(error)}. Candidate files are quarantined; no history or final download item was added.`);
+            const qualityError = new Error(`Animation quality gate failed for ${pendingJob.id}: ${summarizeZaiImportFailureReason(error)}. Candidate files are quarantined; no history or final download item was added.`);
             if (options.throwOnError) throw qualityError;
-            const diagnostic = recordCodexImportFailure(pendingJob, qualityError);
+            const diagnostic = recordZaiImportFailure(pendingJob, qualityError);
             setStatus(`${diagnostic.title}: ${pendingJob.id}`);
-            removeCodexJob(pendingJob.id, "completed");
+            removeZaiJob(pendingJob.id, "completed");
             return false;
           }
-          removeCodexJob(pendingJob.id, "completed");
+          removeZaiJob(pendingJob.id, "completed");
           return true;
         }
       }
@@ -9069,8 +9069,8 @@ function App() {
         }
         const importedResults = await Promise.all(directionalResults.map((result) => fetchOutboxResult(result.name)));
         await importDirectionalHatchPetResults(importedResults, pendingJob);
-        clearCodexFailureNotice(pendingJob.id);
-        removeCodexJob(pendingJob.id, "completed");
+        clearZaiFailureNotice(pendingJob.id);
+        removeZaiJob(pendingJob.id, "completed");
         return true;
       }
 
@@ -9083,15 +9083,15 @@ function App() {
         const importedEffect = await fetchOutboxResult(effectResult.name);
         try {
           await importEffectAnimationResult(importedEffect, pendingJob, jobResults);
-          clearCodexFailureNotice(pendingJob.id);
-          removeCodexJob(pendingJob.id, "completed");
+          clearZaiFailureNotice(pendingJob.id);
+          removeZaiJob(pendingJob.id, "completed");
           return true;
         } catch (error) {
-          const qualityError = new Error(`Effect quality gate failed for ${pendingJob.id}: ${summarizeCodexImportFailureReason(error)} Candidate files are quarantined; no history or final download item was added.`);
+          const qualityError = new Error(`Effect quality gate failed for ${pendingJob.id}: ${summarizeZaiImportFailureReason(error)} Candidate files are quarantined; no history or final download item was added.`);
           if (options.throwOnError) throw qualityError;
-          const diagnostic = recordCodexImportFailure(pendingJob, qualityError);
+          const diagnostic = recordZaiImportFailure(pendingJob, qualityError);
           setStatus(`${diagnostic.title}: ${pendingJob.id}`);
-          removeCodexJob(pendingJob.id, "completed");
+          removeZaiJob(pendingJob.id, "completed");
           return false;
         }
       }
@@ -9120,8 +9120,8 @@ function App() {
       const imported = await fetchOutboxResult(latest.name);
       if (pendingJob?.workflowMode === "sprite-generate") {
         await importAnimationSheetResult(imported, pendingJob);
-        clearCodexFailureNotice(pendingJob.id);
-        removeCodexJob(pendingJob.id, "completed");
+        clearZaiFailureNotice(pendingJob.id);
+        removeZaiJob(pendingJob.id, "completed");
         return true;
       }
 
@@ -9160,8 +9160,8 @@ function App() {
         });
       }
       if (pendingJob) {
-        clearCodexFailureNotice(pendingJob.id);
-        removeCodexJob(pendingJob.id, "completed");
+        clearZaiFailureNotice(pendingJob.id);
+        removeZaiJob(pendingJob.id, "completed");
       }
       setStatus(`${copy.statusInboxImported}: ${imported.name}${inserted.added ? "" : " (already imported)"}`);
       return true;
@@ -9627,7 +9627,7 @@ function App() {
     setJobNotes(example.notes);
     setWorkflowMode("image-generate");
     closePromptExamples();
-    setProviderId("codex-handoff");
+    setProviderId("zai-handoff");
     setTool("select");
     setStatus(copy.promptExampleApplied);
   }
@@ -9636,7 +9636,7 @@ function App() {
     setPrompt(promptText);
     setWorkflowMode("image-generate");
     closePromptExamples();
-    setProviderId("codex-handoff");
+    setProviderId("zai-handoff");
     setTool("select");
     setStatus(copy.promptExampleApplied);
   }
@@ -9687,7 +9687,7 @@ function App() {
   function useAnimationPresetExample(example: AnimationPresetExample) {
     selectAnimationPreset(example);
     setWorkflowMode("sprite-generate");
-    setProviderId("codex-handoff");
+    setProviderId("zai-handoff");
     closeAnimationPresetExamples();
     setStatus(`${copy.animationPresetExampleApplied}: ${localizedText(example.title, language)}`);
   }
@@ -9714,7 +9714,7 @@ function App() {
 
   async function handleAnimationPackFiles(files: FileList | File[]) {
     const entries = Array.from(files).filter((file) =>
-      file.name.endsWith(".image-cockpit-animation.zip") || file.name.endsWith(".zip") || file.type.includes("zip")
+      file.name.endsWith(".zai-cockpit-animation.zip") || file.name.endsWith(".zip") || file.type.includes("zip")
     );
     if (entries.length === 0) {
       setStatus(copy.animationPackImportFailed);
@@ -9782,7 +9782,7 @@ function App() {
       setGrid(manifest.grid);
       setWorkflowMode("sprite-generate");
       setAnimationGenerationMode("standard");
-      setProviderId("codex-handoff");
+      setProviderId("zai-handoff");
       setSelectedFrameId("");
       setStatus(`${copy.animationPackUsed}: ${item.title}`);
     } catch (error) {
@@ -10005,7 +10005,7 @@ function App() {
   async function clearLocalStateScope(scope: LocalStateResetScope) {
     const scopeLabel = localStateResetScopeLabel(scope);
     const confirmed = window.confirm(
-      `Clear ${scopeLabel}? This only removes Image Cockpit browser local state. It does not delete repository files, codex-handoff/outbox, docs/qa, or generated PNG files.`
+      `Clear ${scopeLabel}? This only removes Zai Cockpit browser local state. It does not delete repository files, zai-handoff/outbox, docs/qa, or generated PNG files.`
     );
     if (!confirmed) return;
 
@@ -10025,7 +10025,7 @@ function App() {
     }
     if (scope === "all") {
       setActions(normalizeAnimationActions(defaultActions));
-      setCodexJobs([]);
+      setZaiJobs([]);
     }
 
     const message = dbCleared
@@ -10041,35 +10041,35 @@ function App() {
     setStatus(message);
   }
 
-  const codexProvider = providers.find((provider) => provider.id === "codex-handoff");
+  const zaiProvider = providers.find((provider) => provider.id === "zai-handoff");
   const activeWorkflowCopy = workflowCopy[language][workflowMode];
   const activeWorkflowFormCopy = workflowFormCopy[language][workflowMode];
-  const codexQueueCopy = codexJobQueueLabels(language);
+  const zaiQueueCopy = zaiJobQueueLabels(language);
   const isAnimationWorkflow = workflowMode === "sprite-generate";
   const isEffectWorkflow = workflowMode === "effect-animation";
-  const activeCodexRunnerCount = effectiveCodexRunnerCount(
-    codexJobs,
+  const activeZaiRunnerCount = effectiveZaiRunnerCount(
+    zaiJobs,
     startingQueuedJobIdsRef.current,
-    serverActiveCodexRunnerCount
+    serverActiveZaiRunnerCount
   );
   const reservedAnimationRunnerCount = reservedAnimationInitialCandidateSlots(startingPersistedTournamentCandidatesRef.current);
   const animationInitialAdmission = planAnimationInitialCandidateAdmission({
     initialCandidateCount: animationGenerationProfileDefinition(animationGenerationProfile).initialCandidates,
-    activeRunnerCount: activeCodexRunnerCount,
+    activeRunnerCount: activeZaiRunnerCount,
     reservedRunnerCount: reservedAnimationRunnerCount,
-    maxActiveRunnerCount: MAX_ACTIVE_CODEX_JOBS
+    maxActiveRunnerCount: MAX_ACTIVE_ZAI_JOBS
   });
   const animationInitialAdmissionBlocked =
-    providerId === "codex-handoff" &&
+    providerId === "zai-handoff" &&
     isAnimationWorkflow &&
     !animationInitialAdmission.allowed;
   const animationInitialAdmissionStatus = animationInitialAdmissionBlocked
     ? animationInitialAdmissionMessage(language, animationInitialAdmission.occupiedSlots)
     : "";
-  const shouldQueueCodexJob =
-    providerId === "codex-handoff" &&
+  const shouldQueueZaiJob =
+    providerId === "zai-handoff" &&
     !isAnimationWorkflow &&
-    activeCodexRunnerCount + reservedAnimationRunnerCount >= MAX_ACTIVE_CODEX_JOBS;
+    activeZaiRunnerCount + reservedAnimationRunnerCount >= MAX_ACTIVE_ZAI_JOBS;
   const isImageEditWorkflow = workflowMode === "image-edit";
   const animationSourceReady = !isAnimationWorkflow || isAnimationSource(animationSource);
   const animationPreviewSourceMismatch = Boolean(
@@ -10203,9 +10203,9 @@ function App() {
       <header className="topbar">
         <div className="brand">
           <Grid3X3 size={18} aria-hidden="true" />
-          <strong>Image Cockpit for Codex Workflows</strong>
+          <strong>Zai Cockpit</strong>
           <span>{activeWorkflowCopy.label}</span>
-          <small>v0.2.1</small>
+          <small>v0.1.0</small>
         </div>
         <div className="project-strip">
           <LanguageSelect language={language} label={copy.language} onChange={setLanguage} />
@@ -10232,7 +10232,7 @@ function App() {
             <strong>{activeWorkflowCopy.label}</strong>
             <span>{activeWorkflowCopy.detail}</span>
             <em>{copy.selectedProvider}: {providerLabel(providerId, language)}</em>
-            {providerId === "codex-handoff" && (
+            {providerId === "zai-handoff" && (
               <em className={`runner-pill runner-${runnerPreflight?.state ?? "checking"}`}>
                 <Plug size={13} aria-hidden="true" />
                 {runnerPreflightLabel(runnerPreflight, copy)}
@@ -10251,7 +10251,7 @@ function App() {
           {selected?.provider === "local-generator" && (
             <div className="notice local-generator-notice">
               <AlertTriangle size={15} aria-hidden="true" />
-              <span>{language === "ja" ? "この結果はローカル簡易生成です。Codex imagegenの成功結果ではありません。" : "This result is local procedural generation, not a Codex imagegen success result."}</span>
+              <span>{language === "ja" ? "この結果はローカル簡易生成です。Zai imagegenの成功結果ではありません。" : "This result is local procedural generation, not a Zai imagegen success result."}</span>
             </div>
           )}
           {isAnimationWorkflow ? (
@@ -10531,7 +10531,7 @@ function App() {
                     <section className="animation-utility-section batch-matrix-panel">
                       <div className="step-heading">
                         <strong>Batch Matrix</strong>
-                        <span>Characters are rows, motions are columns. Jobs obey the global {MAX_ACTIVE_CODEX_JOBS}-runner limit.</span>
+                        <span>Characters are rows, motions are columns. Jobs obey the global {MAX_ACTIVE_ZAI_JOBS}-runner limit.</span>
                       </div>
                       <div className="batch-matrix-picker">
                         <div>
@@ -10663,7 +10663,7 @@ function App() {
                   aria-describedby={animationInitialAdmissionBlocked ? "animation-runner-admission-status" : undefined}
                 >
                   <PrimaryActionIcon providerId={providerId} isBusy={isBusy} />
-                  {shouldQueueCodexJob ? codexQueueCopy.queueAction : copy.generateLocalSprite}
+                  {shouldQueueZaiJob ? zaiQueueCopy.queueAction : copy.generateLocalSprite}
                 </button>
                 {animationInitialAdmissionBlocked && (
                   <p
@@ -10717,9 +10717,9 @@ function App() {
                       startedInitialCandidateCount < initialCandidates.length;
                     const initialBundleAdmission = planAnimationInitialCandidateAdmission({
                       initialCandidateCount: manifest.initialCandidateCount,
-                      activeRunnerCount: activeCodexRunnerCount,
+                      activeRunnerCount: activeZaiRunnerCount,
                       reservedRunnerCount: reservedAnimationRunnerCount,
-                      maxActiveRunnerCount: MAX_ACTIVE_CODEX_JOBS
+                      maxActiveRunnerCount: MAX_ACTIVE_ZAI_JOBS
                     });
                     const initialBundleStatusId = `tournament-initial-admission-${manifest.tournamentId}`;
                     return (
@@ -11168,7 +11168,7 @@ function App() {
                 </small>
                 <button className="primary-button full" onClick={() => void handleGenerate()} disabled={primaryActionDisabled}>
                   <PrimaryActionIcon providerId={providerId} isBusy={isBusy} />
-                  {shouldQueueCodexJob ? codexQueueCopy.queueAction : language === "ja" ? "エフェクト生成" : "Generate Effect"}
+                  {shouldQueueZaiJob ? zaiQueueCopy.queueAction : language === "ja" ? "エフェクト生成" : "Generate Effect"}
                 </button>
               </section>
             </div>
@@ -11266,8 +11266,8 @@ function App() {
                     <PrimaryActionIcon providerId={providerId} isBusy={isBusy} />
                     {isImageEditWorkflow && selectedEditSourceIsFinalArtifact
                       ? copy.editImage
-                      : shouldQueueCodexJob
-                        ? codexQueueCopy.queueAction
+                      : shouldQueueZaiJob
+                        ? zaiQueueCopy.queueAction
                         : primaryActionLabel(providerId, workflowMode, copy)}
                   </button>
                   <p className="action-note">{copy.generationMayTakeMinutes}</p>
@@ -11333,7 +11333,7 @@ function App() {
                 <div className="button-row primary-action-row">
                   <button className="primary-button" onClick={() => void handleGenerate()} disabled={primaryActionDisabled}>
                     <PrimaryActionIcon providerId={providerId} isBusy={isBusy} />
-                    {shouldQueueCodexJob ? codexQueueCopy.queueAction : primaryActionLabel(providerId, workflowMode, copy)}
+                    {shouldQueueZaiJob ? zaiQueueCopy.queueAction : primaryActionLabel(providerId, workflowMode, copy)}
                   </button>
                 </div>
               )}
@@ -11354,7 +11354,7 @@ function App() {
           <input
             ref={animationPackInputRef}
             type="file"
-            accept=".image-cockpit-animation.zip,.zip,application/zip,application/x-zip-compressed"
+            accept=".zai-cockpit-animation.zip,.zip,application/zip,application/x-zip-compressed"
             multiple
             hidden
             onChange={(event) => {
@@ -11376,7 +11376,7 @@ function App() {
                   >
                     {provider.id === "local-file" && <FolderOpen size={22} aria-hidden="true" />}
                     {provider.id === "local-generator" && <ImagePlus size={22} aria-hidden="true" />}
-                    {provider.id === "codex-handoff" && <Plug size={22} aria-hidden="true" />}
+                    {provider.id === "zai-handoff" && <Plug size={22} aria-hidden="true" />}
                     {provider.id === "local-inbox" && <Archive size={22} aria-hidden="true" />}
                     <span>
                       <strong>{providerLabel(provider.id, language)}</strong>
@@ -11390,8 +11390,8 @@ function App() {
               <div className="notice">
                 <AlertTriangle size={18} aria-hidden="true" />
                 <span>
-                  This app does not call OpenAI APIs directly. Codex jobs are written to the local inbox
-                  {codexProvider?.path ? `: ${codexProvider.path}` : "."}
+                  Generation runs through the local Z.ai agent runner. Zai jobs are written to the local inbox
+                  {zaiProvider?.path ? `: ${zaiProvider.path}` : "."}
                 </span>
               </div>
             </>
@@ -11676,8 +11676,8 @@ function App() {
               {dedupeHistoryLabel}
             </button>
           </div>
-          {providerId === "codex-handoff" && codexJobs.length > 0 && (
-            <CodexJobShelf jobs={codexJobs} maxActive={MAX_ACTIVE_CODEX_JOBS} language={language} />
+          {providerId === "zai-handoff" && zaiJobs.length > 0 && (
+            <ZaiJobShelf jobs={zaiJobs} maxActive={MAX_ACTIVE_ZAI_JOBS} language={language} />
           )}
           {SHOW_LOW_PRIORITY_CONTROLS && (
             <div className="tabs">
@@ -11692,12 +11692,12 @@ function App() {
             data-total-count={history.length}
             onScroll={handleHistoryScroll}
           >
-            {codexFailureNotices.map((notice) => (
-              <CodexFailureCard
+            {zaiFailureNotices.map((notice) => (
+              <ZaiFailureCard
                 key={notice.id}
                 notice={notice}
                 language={language}
-                onRetryImport={notice.retryJob ? retryCodexFailureImport : undefined}
+                onRetryImport={notice.retryJob ? retryZaiFailureImport : undefined}
               />
             ))}
             {visibleHistory.map((item) => {
@@ -11897,15 +11897,15 @@ function App() {
         )}
       </main>
 
-      <CodexLogPanel
-        logs={codexJobLogs}
-        jobs={codexJobs}
-        collapsed={codexLogsCollapsed}
-        fullscreen={codexLogsFullscreen}
+      <ZaiLogPanel
+        logs={zaiJobLogs}
+        jobs={zaiJobs}
+        collapsed={zaiLogsCollapsed}
+        fullscreen={zaiLogsFullscreen}
         language={language}
-        onToggle={() => setCodexLogsCollapsed((current) => !current)}
-        onEnterFullscreen={enterCodexLogsFullscreen}
-        onExitFullscreen={() => setCodexLogsFullscreen(false)}
+        onToggle={() => setZaiLogsCollapsed((current) => !current)}
+        onEnterFullscreen={enterZaiLogsFullscreen}
+        onExitFullscreen={() => setZaiLogsFullscreen(false)}
       />
 
       <footer className="statusbar">
@@ -11945,9 +11945,9 @@ function App() {
           initialReview={animationReviewManifest.humanReview}
           initialDirection={animationReviewManifest.pilotMode ? animationReviewManifest.pilotDirection : undefined}
           loading={animationReviewLoading}
-          adoptDisabled={animationReviewManifest.pilotMode && animationReviewManifest.state === "pilot-review" && activeCodexRunnerCount >= MAX_ACTIVE_CODEX_JOBS}
-          adoptDisabledReason={animationReviewManifest.pilotMode && animationReviewManifest.state === "pilot-review" && activeCodexRunnerCount >= MAX_ACTIVE_CODEX_JOBS
-            ? `Runner slots are full (${activeCodexRunnerCount}/${MAX_ACTIVE_CODEX_JOBS}). Pilot expansion will remain in review until a slot is free.`
+          adoptDisabled={animationReviewManifest.pilotMode && animationReviewManifest.state === "pilot-review" && activeZaiRunnerCount >= MAX_ACTIVE_ZAI_JOBS}
+          adoptDisabledReason={animationReviewManifest.pilotMode && animationReviewManifest.state === "pilot-review" && activeZaiRunnerCount >= MAX_ACTIVE_ZAI_JOBS
+            ? `Runner slots are full (${activeZaiRunnerCount}/${MAX_ACTIVE_ZAI_JOBS}). Pilot expansion will remain in review until a slot is free.`
             : undefined}
           onClose={closeAnimationReviewCockpit}
           onSaveReview={saveAnimationHumanReview}
@@ -12091,7 +12091,7 @@ function SettingsModal({
   language: Language;
   report: EnvironmentReport;
   cockpitHealth: CockpitHealthReport;
-  runnerPreflight: CodexRunnerPreflight | null;
+  runnerPreflight: ZaiRunnerPreflight | null;
   storageScreen: LocalStateScreenState;
   storageClearState: { scope?: LocalStateResetScope; message?: string; error?: string };
   copyStatus?: string;
@@ -12167,9 +12167,9 @@ function SettingsModal({
         {activeTab === "general" && (
           <div className="settings-section">
             <article className="settings-card">
-              <small>Image Cockpit</small>
-              <strong>v0.2.1</strong>
-              <span>{isJa ? "ChatGPTの画像生成可否と、ローカルCodex runner内でimagegenを使えるかは別の状態です。" : "ChatGPT image generation availability and local Codex runner imagegen availability are separate states."}</span>
+              <small>Zai Cockpit</small>
+              <strong>v0.1.0</strong>
+              <span>{isJa ? "ChatGPTの画像生成可否と、ローカルZai runner内でimagegenを使えるかは別の状態です。" : "ChatGPT image generation availability and local Zai runner imagegen availability are separate states."}</span>
             </article>
             <article className="settings-card">
               <small>{isJa ? "現在の状態" : "Current state"}</small>
@@ -12237,7 +12237,7 @@ function SettingsModal({
               onRepair={onRepair}
             />
             <article className="settings-card">
-              <small>Codex Runner</small>
+              <small>Zai Runner</small>
               <strong>{runnerPreflight?.state ?? cockpitHealth.api?.runner.state ?? "unknown"}</strong>
               <span>{runnerPreflight?.setupHint ?? runnerPreflight?.message ?? cockpitHealth.api?.runner.message ?? "No runner detail available."}</span>
             </article>
@@ -12302,7 +12302,7 @@ function LocalStateRecoveryScreen({
   message?: string;
   error?: string;
   runnerLabel: string;
-  runnerState: CodexRunnerPreflight["state"];
+  runnerState: ZaiRunnerPreflight["state"];
   clearingScope?: LocalStateResetScope;
   clearMessage?: string;
   clearError?: string;
@@ -12325,13 +12325,13 @@ function LocalStateRecoveryScreen({
             : "Local state recovery";
   const detail =
     mode === "checking"
-      ? "Image Cockpit is checking origin storage before reading IndexedDB."
+      ? "Zai Cockpit is checking origin storage before reading IndexedDB."
       : mode === "safe"
         ? "Large history, frames, and animation library state were not loaded."
         : mode === "reset"
           ? "Choose a reset action. Browser state is cleared only after confirmation."
           : mode === "reset-complete"
-            ? "Image Cockpit browser local state has been cleared for this origin."
+            ? "Zai Cockpit browser local state has been cleared for this origin."
             : "Origin storage is above the safe startup threshold, so large local state was skipped.";
   const usage = formatStorageBytes(preflight?.estimate?.usage);
   const quota = formatStorageBytes(preflight?.estimate?.quota);
@@ -12344,9 +12344,9 @@ function LocalStateRecoveryScreen({
       <header className="topbar">
         <div className="brand">
           <Grid3X3 size={18} aria-hidden="true" />
-          <strong>Image Cockpit for Codex Workflows</strong>
+          <strong>Zai Cockpit</strong>
           <span>Storage recovery</span>
-          <small>v0.2.1</small>
+          <small>v0.1.0</small>
         </div>
       </header>
 
@@ -12373,7 +12373,7 @@ function LocalStateRecoveryScreen({
               <span>Warning 200 MB / Auto safe 500 MB / Hard block 1 GB</span>
             </div>
             <div>
-              <small>Codex runner</small>
+              <small>Zai runner</small>
               <strong className={`runner-pill runner-${runnerState}`}>
                 <Plug size={14} aria-hidden="true" />
                 {runnerLabel}
@@ -12415,7 +12415,7 @@ function LocalStateRecoveryScreen({
           <div className="storage-reset-panel">
             <div>
               <strong>Reset browser local state</strong>
-              <span>These actions never delete repository files, codex-handoff/outbox, docs/qa, or generated PNG files.</span>
+              <span>These actions never delete repository files, zai-handoff/outbox, docs/qa, or generated PNG files.</span>
             </div>
             <div className="storage-reset-grid">
               <button className="secondary-button" onClick={onDedupeHistory} disabled={clearingScope === "history"}>
@@ -12436,7 +12436,7 @@ function LocalStateRecoveryScreen({
               </button>
               <button className="secondary-button storage-danger-button" onClick={() => onClear("all")} disabled={clearingScope === "all"}>
                 <Trash2 size={16} aria-hidden="true" />
-                Clear all local Image Cockpit state
+                Clear all local Zai Cockpit state
               </button>
             </div>
           </div>
@@ -12474,11 +12474,11 @@ function localStateResetScopeLabel(scope: LocalStateResetScope) {
   if (scope === "frames") return "frames";
   if (scope === "animation-library") return "animation library";
   if (scope === "actions") return "actions";
-  return "all local Image Cockpit state";
+  return "all local Zai Cockpit state";
 }
 
 function selectedImageSafeBaseName(item: Pick<HistoryItem, "name">) {
-  const baseName = item.name.replace(/\.[^.]+$/, "") || "image-cockpit-result";
+  const baseName = item.name.replace(/\.[^.]+$/, "") || "zai-cockpit-result";
   return baseName.replace(/[<>:"/\\|?*\x00-\x1F]+/g, "-");
 }
 
@@ -12551,7 +12551,7 @@ function buildSelectedAnimationPackManifest({
   const title = draft.title.trim() || selected.name.replace(/\.[^.]+$/, "") || action.name;
   const resolvedDirections = directions.length > 0 ? directions : ANIMATION_DIRECTIONS;
   return {
-    schema: "image-cockpit.animation.v1",
+    schema: "zai-cockpit.animation.v1",
     title,
     kind: "user",
     action: action.name,
@@ -12561,7 +12561,7 @@ function buildSelectedAnimationPackManifest({
     framesPerDirection: grid.columns,
     playback: action.playbackMode ?? "normal",
     createdAt: new Date().toISOString(),
-    createdWith: "Image Cockpit for Codex Workflows",
+    createdWith: "Zai Cockpit",
     license: draft.license.trim(),
     sourceNote: draft.sourceNote.trim(),
     promptSummary: draft.includePromptSummary ? draft.promptSummary.trim() : "",
@@ -12671,7 +12671,7 @@ function safeAnimationFileBaseName(title: string, action: string) {
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .toLowerCase() || "image-cockpit-animation";
+    .toLowerCase() || "zai-cockpit-animation";
 }
 
 function safeAnimationDirectionFileName(direction: string) {
@@ -12724,20 +12724,20 @@ function LanguageSelect({
   );
 }
 
-function useCodexProgressNow(active: boolean) {
+function useZaiProgressNow(active: boolean) {
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
     if (!active) return;
     setNowMs(Date.now());
-    const intervalId = window.setInterval(() => setNowMs(Date.now()), CODEX_PROGRESS_TICK_MS);
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), ZAI_PROGRESS_TICK_MS);
     return () => window.clearInterval(intervalId);
   }, [active]);
 
   return nowMs;
 }
 
-function codexProgressPhaseLabel(labels: ReturnType<typeof codexJobQueueLabels>, phase: CodexJobProgressPhase) {
+function zaiProgressPhaseLabel(labels: ReturnType<typeof zaiJobQueueLabels>, phase: ZaiJobProgressPhase) {
   if (phase === "queued") return labels.phaseQueued;
   if (phase === "starting") return labels.phaseStarting;
   if (phase === "checking") return labels.phaseChecking;
@@ -12745,68 +12745,68 @@ function codexProgressPhaseLabel(labels: ReturnType<typeof codexJobQueueLabels>,
   return labels.phaseGenerating;
 }
 
-function CodexJobProgress({
+function ZaiJobProgress({
   job,
   labels,
   compact = false
 }: {
-  job: Pick<CodexJobQueueItem, "state" | "createdAt" | "workflowMode">;
-  labels: ReturnType<typeof codexJobQueueLabels>;
+  job: Pick<ZaiJobQueueItem, "state" | "createdAt" | "workflowMode">;
+  labels: ReturnType<typeof zaiJobQueueLabels>;
   compact?: boolean;
 }) {
   const active = job.state === "running" || job.state === "queued";
-  const nowMs = useCodexProgressNow(active);
+  const nowMs = useZaiProgressNow(active);
   if (!active) return null;
 
-  const phase = codexJobProgressPhase(job.state, job.createdAt, nowMs, job.workflowMode);
-  const phaseLabel = codexProgressPhaseLabel(labels, phase);
+  const phase = zaiJobProgressPhase(job.state, job.createdAt, nowMs, job.workflowMode);
+  const phaseLabel = zaiProgressPhaseLabel(labels, phase);
   const elapsed = formatDurationSinceAt(job.createdAt, nowMs);
-  const progress = job.state === "queued" ? 6 : estimateCodexJobProgress(job.createdAt, nowMs, job.workflowMode);
-  const progressStyle = { "--codex-progress-value": `${progress}%` } as CSSProperties;
+  const progress = job.state === "queued" ? 6 : estimateZaiJobProgress(job.createdAt, nowMs, job.workflowMode);
+  const progressStyle = { "--zai-progress-value": `${progress}%` } as CSSProperties;
   const valueText = `${phaseLabel}, ${labels.elapsed}: ${elapsed}`;
 
   return (
-    <div className={`codex-progress-meter ${compact ? "compact" : ""} state-${job.state}`}>
+    <div className={`zai-progress-meter ${compact ? "compact" : ""} state-${job.state}`}>
       {!compact && (
-        <div className="codex-progress-copy">
+        <div className="zai-progress-copy">
           <span>{phaseLabel}</span>
           <span>{labels.elapsed}: {elapsed}</span>
         </div>
       )}
-      <div className="codex-progress-track" role="progressbar" aria-label={labels.progressLabel} aria-valuetext={valueText}>
-        <span className="codex-progress-fill" style={progressStyle} />
+      <div className="zai-progress-track" role="progressbar" aria-label={labels.progressLabel} aria-valuetext={valueText}>
+        <span className="zai-progress-fill" style={progressStyle} />
       </div>
     </div>
   );
 }
 
-function CodexJobShelf({
+function ZaiJobShelf({
   jobs,
   maxActive,
   language
 }: {
-  jobs: CodexJobQueueItem[];
+  jobs: ZaiJobQueueItem[];
   maxActive: number;
   language: Language;
 }) {
-  const labels = codexJobQueueLabels(language);
+  const labels = zaiJobQueueLabels(language);
   const runningCount = jobs.filter((job) => job.state === "running").length;
 
   return (
-    <section className="codex-job-shelf" aria-label={labels.title}>
-      <div className="codex-job-shelf-heading">
+    <section className="zai-job-shelf" aria-label={labels.title}>
+      <div className="zai-job-shelf-heading">
         <strong>{labels.title}</strong>
         <span>{labels.activeSlots} {runningCount}/{maxActive}</span>
       </div>
-      <div className="codex-job-list">
+      <div className="zai-job-list">
         {jobs.map((job) => (
-          <div className="codex-job-row" key={job.id}>
-            <span className={`codex-job-state ${job.state}`}>
+          <div className="zai-job-row" key={job.id}>
+            <span className={`zai-job-state ${job.state}`}>
               {job.state === "running" ? labels.running : job.state === "evaluating" ? labels.evaluating : labels.queued}
             </span>
             <strong>{job.label}</strong>
             <small>{job.state === "running" ? job.id : job.state === "evaluating" ? labels.waitingForTournament : labels.waitingForSlot}</small>
-            {job.state === "running" && <CodexJobProgress job={job} labels={labels} />}
+            {job.state === "running" && <ZaiJobProgress job={job} labels={labels} />}
           </div>
         ))}
       </div>
@@ -12814,7 +12814,7 @@ function CodexJobShelf({
   );
 }
 
-function CodexLogPanel({
+function ZaiLogPanel({
   logs,
   jobs,
   collapsed,
@@ -12824,8 +12824,8 @@ function CodexLogPanel({
   onEnterFullscreen,
   onExitFullscreen
 }: {
-  logs: CodexJobLogItem[];
-  jobs: CodexJobQueueItem[];
+  logs: ZaiJobLogItem[];
+  jobs: ZaiJobQueueItem[];
   collapsed: boolean;
   fullscreen: boolean;
   language: Language;
@@ -12834,55 +12834,55 @@ function CodexLogPanel({
   onExitFullscreen: () => void;
 }) {
   const copy = uiCopy[language];
-  const labels = codexJobQueueLabels(language);
+  const labels = zaiJobQueueLabels(language);
   const runningCount = jobs.filter((job) => job.state === "running").length;
   const firstRunningJob = jobs.find((job) => job.state === "running");
   const jobsById = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
   const hasContent = logs.length > 0 || jobs.length > 0;
   const visibleLogs = logs.length > 0
     ? logs
-    : jobs.slice(0, CODEX_LOG_HISTORY_LIMIT).map((job) => createCodexJobLogItem(job, undefined, job.state));
+    : jobs.slice(0, ZAI_LOG_HISTORY_LIMIT).map((job) => createZaiJobLogItem(job, undefined, job.state));
   const visibleLogSignature = visibleLogs
     .map((log) => `${log.jobId}:${log.state}:${log.readAt}:${log.modifiedAt}:${log.size}:${log.error ? "error" : ""}`)
     .join("|");
-  const codexLogPreRefs = useRef(new Map<string, HTMLPreElement>());
-  const codexLogAutoScrollRef = useRef(new Map<string, boolean>());
+  const zaiLogPreRefs = useRef(new Map<string, HTMLPreElement>());
+  const zaiLogAutoScrollRef = useRef(new Map<string, boolean>());
   const previousFullscreenRef = useRef(fullscreen);
 
-  const setCodexLogPreRef = useCallback((jobId: string, node: HTMLPreElement | null) => {
+  const setZaiLogPreRef = useCallback((jobId: string, node: HTMLPreElement | null) => {
     if (!node) {
-      codexLogPreRefs.current.delete(jobId);
+      zaiLogPreRefs.current.delete(jobId);
       return;
     }
-    codexLogPreRefs.current.set(jobId, node);
-    if (!codexLogAutoScrollRef.current.has(jobId)) {
-      codexLogAutoScrollRef.current.set(jobId, true);
+    zaiLogPreRefs.current.set(jobId, node);
+    if (!zaiLogAutoScrollRef.current.has(jobId)) {
+      zaiLogAutoScrollRef.current.set(jobId, true);
     }
   }, []);
 
-  const handleCodexLogScroll = useCallback((jobId: string, event: UIEvent<HTMLPreElement>) => {
+  const handleZaiLogScroll = useCallback((jobId: string, event: UIEvent<HTMLPreElement>) => {
     const target = event.currentTarget;
     const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
-    codexLogAutoScrollRef.current.set(jobId, distanceFromBottom < 24);
+    zaiLogAutoScrollRef.current.set(jobId, distanceFromBottom < 24);
   }, []);
 
   useEffect(() => {
     const fullscreenChanged = previousFullscreenRef.current !== fullscreen;
     previousFullscreenRef.current = fullscreen;
     const visibleJobIds = new Set(visibleLogs.map((log) => log.jobId));
-    Array.from(codexLogAutoScrollRef.current.keys()).forEach((jobId) => {
+    Array.from(zaiLogAutoScrollRef.current.keys()).forEach((jobId) => {
       if (!visibleJobIds.has(jobId)) {
-        codexLogAutoScrollRef.current.delete(jobId);
+        zaiLogAutoScrollRef.current.delete(jobId);
       }
     });
     const frame = window.requestAnimationFrame(() => {
       visibleLogs.forEach((log) => {
-        const pre = codexLogPreRefs.current.get(log.jobId);
+        const pre = zaiLogPreRefs.current.get(log.jobId);
         if (!pre) return;
-        const shouldAutoScroll = fullscreenChanged || (codexLogAutoScrollRef.current.get(log.jobId) ?? true);
+        const shouldAutoScroll = fullscreenChanged || (zaiLogAutoScrollRef.current.get(log.jobId) ?? true);
         if (!shouldAutoScroll) return;
         pre.scrollTop = pre.scrollHeight;
-        codexLogAutoScrollRef.current.set(log.jobId, true);
+        zaiLogAutoScrollRef.current.set(log.jobId, true);
       });
     });
     return () => window.cancelAnimationFrame(frame);
@@ -12891,56 +12891,56 @@ function CodexLogPanel({
   if (!hasContent) return null;
 
   return (
-    <section className={`codex-log-panel ${collapsed ? "collapsed" : ""} ${fullscreen ? "fullscreen" : ""}`} aria-label={copy.codexLogTitle}>
-      <div className="codex-log-header">
+    <section className={`zai-log-panel ${collapsed ? "collapsed" : ""} ${fullscreen ? "fullscreen" : ""}`} aria-label={copy.zaiLogTitle}>
+      <div className="zai-log-header">
         <span>
           <Terminal size={15} aria-hidden="true" />
-          <strong>{copy.codexLogTitle}</strong>
-          <small>{copy.codexLogLive}</small>
+          <strong>{copy.zaiLogTitle}</strong>
+          <small>{copy.zaiLogLive}</small>
         </span>
-        <span className="codex-log-meta">
-          <em>{runningCount}/{MAX_ACTIVE_CODEX_JOBS}</em>
+        <span className="zai-log-meta">
+          <em>{runningCount}/{MAX_ACTIVE_ZAI_JOBS}</em>
           <button
-            className="secondary-button mini icon-button codex-log-fullscreen-button"
+            className="secondary-button mini icon-button zai-log-fullscreen-button"
             onClick={fullscreen ? onExitFullscreen : onEnterFullscreen}
-            aria-label={fullscreen ? copy.codexLogExitFullscreen : copy.codexLogFullscreen}
-            title={fullscreen ? copy.codexLogExitFullscreen : copy.codexLogFullscreen}
+            aria-label={fullscreen ? copy.zaiLogExitFullscreen : copy.zaiLogFullscreen}
+            title={fullscreen ? copy.zaiLogExitFullscreen : copy.zaiLogFullscreen}
           >
             {fullscreen ? <Minimize2 size={15} aria-hidden="true" /> : <Maximize2 size={15} aria-hidden="true" />}
           </button>
           <button className="secondary-button mini" onClick={onToggle}>
-            {collapsed ? copy.codexLogExpand : copy.codexLogCollapse}
+            {collapsed ? copy.zaiLogExpand : copy.zaiLogCollapse}
           </button>
         </span>
-        {firstRunningJob && <CodexJobProgress job={firstRunningJob} labels={labels} compact />}
+        {firstRunningJob && <ZaiJobProgress job={firstRunningJob} labels={labels} compact />}
       </div>
       {!collapsed && (
-        <div className="codex-log-list">
+        <div className="zai-log-list">
           {visibleLogs.map((log) => {
             const activeJob = jobsById.get(log.jobId);
             const showProgress = activeJob?.state === "running";
             return (
-              <article className={`codex-log-card state-${log.state}`} key={log.jobId}>
-                <div className="codex-log-card-heading">
-                  <span className={`codex-job-state ${log.state === "queued" ? "queued" : "running"}`}>
+              <article className={`zai-log-card state-${log.state}`} key={log.jobId}>
+                <div className="zai-log-card-heading">
+                  <span className={`zai-job-state ${log.state === "queued" ? "queued" : "running"}`}>
                     {log.state}
                   </span>
                   <strong>{log.label}</strong>
                   <small>{log.jobId}</small>
                 </div>
-                <div className="codex-log-card-meta">
-                  <span>{copy.codexLogElapsed}: {formatDurationSince(log.createdAt)}</span>
-                  <span>{copy.codexLogUpdated}: {log.modifiedAt ? formatTime(log.modifiedAt) : "-"}</span>
-                  {log.truncated && <span>{copy.codexLogTruncated}</span>}
+                <div className="zai-log-card-meta">
+                  <span>{copy.zaiLogElapsed}: {formatDurationSince(log.createdAt)}</span>
+                  <span>{copy.zaiLogUpdated}: {log.modifiedAt ? formatTime(log.modifiedAt) : "-"}</span>
+                  {log.truncated && <span>{copy.zaiLogTruncated}</span>}
                 </div>
-                <div className="codex-log-progress-slot">
-                  {showProgress && <CodexJobProgress job={activeJob} labels={labels} />}
+                <div className="zai-log-progress-slot">
+                  {showProgress && <ZaiJobProgress job={activeJob} labels={labels} />}
                 </div>
                 <pre
-                  ref={(node) => setCodexLogPreRef(log.jobId, node)}
-                  onScroll={(event) => handleCodexLogScroll(log.jobId, event)}
+                  ref={(node) => setZaiLogPreRef(log.jobId, node)}
+                  onScroll={(event) => handleZaiLogScroll(log.jobId, event)}
                 >
-                  {log.error || log.text || (log.exists ? copy.codexLogNoOutput : copy.codexLogWaiting)}
+                  {log.error || log.text || (log.exists ? copy.zaiLogNoOutput : copy.zaiLogWaiting)}
                 </pre>
               </article>
             );
@@ -13015,21 +13015,21 @@ function CockpitHealthPanel({
   );
 }
 
-function CodexFailureCard({
+function ZaiFailureCard({
   notice,
   language,
   onRetryImport
 }: {
-  notice: CodexFailureNotice;
+  notice: ZaiFailureNotice;
   language: Language;
-  onRetryImport?: (notice: CodexFailureNotice) => void;
+  onRetryImport?: (notice: ZaiFailureNotice) => void;
 }) {
   const copy = uiCopy[language];
-  const failure = codexFailureDisplay(notice.diagnostic.kind, copy, notice.diagnostic);
+  const failure = zaiFailureDisplay(notice.diagnostic.kind, copy, notice.diagnostic);
   const canRetryImport = notice.diagnostic.kind === "import_failed" && Boolean(onRetryImport);
   return (
-    <article className={`codex-failure-card ${notice.diagnostic.kind}`}>
-      <div className="codex-failure-icon">
+    <article className={`zai-failure-card ${notice.diagnostic.kind}`}>
+      <div className="zai-failure-icon">
         <AlertTriangle size={17} aria-hidden="true" />
       </div>
       <span>
@@ -13037,10 +13037,10 @@ function CodexFailureCard({
         <small>{formatTime(notice.createdAt)} • {notice.jobId}</small>
         <small>{notice.label}</small>
         <em>{failure.message}</em>
-        <small>{copy.codexFailureRetryHint}: {failure.suggestion}</small>
+        <small>{copy.zaiFailureRetryHint}: {failure.suggestion}</small>
         {canRetryImport && (
           <button className="secondary-button mini" onClick={() => onRetryImport?.(notice)}>
-            {copy.codexFailureRetryImport}
+            {copy.zaiFailureRetryImport}
           </button>
         )}
       </span>
@@ -13048,53 +13048,53 @@ function CodexFailureCard({
   );
 }
 
-function codexFailureDisplay(kind: CodexFailureKind, copy: Record<string, string>, diagnostic?: CodexJobDiagnostic) {
+function zaiFailureDisplay(kind: ZaiFailureKind, copy: Record<string, string>, diagnostic?: ZaiJobDiagnostic) {
   if (kind === "policy_or_safety") {
     return {
-      title: copy.codexFailureTitle,
-      message: copy.codexFailurePolicyMessage,
-      suggestion: copy.codexFailurePolicySuggestion
+      title: copy.zaiFailureTitle,
+      message: copy.zaiFailurePolicyMessage,
+      suggestion: copy.zaiFailurePolicySuggestion
     };
   }
   if (kind === "imagegen_unavailable") {
     return {
-      title: copy.codexFailureImagegenUnavailableTitle,
-      message: copy.codexFailureImagegenUnavailableMessage,
-      suggestion: copy.codexFailureImagegenUnavailableSuggestion
+      title: copy.zaiFailureImagegenUnavailableTitle,
+      message: copy.zaiFailureImagegenUnavailableMessage,
+      suggestion: copy.zaiFailureImagegenUnavailableSuggestion
     };
   }
   if (kind === "usage_limit") {
     return {
-      title: copy.codexFailureUsageLimitTitle || diagnostic?.title || copy.codexFailureRunnerFailedTitle,
-      message: copy.codexFailureUsageLimitMessage || diagnostic?.userMessage || copy.codexFailureRunnerFailedMessage,
-      suggestion: copy.codexFailureUsageLimitSuggestion || diagnostic?.suggestion || copy.codexFailureRunnerFailedSuggestion
+      title: copy.zaiFailureUsageLimitTitle || diagnostic?.title || copy.zaiFailureRunnerFailedTitle,
+      message: copy.zaiFailureUsageLimitMessage || diagnostic?.userMessage || copy.zaiFailureRunnerFailedMessage,
+      suggestion: copy.zaiFailureUsageLimitSuggestion || diagnostic?.suggestion || copy.zaiFailureRunnerFailedSuggestion
     };
   }
   if (kind === "runner_failed") {
     return {
-      title: copy.codexFailureRunnerFailedTitle,
-      message: copy.codexFailureRunnerFailedMessage,
-      suggestion: copy.codexFailureRunnerFailedSuggestion
+      title: copy.zaiFailureRunnerFailedTitle,
+      message: copy.zaiFailureRunnerFailedMessage,
+      suggestion: copy.zaiFailureRunnerFailedSuggestion
     };
   }
   if (kind === "import_failed") {
     return {
-      title: diagnostic?.title || copy.codexFailureImportFailedTitle,
-      message: diagnostic?.userMessage || copy.codexFailureImportFailedMessage,
-      suggestion: diagnostic?.suggestion || copy.codexFailureImportFailedSuggestion
+      title: diagnostic?.title || copy.zaiFailureImportFailedTitle,
+      message: diagnostic?.userMessage || copy.zaiFailureImportFailedMessage,
+      suggestion: diagnostic?.suggestion || copy.zaiFailureImportFailedSuggestion
     };
   }
   if (kind === "no_image_returned") {
     return {
-      title: copy.codexFailureNoImageTitle,
-      message: copy.codexFailureNoImageMessage,
-      suggestion: copy.codexFailureNoImageSuggestion
+      title: copy.zaiFailureNoImageTitle,
+      message: copy.zaiFailureNoImageMessage,
+      suggestion: copy.zaiFailureNoImageSuggestion
     };
   }
   return {
-    title: copy.codexFailureTitle,
-    message: copy.codexFailureUnknownMessage,
-    suggestion: copy.codexFailureUnknownSuggestion
+    title: copy.zaiFailureTitle,
+    message: copy.zaiFailureUnknownMessage,
+    suggestion: copy.zaiFailureUnknownSuggestion
   };
 }
 
@@ -13109,29 +13109,29 @@ function primaryActionLabel(
   providerId: ProviderId,
   workflowMode: WorkflowMode | null,
   copy: Record<string, string>,
-  isWaitingForCodexResult = false
+  isWaitingForZaiResult = false
 ) {
   if (providerId === "local-generator" && workflowMode === "sprite-generate") return copy.generateLocalSprite;
   if (providerId === "local-generator") return copy.generateLocalImage;
-  if (providerId === "codex-handoff" && isWaitingForCodexResult) return copy.waitingForCodexResult;
-  if (providerId === "codex-handoff" && workflowMode === "image-generate") return copy.generateLocalImage;
-  if (providerId === "codex-handoff" && workflowMode === "image-edit") return copy.editImage;
-  if (providerId === "codex-handoff") return copy.createCodexJob;
+  if (providerId === "zai-handoff" && isWaitingForZaiResult) return copy.waitingForZaiResult;
+  if (providerId === "zai-handoff" && workflowMode === "image-generate") return copy.generateLocalImage;
+  if (providerId === "zai-handoff" && workflowMode === "image-edit") return copy.editImage;
+  if (providerId === "zai-handoff") return copy.createZaiJob;
   if (providerId === "local-inbox") return copy.importLatest;
   return copy.importFile;
 }
 
-function codexJobQueueLabels(language: Language) {
-  return codexJobQueueCopy[language];
+function zaiJobQueueLabels(language: Language) {
+  return zaiJobQueueCopy[language];
 }
 
-const codexJobQueueCopyBase = {
-  title: "Codex Jobs",
+const zaiJobQueueCopyBase = {
+  title: "Zai Jobs",
   activeSlots: "Active",
   running: "Running",
   queued: "Queued",
   evaluating: "Evaluating",
-  progressLabel: "Codex job progress",
+  progressLabel: "Zai job progress",
   elapsed: "Elapsed",
   phaseQueued: "Queued",
   phaseStarting: "Starting",
@@ -13140,18 +13140,18 @@ const codexJobQueueCopyBase = {
   phaseExtended: "Still working",
   waitingForSlot: "Waiting for an open slot",
   waitingForTournament: "Runner slot released; comparing tournament candidates",
-  queueAction: "Queue Codex Job",
-  queuedStatus: "Codex job queued"
+  queueAction: "Queue Zai Job",
+  queuedStatus: "Zai job queued"
 };
 
-const codexJobQueueCopy = {
+const zaiJobQueueCopy = {
   en: {
-    title: "Codex Jobs",
+    title: "Zai Jobs",
     activeSlots: "Active",
     running: "Running",
     queued: "Queued",
     evaluating: "Evaluating",
-    progressLabel: "Codex job progress",
+    progressLabel: "Zai job progress",
     elapsed: "Elapsed",
     phaseQueued: "Queued",
     phaseStarting: "Starting",
@@ -13160,16 +13160,16 @@ const codexJobQueueCopy = {
     phaseExtended: "Still working",
     waitingForSlot: "Waiting for an open slot",
     waitingForTournament: "Runner slot released; comparing tournament candidates",
-    queueAction: "Queue Codex Job",
-    queuedStatus: "Codex job queued"
+    queueAction: "Queue Zai Job",
+    queuedStatus: "Zai job queued"
   },
   ja: {
-    title: "Codexジョブ",
+    title: "Zaiジョブ",
     activeSlots: "実行枠",
     running: "実行中",
     queued: "待機中",
     evaluating: "評価中",
-    progressLabel: "Codexジョブ進行目安",
+    progressLabel: "Zaiジョブ進行目安",
     elapsed: "経過",
     phaseQueued: "待機中",
     phaseStarting: "起動中",
@@ -13179,38 +13179,38 @@ const codexJobQueueCopy = {
     waitingForSlot: "空き枠待ち",
     waitingForTournament: "実行枠を解放し、候補比較を待っています",
     queueAction: "キューに追加",
-    queuedStatus: "Codexキューに追加しました"
+    queuedStatus: "Zaiキューに追加しました"
   },
-  "zh-CN": withCodexJobQueueCopy({ title: "Codex 作业", activeSlots: "执行槽", running: "运行中", queued: "排队中", waitingForSlot: "等待空槽", queueAction: "加入队列", queuedStatus: "Codex 作业已排队" }),
-  "zh-TW": withCodexJobQueueCopy({ title: "Codex 作業", activeSlots: "執行槽", running: "執行中", queued: "排隊中", waitingForSlot: "等待空位", queueAction: "加入佇列", queuedStatus: "Codex 作業已加入佇列" }),
-  ko: withCodexJobQueueCopy({ title: "Codex 작업", activeSlots: "실행 슬롯", running: "실행 중", queued: "대기 중", waitingForSlot: "빈 슬롯 대기", queueAction: "대기열에 추가", queuedStatus: "Codex 작업을 대기열에 추가했습니다" }),
-  ru: withCodexJobQueueCopy({ title: "Задания Codex", activeSlots: "Слоты", running: "Выполняется", queued: "В очереди", waitingForSlot: "Ожидание свободного слота", queueAction: "Поставить в очередь", queuedStatus: "Задание Codex в очереди" }),
-  es: withCodexJobQueueCopy({ title: "Trabajos Codex", activeSlots: "Activos", running: "En ejecución", queued: "En cola", waitingForSlot: "Esperando un hueco", queueAction: "Poner en cola", queuedStatus: "Trabajo Codex en cola" }),
-  "pt-BR": withCodexJobQueueCopy({ title: "Jobs Codex", activeSlots: "Ativos", running: "Executando", queued: "Na fila", waitingForSlot: "Aguardando vaga", queueAction: "Adicionar à fila", queuedStatus: "Job Codex na fila" }),
-  de: withCodexJobQueueCopy({ title: "Codex-Jobs", activeSlots: "Aktiv", running: "Läuft", queued: "Wartet", waitingForSlot: "Warten auf freien Slot", queueAction: "Job einreihen", queuedStatus: "Codex-Job eingereiht" }),
-  fr: withCodexJobQueueCopy({ title: "Tâches Codex", activeSlots: "Actives", running: "En cours", queued: "En file", waitingForSlot: "En attente d'un créneau", queueAction: "Mettre en file", queuedStatus: "Tâche Codex en file" }),
-  id: withCodexJobQueueCopy({ title: "Job Codex", activeSlots: "Aktif", running: "Berjalan", queued: "Antre", waitingForSlot: "Menunggu slot kosong", queueAction: "Masukkan antrean", queuedStatus: "Job Codex masuk antrean" }),
-  tr: withCodexJobQueueCopy({ title: "Codex işleri", activeSlots: "Aktif", running: "Çalışıyor", queued: "Sırada", waitingForSlot: "Boş slot bekleniyor", queueAction: "Sıraya ekle", queuedStatus: "Codex işi sıraya eklendi" }),
-  vi: withCodexJobQueueCopy({ title: "Job Codex", activeSlots: "Đang chạy", running: "Đang chạy", queued: "Đang chờ", waitingForSlot: "Chờ ô trống", queueAction: "Thêm vào hàng chờ", queuedStatus: "Job Codex đã vào hàng chờ" }),
-  pl: withCodexJobQueueCopy({ title: "Zadania Codex", activeSlots: "Aktywne", running: "Działa", queued: "W kolejce", waitingForSlot: "Czeka na slot", queueAction: "Dodaj do kolejki", queuedStatus: "Zadanie Codex w kolejce" }),
-  it: withCodexJobQueueCopy({ title: "Job Codex", activeSlots: "Attivi", running: "In esecuzione", queued: "In coda", waitingForSlot: "In attesa di uno slot", queueAction: "Metti in coda", queuedStatus: "Job Codex in coda" })
-} satisfies Record<Language, typeof codexJobQueueCopyBase>;
+  "zh-CN": withZaiJobQueueCopy({ title: "Zai 作业", activeSlots: "执行槽", running: "运行中", queued: "排队中", waitingForSlot: "等待空槽", queueAction: "加入队列", queuedStatus: "Zai 作业已排队" }),
+  "zh-TW": withZaiJobQueueCopy({ title: "Zai 作業", activeSlots: "執行槽", running: "執行中", queued: "排隊中", waitingForSlot: "等待空位", queueAction: "加入佇列", queuedStatus: "Zai 作業已加入佇列" }),
+  ko: withZaiJobQueueCopy({ title: "Zai 작업", activeSlots: "실행 슬롯", running: "실행 중", queued: "대기 중", waitingForSlot: "빈 슬롯 대기", queueAction: "대기열에 추가", queuedStatus: "Zai 작업을 대기열에 추가했습니다" }),
+  ru: withZaiJobQueueCopy({ title: "Задания Zai", activeSlots: "Слоты", running: "Выполняется", queued: "В очереди", waitingForSlot: "Ожидание свободного слота", queueAction: "Поставить в очередь", queuedStatus: "Задание Zai в очереди" }),
+  es: withZaiJobQueueCopy({ title: "Trabajos Zai", activeSlots: "Activos", running: "En ejecución", queued: "En cola", waitingForSlot: "Esperando un hueco", queueAction: "Poner en cola", queuedStatus: "Trabajo Zai en cola" }),
+  "pt-BR": withZaiJobQueueCopy({ title: "Jobs Zai", activeSlots: "Ativos", running: "Executando", queued: "Na fila", waitingForSlot: "Aguardando vaga", queueAction: "Adicionar à fila", queuedStatus: "Job Zai na fila" }),
+  de: withZaiJobQueueCopy({ title: "Zai-Jobs", activeSlots: "Aktiv", running: "Läuft", queued: "Wartet", waitingForSlot: "Warten auf freien Slot", queueAction: "Job einreihen", queuedStatus: "Zai-Job eingereiht" }),
+  fr: withZaiJobQueueCopy({ title: "Tâches Zai", activeSlots: "Actives", running: "En cours", queued: "En file", waitingForSlot: "En attente d'un créneau", queueAction: "Mettre en file", queuedStatus: "Tâche Zai en file" }),
+  id: withZaiJobQueueCopy({ title: "Job Zai", activeSlots: "Aktif", running: "Berjalan", queued: "Antre", waitingForSlot: "Menunggu slot kosong", queueAction: "Masukkan antrean", queuedStatus: "Job Zai masuk antrean" }),
+  tr: withZaiJobQueueCopy({ title: "Zai işleri", activeSlots: "Aktif", running: "Çalışıyor", queued: "Sırada", waitingForSlot: "Boş slot bekleniyor", queueAction: "Sıraya ekle", queuedStatus: "Zai işi sıraya eklendi" }),
+  vi: withZaiJobQueueCopy({ title: "Job Zai", activeSlots: "Đang chạy", running: "Đang chạy", queued: "Đang chờ", waitingForSlot: "Chờ ô trống", queueAction: "Thêm vào hàng chờ", queuedStatus: "Job Zai đã vào hàng chờ" }),
+  pl: withZaiJobQueueCopy({ title: "Zadania Zai", activeSlots: "Aktywne", running: "Działa", queued: "W kolejce", waitingForSlot: "Czeka na slot", queueAction: "Dodaj do kolejki", queuedStatus: "Zadanie Zai w kolejce" }),
+  it: withZaiJobQueueCopy({ title: "Job Zai", activeSlots: "Attivi", running: "In esecuzione", queued: "In coda", waitingForSlot: "In attesa di uno slot", queueAction: "Metti in coda", queuedStatus: "Job Zai in coda" })
+} satisfies Record<Language, typeof zaiJobQueueCopyBase>;
 
-function withCodexJobQueueCopy(overrides: Partial<typeof codexJobQueueCopyBase>) {
-  return { ...codexJobQueueCopyBase, ...overrides };
+function withZaiJobQueueCopy(overrides: Partial<typeof zaiJobQueueCopyBase>) {
+  return { ...zaiJobQueueCopyBase, ...overrides };
 }
 
-function codexJobLabel(mode: WorkflowMode | null, prompt: string, actionName?: string) {
+function zaiJobLabel(mode: WorkflowMode | null, prompt: string, actionName?: string) {
   const shortPrompt = prompt.trim().replace(/\s+/g, " ").slice(0, 54);
   if (mode === "sprite-generate") return `Animation: ${actionName ?? "motion"}${shortPrompt ? ` / ${shortPrompt}` : ""}`;
   if (mode === "effect-animation") return `Effect: ${actionName ?? "VFX"}${shortPrompt ? ` / ${shortPrompt}` : ""}`;
   if (mode === "image-generate") return shortPrompt ? `Pixel Art: ${shortPrompt}` : "Pixel Art Generation";
   if (mode === "image-edit") return shortPrompt ? `Image Edit: ${shortPrompt}` : "Image Edit";
   if (mode === "sprite-edit") return shortPrompt ? `Sprite Edit: ${shortPrompt}` : "Sprite Edit";
-  return shortPrompt || "Codex Job";
+  return shortPrompt || "Zai Job";
 }
 
-function buildImageEditCodexPrompt({
+function buildImageEditZaiPrompt({
   prompt,
   sourceName,
   annotations
@@ -13242,7 +13242,7 @@ function buildImageEditCodexPrompt({
   ].join("\n");
 }
 
-function buildImageEditCodexNotes({
+function buildImageEditZaiNotes({
   userNotes,
   annotations
 }: {
@@ -13464,7 +13464,7 @@ async function chooseAnimationChromaKey(sourceDataUrl: string) {
   };
 }
 
-function buildAnimationCodexPrompt({
+function buildAnimationZaiPrompt({
   sourceName,
   motionPrompt,
   actionName,
@@ -13495,7 +13495,7 @@ function buildAnimationCodexPrompt({
     "このキャラクターをデフォルメして、方向別アニメーション素材として画像生成してほしい。",
     `Use the uploaded source image "${sourceName}" as the character reference.`,
     `Extract only the single character and create a direction-split pixel-art animation set of that same character ${motion}.`,
-    `Do not return one combined ${directions.length}x${frameCount} sheet for the standard animation workflow. Return ${directionCountWord} separate direction image${directions.length === 1 ? "" : "s"}, and Image Cockpit will compose the final ${frameCount}x${directions.length} sheet after import.`,
+    `Do not return one combined ${directions.length}x${frameCount} sheet for the standard animation workflow. Return ${directionCountWord} separate direction image${directions.length === 1 ? "" : "s"}, and Zai Cockpit will compose the final ${frameCount}x${directions.length} sheet after import.`,
     `Each direction image must be exactly ${cell.width * directionImageGrid.columns}x${cell.height * directionImageGrid.rows}px: ${directionImageGrid.columns} columns x ${directionImageGrid.rows} rows, no gutters, no extra outer margin, exactly ${frameCount} populated cells.`,
     `Required directions and file suffixes: ${directions.map((direction) => `${direction}=${animationDirectionSlug(direction)}`).join(", ")}. Do not generate directions that are not listed.`,
     `Each cell must be exactly ${cell.width}x${cell.height} pixels. Fill frames in row-major order until all ${frameCount} frames are populated.`,
@@ -13516,7 +13516,7 @@ function buildAnimationCodexPrompt({
   ].join(" ");
 }
 
-function buildAnimationCodexNotes({
+function buildAnimationZaiNotes({
   userNotes,
   chromaKey,
   chromaReason,
@@ -13541,7 +13541,7 @@ function buildAnimationCodexNotes({
   const scaleReference = animationScaleReferenceLabel(directions);
   return [
     userNotes.trim(),
-    `Animation sprite workflow: generate ${directions.length} source-image-driven direction image${directions.length === 1 ? "" : "s"} through Codex imagegen / built-in image_gen, then Image Cockpit will remove the ${chromaKey.label} background and compose the final sheet.`,
+    `Animation sprite workflow: generate ${directions.length} source-image-driven direction image${directions.length === 1 ? "" : "s"} through Zai imagegen / built-in image_gen, then Zai Cockpit will remove the ${chromaKey.label} background and compose the final sheet.`,
     `Chroma key decision: ${chromaKey.name} ${chromaKey.hex}. ${chromaReason}`,
     `Final app sheet layout after import: ${grid.columns} columns x ${grid.rows} rows, ${cell.width}x${cell.height} per cell.`,
     `Raw returned direction layout: ${directionImageGrid.columns} columns x ${directionImageGrid.rows} rows per direction image, ${cell.width}x${cell.height} per cell, ${frameCount} populated frames.`,
@@ -13554,11 +13554,11 @@ function buildAnimationCodexNotes({
       ? animationScaleConsistencyContractLines(directions)
       : ["Topology scale QA is mandatory: compare head, torso, body length, support-part thickness, tail or wing scale, and prop size against the source; lower or wider poses must not be auto-enlarged."]),
     "The generated sheet should keep the chroma key background simple and flat so the app can remove it reliably.",
-    `Temporary guide grid: pure cyan #00FFFF on exact ${directionImageGrid.columns}x${directionImageGrid.rows} direction-image cell boundaries only. Image Cockpit removes those guide pixels before slicing/export.`
+    `Temporary guide grid: pure cyan #00FFFF on exact ${directionImageGrid.columns}x${directionImageGrid.rows} direction-image cell boundaries only. Zai Cockpit removes those guide pixels before slicing/export.`
   ].filter(Boolean).join("\n");
 }
 
-function buildHatchPetCodexPrompt({
+function buildHatchPetZaiPrompt({
   sourceName,
   motionPrompt,
   chromaKey
@@ -13567,14 +13567,14 @@ function buildHatchPetCodexPrompt({
   motionPrompt: string;
   chromaKey: AnimationChromaKey;
 }) {
-  const concept = motionPrompt.trim() || "make this uploaded character into a compact Codex pet with calm idle, movement, waiting, working, failed, and review states";
+  const concept = motionPrompt.trim() || "make this uploaded character into a compact Zai pet with calm idle, movement, waiting, working, failed, and review states";
   return [
     `Use the uploaded source image "${sourceName}" as the canonical character reference.`,
-    "Try the installed hatch-pet workflow for a Codex-compatible custom pet atlas.",
+    "Try the installed hatch-pet workflow for a Zai-compatible custom pet atlas.",
     "If the hatch-pet skill is available, use its deterministic scripts for run preparation, atlas geometry, validation, contact sheet, and preview generation.",
-    "Use Codex imagegen / built-in image_gen only through the hatch-pet or imagegen workflow for visual generation; do not call external APIs directly.",
+    "Use Zai imagegen / built-in image_gen only through the hatch-pet or imagegen workflow for visual generation; do not call external APIs directly.",
     `Pet concept and motion guidance: ${concept}.`,
-    "Create the same character across the full Codex pet state contract: idle, running-right, running-left, waving, jumping, failed, waiting, running, review.",
+    "Create the same character across the full Zai pet state contract: idle, running-right, running-left, waving, jumping, failed, waiting, running, review.",
     `Final atlas must be 8 columns x 9 rows, 1536x1872 pixels total, ${HATCH_PET_CELL.width}x${HATCH_PET_CELL.height} per cell, transparent background, transparent unused cells.`,
     `Use ${chromaKey.label} (${chromaKey.hex}) only as a temporary removable row-generation background when needed; the final atlas should be transparent.`,
     "Keep a canonical base identity first, then generate each row from that identity so face, body shape, palette, outfit, prop design, and pixel density stay consistent.",
@@ -13584,7 +13584,7 @@ function buildHatchPetCodexPrompt({
   ].join(" ");
 }
 
-function buildHatchPetCodexNotes({
+function buildHatchPetZaiNotes({
   userNotes,
   chromaKey,
   chromaReason
@@ -13595,7 +13595,7 @@ function buildHatchPetCodexNotes({
 }) {
   return [
     userNotes.trim(),
-    "Experimental hatch-pet sprite workflow: create a Codex pet atlas from the selected source image, using the local hatch-pet skill/scripts when available.",
+    "Experimental hatch-pet sprite workflow: create a Zai pet atlas from the selected source image, using the local hatch-pet skill/scripts when available.",
     "Reference process: first lock a canonical base identity, then generate row strips, validate frames, compose the atlas, and visually QA the contact sheet/previews.",
     `Expected atlas: ${HATCH_PET_GRID.columns} columns x ${HATCH_PET_GRID.rows} rows, ${HATCH_PET_CELL.width}x${HATCH_PET_CELL.height} per cell, 1536x1872 total.`,
     `Rows and intended frame counts: ${HATCH_PET_STATE_ROWS.map((row) => `${row.id}=${row.frames}`).join(", ")}.`,
@@ -13605,7 +13605,7 @@ function buildHatchPetCodexNotes({
   ].filter(Boolean).join("\n");
 }
 
-function buildDirectionalHatchPetCodexPrompt({
+function buildDirectionalHatchPetZaiPrompt({
   sourceName,
   motionPrompt,
   chromaKey
@@ -13614,15 +13614,15 @@ function buildDirectionalHatchPetCodexPrompt({
   motionPrompt: string;
   chromaKey: AnimationChromaKey;
 }) {
-  const concept = motionPrompt.trim() || "make this uploaded character into a five-direction Codex pet atlas set with clear idle-ready movement";
+  const concept = motionPrompt.trim() || "make this uploaded character into a five-direction Zai pet atlas set with clear idle-ready movement";
   return [
     `Use the uploaded source image "${sourceName}" as the canonical character reference.`,
-    "Create a 5-direction hatch-pet set: one separate Codex pet atlas for each direction.",
+    "Create a 5-direction hatch-pet set: one separate Zai pet atlas for each direction.",
     `Required directions and filename suffixes: ${ANIMATION_DIRECTIONS.map((direction, index) => `direction-${String(index + 1).padStart(2, "0")}-${direction.replace(/\s+/g, "-")}`).join(", ")}.`,
     "For each direction, try the installed hatch-pet workflow/scripts when available: canonical identity lock, row-strip generation, atlas composition, validation, contact sheet, and preview generation.",
     "Do not return only one giant combined sheet. Return five final spritesheet PNG/WebP files, each using the job id filename prefix plus its direction suffix.",
     `Pet concept and motion guidance: ${concept}.`,
-    "Each direction atlas must contain the same Codex pet state contract: idle, running-right, running-left, waving, jumping, failed, waiting, running, review.",
+    "Each direction atlas must contain the same Zai pet state contract: idle, running-right, running-left, waving, jumping, failed, waiting, running, review.",
     `Each atlas must be 8 columns x 9 rows, 1536x1872 pixels total, ${HATCH_PET_CELL.width}x${HATCH_PET_CELL.height} per cell, transparent background, transparent unused cells.`,
     `Use ${chromaKey.label} (${chromaKey.hex}) only as a temporary removable row-generation background when needed; final atlases should be transparent.`,
     "Keep identity consistent across all five directions: face, body shape, palette, outfit, prop design, outline thickness, and pixel density must match.",
@@ -13631,7 +13631,7 @@ function buildDirectionalHatchPetCodexPrompt({
   ].join(" ");
 }
 
-function buildDirectionalHatchPetCodexNotes({
+function buildDirectionalHatchPetZaiNotes({
   userNotes,
   chromaKey,
   chromaReason
@@ -13669,7 +13669,7 @@ async function createTransparentSpriteSheetDataUrl(dataUrl: string, chromaKey: A
 }
 
 async function composeDirectionSplitAnimationSheet(
-  importedResults: CodexOutboxImportResponse[],
+  importedResults: ZaiOutboxImportResponse[],
   chromaKey: AnimationChromaKey,
   cell: SpriteAction["cell"],
   actionName?: string,
@@ -14615,14 +14615,14 @@ function workflowUsesSpriteContext(mode: WorkflowMode | null) {
   return mode === "sprite-generate" || mode === "sprite-edit" || mode === "effect-animation";
 }
 
-async function loadCodexRunnerPreflight() {
-  const response = await fetch("/api/codex/runner");
+async function loadZaiRunnerPreflight() {
+  const response = await fetch("/api/zai/runner");
   if (!response.ok) throw new Error(await response.text());
-  const data = (await response.json()) as CodexRunnerPreflightResponse;
+  const data = (await response.json()) as ZaiRunnerPreflightResponse;
   return data.runner;
 }
 
-function runnerPreflightLabel(runner: CodexRunnerPreflight | null, copy: Record<string, string>) {
+function runnerPreflightLabel(runner: ZaiRunnerPreflight | null, copy: Record<string, string>) {
   if (!runner) return copy.runnerChecking;
   if (runner.state === "ready" && runner.mode === "mock") return copy.runnerMock;
   if (runner.state === "ready") return copy.runnerReady;
@@ -14650,7 +14650,7 @@ async function loadDevSupervisorHealth() {
     // Fall back to the direct loopback supervisor when Vite's /api proxy is misdirected.
   }
   const health = await fetchJsonWithTimeout<ImageCockpitDevSupervisorHealth>(`${devSupervisorBaseUrl()}/api/dev/health`);
-  if (!isDevSupervisorHealth(health)) throw new Error("Dev supervisor health did not return Image Cockpit supervisor metadata.");
+  if (!isDevSupervisorHealth(health)) throw new Error("Dev supervisor health did not return Zai Cockpit supervisor metadata.");
   return health;
 }
 
@@ -14667,7 +14667,7 @@ async function postDevSupervisorRepair() {
 }
 
 function devSupervisorBaseUrl() {
-  const rawPort = Number(import.meta.env.VITE_IMAGE_COCKPIT_SUPERVISOR_PORT ?? DEFAULT_SUPERVISOR_PORT);
+  const rawPort = Number(import.meta.env.VITE_ZAI_COCKPIT_SUPERVISOR_PORT ?? DEFAULT_SUPERVISOR_PORT);
   const port = Number.isFinite(rawPort) && rawPort > 0 ? rawPort : DEFAULT_SUPERVISOR_PORT;
   return `http://127.0.0.1:${port}`;
 }
@@ -14676,34 +14676,34 @@ function isDevSupervisorHealth(value: unknown): value is ImageCockpitDevSupervis
   return Boolean(
     value &&
       typeof value === "object" &&
-      (value as ImageCockpitDevSupervisorHealth).app === "image-cockpit" &&
+      (value as ImageCockpitDevSupervisorHealth).app === "zai-cockpit" &&
       (value as ImageCockpitDevSupervisorHealth).role === "supervisor"
   );
 }
 
-async function loadCodexRunnerStatus(jobId: string) {
+async function loadZaiRunnerStatus(jobId: string) {
   try {
-    const response = await fetch(`/api/codex/jobs/${encodeURIComponent(jobId)}/status`);
+    const response = await fetch(`/api/zai/jobs/${encodeURIComponent(jobId)}/status`);
     if (!response.ok) return null;
-    const data = (await response.json()) as CodexJobStatusResponse;
+    const data = (await response.json()) as ZaiJobStatusResponse;
     return data.status;
   } catch {
     return null;
   }
 }
 
-async function loadCodexJobLog(jobId: string) {
-  const response = await fetch(`/api/codex/jobs/${encodeURIComponent(jobId)}/log?bytes=${CODEX_LOG_TAIL_BYTES}`);
+async function loadZaiJobLog(jobId: string) {
+  const response = await fetch(`/api/zai/jobs/${encodeURIComponent(jobId)}/log?bytes=${ZAI_LOG_TAIL_BYTES}`);
   if (!response.ok) throw new Error(await response.text());
-  return (await response.json()) as CodexJobLogResponse;
+  return (await response.json()) as ZaiJobLogResponse;
 }
 
-function createCodexJobLogItem(
-  job: Pick<CodexJobQueueItem, "id" | "label" | "createdAt" | "state">,
-  log?: Partial<CodexJobLogResponse & CodexJobLogItem>,
-  state: CodexJobLogItem["state"] = job.state,
+function createZaiJobLogItem(
+  job: Pick<ZaiJobQueueItem, "id" | "label" | "createdAt" | "state">,
+  log?: Partial<ZaiJobLogResponse & ZaiJobLogItem>,
+  state: ZaiJobLogItem["state"] = job.state,
   error?: string
-): CodexJobLogItem {
+): ZaiJobLogItem {
   return {
     jobId: job.id,
     label: job.label,
@@ -14719,7 +14719,7 @@ function createCodexJobLogItem(
   };
 }
 
-function mergeCodexJobLogs(current: CodexJobLogItem[], incoming: CodexJobLogItem[]) {
+function mergeZaiJobLogs(current: ZaiJobLogItem[], incoming: ZaiJobLogItem[]) {
   const merged = new Map(current.map((item) => [item.jobId, item]));
   incoming.forEach((item) => {
     const previous = merged.get(item.jobId);
@@ -14727,10 +14727,10 @@ function mergeCodexJobLogs(current: CodexJobLogItem[], incoming: CodexJobLogItem
   });
   return Array.from(merged.values())
     .sort((left, right) => Date.parse(right.readAt || right.createdAt) - Date.parse(left.readAt || left.createdAt))
-    .slice(0, CODEX_LOG_HISTORY_LIMIT);
+    .slice(0, ZAI_LOG_HISTORY_LIMIT);
 }
 
-export function shouldWaitForCodexRunner(status?: CodexRunnerStatus) {
+export function shouldWaitForZaiRunner(status?: ZaiRunnerStatus) {
   if (!status) return true;
   return status.state === "running";
 }
@@ -14752,17 +14752,17 @@ export function resolveAnimationTournamentCandidateDirections(
   return normalizeAnimationDirections(repairDirections?.length ? repairDirections : requestedDirections);
 }
 
-function runnerStatusMessage(status: CodexRunnerStatus | undefined, copy: Record<string, string>) {
-  if (!status || status.state === "running") return copy.statusCodexJobPending;
+function runnerStatusMessage(status: ZaiRunnerStatus | undefined, copy: Record<string, string>) {
+  if (!status || status.state === "running") return copy.statusZaiJobPending;
   if (status.diagnostic) {
-    const failure = codexFailureDisplay(status.diagnostic.kind, copy, status.diagnostic);
+    const failure = zaiFailureDisplay(status.diagnostic.kind, copy, status.diagnostic);
     return `${failure.title}: ${failure.message}`;
   }
   if (status.state === "disabled" || status.state === "unavailable" || status.state === "unknown") {
-    return `${copy.statusCodexRunnerUnavailable}: ${status.message}`;
+    return `${copy.statusZaiRunnerUnavailable}: ${status.message}`;
   }
-  if (status.state === "failed") return `${copy.statusCodexRunnerFailed}: ${status.message}`;
-  return copy.statusCodexRunnerCompletedNoImage;
+  if (status.state === "failed") return `${copy.statusZaiRunnerFailed}: ${status.message}`;
+  return copy.statusZaiRunnerCompletedNoImage;
 }
 
 function NumberField({
@@ -16410,19 +16410,19 @@ function formatDurationSince(value: string) {
   return formatDurationSinceAt(value, Date.now());
 }
 
-function codexProgressEstimateMs(workflowMode?: WorkflowMode | null) {
-  return workflowMode ? CODEX_PROGRESS_ESTIMATE_MS[workflowMode] : CODEX_PROGRESS_ESTIMATE_MS.default;
+function zaiProgressEstimateMs(workflowMode?: WorkflowMode | null) {
+  return workflowMode ? ZAI_PROGRESS_ESTIMATE_MS[workflowMode] : ZAI_PROGRESS_ESTIMATE_MS.default;
 }
 
-function codexJobElapsedRatio(createdAt: string, nowMs: number, workflowMode?: WorkflowMode | null) {
+function zaiJobElapsedRatio(createdAt: string, nowMs: number, workflowMode?: WorkflowMode | null) {
   const start = Date.parse(createdAt);
   if (!Number.isFinite(start)) return 0;
   const elapsedMs = Math.max(0, nowMs - start);
-  return elapsedMs / codexProgressEstimateMs(workflowMode);
+  return elapsedMs / zaiProgressEstimateMs(workflowMode);
 }
 
-export function estimateCodexJobProgress(createdAt: string, nowMs = Date.now(), workflowMode?: WorkflowMode | null) {
-  const ratio = codexJobElapsedRatio(createdAt, nowMs, workflowMode);
+export function estimateZaiJobProgress(createdAt: string, nowMs = Date.now(), workflowMode?: WorkflowMode | null) {
+  const ratio = zaiJobElapsedRatio(createdAt, nowMs, workflowMode);
   if (ratio <= 0) return 7;
   if (ratio < 0.08) return 7 + ratio / 0.08 * 11;
   if (ratio < 0.68) return 18 + (ratio - 0.08) / 0.6 * 54;
@@ -16431,14 +16431,14 @@ export function estimateCodexJobProgress(createdAt: string, nowMs = Date.now(), 
   return Math.min(96, extended);
 }
 
-export function codexJobProgressPhase(
-  state: CodexJobQueueState,
+export function zaiJobProgressPhase(
+  state: ZaiJobQueueState,
   createdAt: string,
   nowMs = Date.now(),
   workflowMode?: WorkflowMode | null
-): CodexJobProgressPhase {
+): ZaiJobProgressPhase {
   if (state === "queued") return "queued";
-  const ratio = codexJobElapsedRatio(createdAt, nowMs, workflowMode);
+  const ratio = zaiJobElapsedRatio(createdAt, nowMs, workflowMode);
   if (ratio < 0.08) return "starting";
   if (ratio < 0.68) return "generating";
   if (ratio < 1) return "checking";
@@ -16562,27 +16562,27 @@ async function fingerprintImageSource(dataUrl: string) {
   return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-function loadPendingCodexJobs(): CodexJobQueueItem[] {
+function loadPendingZaiJobs(): ZaiJobQueueItem[] {
   try {
-    const stored = window.localStorage.getItem(PENDING_CODEX_JOB_STORAGE_KEY);
+    const stored = window.localStorage.getItem(PENDING_ZAI_JOB_STORAGE_KEY);
     if (!stored) return [];
     const parsed: unknown = JSON.parse(stored);
     const jobs = Array.isArray(parsed) ? parsed : [parsed];
     return jobs
-      .filter(isStoredPendingCodexJob)
+      .filter(isStoredPendingZaiJob)
       .map((job) => ({
         ...job,
         state: job.state === "evaluating" ? "evaluating" as const : "running" as const,
-        label: job.label ?? codexJobLabel(job.workflowMode ?? null, "", job.actionName)
+        label: job.label ?? zaiJobLabel(job.workflowMode ?? null, "", job.actionName)
       }));
   } catch {
     return [];
   }
 }
 
-function savePendingCodexJobs(jobs: CodexJobQueueItem[]) {
+function savePendingZaiJobs(jobs: ZaiJobQueueItem[]) {
   try {
-    const runningJobs: PendingCodexJob[] = jobs
+    const runningJobs: PendingZaiJob[] = jobs
       .filter((job) => (job.state === "running" || job.state === "evaluating") && Boolean(job.path))
       .map((job) => ({
         id: job.id,
@@ -16611,18 +16611,18 @@ function savePendingCodexJobs(jobs: CodexJobQueueItem[]) {
         effectContext: job.effectContext
       }));
     if (runningJobs.length > 0) {
-      window.localStorage.setItem(PENDING_CODEX_JOB_STORAGE_KEY, JSON.stringify(runningJobs));
+      window.localStorage.setItem(PENDING_ZAI_JOB_STORAGE_KEY, JSON.stringify(runningJobs));
       return;
     }
-    window.localStorage.removeItem(PENDING_CODEX_JOB_STORAGE_KEY);
+    window.localStorage.removeItem(PENDING_ZAI_JOB_STORAGE_KEY);
   } catch {
     // Pending state is best-effort; the current session still tracks active jobs.
   }
 }
 
-function isStoredPendingCodexJob(value: unknown): value is PendingCodexJob {
+function isStoredPendingZaiJob(value: unknown): value is PendingZaiJob {
   if (!value || typeof value !== "object") return false;
-  const job = value as Partial<PendingCodexJob>;
+  const job = value as Partial<PendingZaiJob>;
   return typeof job.id === "string" && typeof job.path === "string" && typeof job.createdAt === "string";
 }
 
@@ -16635,39 +16635,39 @@ function providerMessage(provider: ProviderStatus, language: Language) {
 }
 
 const providerLabels = {
-  en: { "local-file": "Local File", "local-generator": "Local Generator", "codex-handoff": "Codex Handoff", "local-inbox": "Local Inbox" },
-  ja: { "local-file": "ローカルファイル", "local-generator": "ローカル生成", "codex-handoff": "Codex受け渡し", "local-inbox": "ローカル受信箱" },
-  "zh-CN": { "local-file": "本地文件", "local-generator": "本地生成", "codex-handoff": "Codex 交接", "local-inbox": "本地收件箱" },
-  "zh-TW": { "local-file": "本地檔案", "local-generator": "本地生成", "codex-handoff": "Codex 交接", "local-inbox": "本地收件匣" },
-  ko: { "local-file": "로컬 파일", "local-generator": "로컬 생성", "codex-handoff": "Codex 전달", "local-inbox": "로컬 수신함" },
-  ru: { "local-file": "Локальный файл", "local-generator": "Локальная генерация", "codex-handoff": "Handoff Codex", "local-inbox": "Локальный inbox" },
-  es: { "local-file": "Archivo local", "local-generator": "Generador local", "codex-handoff": "Handoff Codex", "local-inbox": "Bandeja local" },
-  "pt-BR": { "local-file": "Arquivo local", "local-generator": "Gerador local", "codex-handoff": "Handoff Codex", "local-inbox": "Caixa local" },
-  de: { "local-file": "Lokale Datei", "local-generator": "Lokaler Generator", "codex-handoff": "Codex-Handoff", "local-inbox": "Lokaler Eingang" },
-  fr: { "local-file": "Fichier local", "local-generator": "Générateur local", "codex-handoff": "Handoff Codex", "local-inbox": "Boîte locale" },
-  id: { "local-file": "File lokal", "local-generator": "Generator lokal", "codex-handoff": "Handoff Codex", "local-inbox": "Kotak lokal" },
-  tr: { "local-file": "Yerel dosya", "local-generator": "Yerel üretici", "codex-handoff": "Codex handoff", "local-inbox": "Yerel gelen kutusu" },
-  vi: { "local-file": "Tệp cục bộ", "local-generator": "Trình tạo cục bộ", "codex-handoff": "Handoff Codex", "local-inbox": "Hộp cục bộ" },
-  pl: { "local-file": "Plik lokalny", "local-generator": "Generator lokalny", "codex-handoff": "Handoff Codex", "local-inbox": "Lokalna skrzynka" },
-  it: { "local-file": "File locale", "local-generator": "Generatore locale", "codex-handoff": "Handoff Codex", "local-inbox": "Inbox locale" }
+  en: { "local-file": "Local File", "local-generator": "Local Generator", "zai-handoff": "Zai Handoff", "local-inbox": "Local Inbox" },
+  ja: { "local-file": "ローカルファイル", "local-generator": "ローカル生成", "zai-handoff": "Zai受け渡し", "local-inbox": "ローカル受信箱" },
+  "zh-CN": { "local-file": "本地文件", "local-generator": "本地生成", "zai-handoff": "Zai 交接", "local-inbox": "本地收件箱" },
+  "zh-TW": { "local-file": "本地檔案", "local-generator": "本地生成", "zai-handoff": "Zai 交接", "local-inbox": "本地收件匣" },
+  ko: { "local-file": "로컬 파일", "local-generator": "로컬 생성", "zai-handoff": "Zai 전달", "local-inbox": "로컬 수신함" },
+  ru: { "local-file": "Локальный файл", "local-generator": "Локальная генерация", "zai-handoff": "Handoff Zai", "local-inbox": "Локальный inbox" },
+  es: { "local-file": "Archivo local", "local-generator": "Generador local", "zai-handoff": "Handoff Zai", "local-inbox": "Bandeja local" },
+  "pt-BR": { "local-file": "Arquivo local", "local-generator": "Gerador local", "zai-handoff": "Handoff Zai", "local-inbox": "Caixa local" },
+  de: { "local-file": "Lokale Datei", "local-generator": "Lokaler Generator", "zai-handoff": "Zai-Handoff", "local-inbox": "Lokaler Eingang" },
+  fr: { "local-file": "Fichier local", "local-generator": "Générateur local", "zai-handoff": "Handoff Zai", "local-inbox": "Boîte locale" },
+  id: { "local-file": "File lokal", "local-generator": "Generator lokal", "zai-handoff": "Handoff Zai", "local-inbox": "Kotak lokal" },
+  tr: { "local-file": "Yerel dosya", "local-generator": "Yerel üretici", "zai-handoff": "Zai handoff", "local-inbox": "Yerel gelen kutusu" },
+  vi: { "local-file": "Tệp cục bộ", "local-generator": "Trình tạo cục bộ", "zai-handoff": "Handoff Zai", "local-inbox": "Hộp cục bộ" },
+  pl: { "local-file": "Plik lokalny", "local-generator": "Generator lokalny", "zai-handoff": "Handoff Zai", "local-inbox": "Lokalna skrzynka" },
+  it: { "local-file": "File locale", "local-generator": "Generatore locale", "zai-handoff": "Handoff Zai", "local-inbox": "Inbox locale" }
 } satisfies Record<Language, Record<ProviderId, string>>;
 
 const providerMessages = {
-  en: { "local-file": "Use images from this machine", "local-generator": "Generate local PNG images", "codex-handoff": "Write local jobs for Codex to pick up", "local-inbox": "Import results returned by Codex" },
-  ja: { "local-file": "このマシン上の画像を使います", "local-generator": "このマシン上でPNGを生成します", "codex-handoff": "Codexが拾うローカルジョブを書き込みます", "local-inbox": "Codex outboxの最新画像を取り込みます" },
-  "zh-CN": { "local-file": "使用本机图像", "local-generator": "在本机生成 PNG", "codex-handoff": "写入供 Codex 处理的本地作业", "local-inbox": "导入 Codex 返回的结果" },
-  "zh-TW": { "local-file": "使用本機圖像", "local-generator": "在本機生成 PNG", "codex-handoff": "寫入供 Codex 處理的本地作業", "local-inbox": "匯入 Codex 返回的結果" },
-  ko: { "local-file": "이 컴퓨터의 이미지를 사용합니다", "local-generator": "로컬 PNG 이미지를 생성합니다", "codex-handoff": "Codex가 처리할 로컬 작업을 씁니다", "local-inbox": "Codex가 반환한 결과를 가져옵니다" },
-  ru: { "local-file": "Использует изображения с этого компьютера", "local-generator": "Создает локальные PNG", "codex-handoff": "Записывает локальные задания для Codex", "local-inbox": "Импортирует результаты Codex" },
-  es: { "local-file": "Usa imágenes de este equipo", "local-generator": "Genera PNG locales", "codex-handoff": "Escribe trabajos locales para Codex", "local-inbox": "Importa resultados devueltos por Codex" },
-  "pt-BR": { "local-file": "Usa imagens deste computador", "local-generator": "Gera PNGs locais", "codex-handoff": "Grava jobs locais para o Codex", "local-inbox": "Importa resultados retornados pelo Codex" },
-  de: { "local-file": "Bilder von diesem Gerät verwenden", "local-generator": "Lokale PNGs erzeugen", "codex-handoff": "Lokale Jobs für Codex schreiben", "local-inbox": "Von Codex zurückgegebene Ergebnisse importieren" },
-  fr: { "local-file": "Utilise les images de cette machine", "local-generator": "Génère des PNG locaux", "codex-handoff": "Écrit des tâches locales pour Codex", "local-inbox": "Importe les résultats renvoyés par Codex" },
-  id: { "local-file": "Gunakan gambar dari mesin ini", "local-generator": "Buat PNG lokal", "codex-handoff": "Tulis job lokal untuk Codex", "local-inbox": "Impor hasil dari Codex" },
-  tr: { "local-file": "Bu makinedeki görselleri kullanır", "local-generator": "Yerel PNG üretir", "codex-handoff": "Codex için yerel işler yazar", "local-inbox": "Codex sonuçlarını içe aktarır" },
-  vi: { "local-file": "Dùng ảnh trên máy này", "local-generator": "Tạo PNG cục bộ", "codex-handoff": "Ghi job cục bộ cho Codex", "local-inbox": "Nhập kết quả Codex trả về" },
-  pl: { "local-file": "Używa obrazów z tego komputera", "local-generator": "Tworzy lokalne PNG", "codex-handoff": "Zapisuje lokalne zadania dla Codex", "local-inbox": "Importuje wyniki z Codex" },
-  it: { "local-file": "Usa immagini da questa macchina", "local-generator": "Genera PNG locali", "codex-handoff": "Scrive job locali per Codex", "local-inbox": "Importa risultati restituiti da Codex" }
+  en: { "local-file": "Use images from this machine", "local-generator": "Generate local PNG images", "zai-handoff": "Write local jobs for Zai to pick up", "local-inbox": "Import results returned by Zai" },
+  ja: { "local-file": "このマシン上の画像を使います", "local-generator": "このマシン上でPNGを生成します", "zai-handoff": "Zaiが拾うローカルジョブを書き込みます", "local-inbox": "Zai outboxの最新画像を取り込みます" },
+  "zh-CN": { "local-file": "使用本机图像", "local-generator": "在本机生成 PNG", "zai-handoff": "写入供 Zai 处理的本地作业", "local-inbox": "导入 Zai 返回的结果" },
+  "zh-TW": { "local-file": "使用本機圖像", "local-generator": "在本機生成 PNG", "zai-handoff": "寫入供 Zai 處理的本地作業", "local-inbox": "匯入 Zai 返回的結果" },
+  ko: { "local-file": "이 컴퓨터의 이미지를 사용합니다", "local-generator": "로컬 PNG 이미지를 생성합니다", "zai-handoff": "Zai가 처리할 로컬 작업을 씁니다", "local-inbox": "Zai가 반환한 결과를 가져옵니다" },
+  ru: { "local-file": "Использует изображения с этого компьютера", "local-generator": "Создает локальные PNG", "zai-handoff": "Записывает локальные задания для Zai", "local-inbox": "Импортирует результаты Zai" },
+  es: { "local-file": "Usa imágenes de este equipo", "local-generator": "Genera PNG locales", "zai-handoff": "Escribe trabajos locales para Zai", "local-inbox": "Importa resultados devueltos por Zai" },
+  "pt-BR": { "local-file": "Usa imagens deste computador", "local-generator": "Gera PNGs locais", "zai-handoff": "Grava jobs locais para o Zai", "local-inbox": "Importa resultados retornados pelo Zai" },
+  de: { "local-file": "Bilder von diesem Gerät verwenden", "local-generator": "Lokale PNGs erzeugen", "zai-handoff": "Lokale Jobs für Zai schreiben", "local-inbox": "Von Zai zurückgegebene Ergebnisse importieren" },
+  fr: { "local-file": "Utilise les images de cette machine", "local-generator": "Génère des PNG locaux", "zai-handoff": "Écrit des tâches locales pour Zai", "local-inbox": "Importe les résultats renvoyés par Zai" },
+  id: { "local-file": "Gunakan gambar dari mesin ini", "local-generator": "Buat PNG lokal", "zai-handoff": "Tulis job lokal untuk Zai", "local-inbox": "Impor hasil dari Zai" },
+  tr: { "local-file": "Bu makinedeki görselleri kullanır", "local-generator": "Yerel PNG üretir", "zai-handoff": "Zai için yerel işler yazar", "local-inbox": "Zai sonuçlarını içe aktarır" },
+  vi: { "local-file": "Dùng ảnh trên máy này", "local-generator": "Tạo PNG cục bộ", "zai-handoff": "Ghi job cục bộ cho Zai", "local-inbox": "Nhập kết quả Zai trả về" },
+  pl: { "local-file": "Używa obrazów z tego komputera", "local-generator": "Tworzy lokalne PNG", "zai-handoff": "Zapisuje lokalne zadania dla Zai", "local-inbox": "Importuje wyniki z Zai" },
+  it: { "local-file": "Usa immagini da questa macchina", "local-generator": "Genera PNG locali", "zai-handoff": "Scrive job locali per Zai", "local-inbox": "Importa risultati restituiti da Zai" }
 } satisfies Record<Language, Record<ProviderId, string>>;
 
 export default App;

@@ -9,7 +9,7 @@ import {
 } from "./animationReview";
 
 const report: AnimationQualityReportV2 = {
-  metricVersion: "image-cockpit.animation-quality.v2",
+  metricVersion: "zai-cockpit.animation-quality.v2",
   policyVersion: "shadow-v1",
   recordedAt: "2026-07-15T00:00:00.000Z",
   action: "walk",
@@ -93,7 +93,7 @@ describe("animation review cockpit model", () => {
       review: { updatedAt: "now", decisions: [] },
       reports: { "job-a": report }
     });
-    expect(exported.schema).toBe("image-cockpit.animation-review-calibration.v1");
+    expect(exported.schema).toBe("zai-cockpit.animation-review-calibration.v1");
     expect(exported.candidates[0].dimensions).toHaveLength(8);
   });
 });

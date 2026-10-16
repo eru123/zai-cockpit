@@ -1,30 +1,30 @@
 import type { AnimationLibraryItem, HistoryItem, SpriteAction, SpriteFrame } from "../types";
 
-export const HISTORY_KEY = "image-cockpit.v3.history";
-export const FRAMES_KEY = "image-cockpit.v3.frames";
-export const HISTORY_SUMMARY_KEY = "image-cockpit.v3.history.summary";
-export const FRAMES_SUMMARY_KEY = "image-cockpit.v3.frames.summary";
-const ACTIONS_KEY = "image-cockpit.v3.actions";
-const ANIMATION_LIBRARY_KEY = "image-cockpit.v3.animation-library";
-export const PENDING_CODEX_JOB_STORAGE_KEY = "image-cockpit.pendingCodexJob";
+export const HISTORY_KEY = "zai-cockpit.v3.history";
+export const FRAMES_KEY = "zai-cockpit.v3.frames";
+export const HISTORY_SUMMARY_KEY = "zai-cockpit.v3.history.summary";
+export const FRAMES_SUMMARY_KEY = "zai-cockpit.v3.frames.summary";
+const ACTIONS_KEY = "zai-cockpit.v3.actions";
+const ANIMATION_LIBRARY_KEY = "zai-cockpit.v3.animation-library";
+export const PENDING_ZAI_JOB_STORAGE_KEY = "zai-cockpit.pendingZaiJob";
 export const MAX_USER_ANIMATION_LIBRARY_ITEMS = 30;
 export const HISTORY_RETENTION_LIMIT = 30;
 export const FRAME_RETENTION_LIMIT = 240;
 export const STORAGE_WARNING_BYTES = 200 * 1024 * 1024;
 export const STORAGE_AUTO_SAFE_BYTES = 500 * 1024 * 1024;
 export const STORAGE_HARD_BLOCK_BYTES = 1024 * 1024 * 1024;
-export const DB_NAME = "image-cockpit-local-state";
+export const DB_NAME = "zai-cockpit-local-state";
 const DB_VERSION = 1;
 const STORE_NAME = "state";
 
-export const IMAGE_COCKPIT_LOCAL_STATE_KEYS = [
+export const ZAI_COCKPIT_LOCAL_STATE_KEYS = [
   HISTORY_KEY,
   FRAMES_KEY,
   HISTORY_SUMMARY_KEY,
   FRAMES_SUMMARY_KEY,
   ACTIONS_KEY,
   ANIMATION_LIBRARY_KEY,
-  PENDING_CODEX_JOB_STORAGE_KEY
+  PENDING_ZAI_JOB_STORAGE_KEY
 ] as const;
 
 export type LocalStateStoragePressure = "normal" | "warning" | "auto-safe" | "hard-block";
@@ -554,7 +554,7 @@ async function saveIndexedJson<T>(key: string, value: T) {
 }
 
 function localStorageKeysForResetScope(scope: LocalStateResetScope) {
-  if (scope === "all") return [...IMAGE_COCKPIT_LOCAL_STATE_KEYS];
+  if (scope === "all") return [...ZAI_COCKPIT_LOCAL_STATE_KEYS];
   if (scope === "history") return [HISTORY_KEY, HISTORY_SUMMARY_KEY];
   if (scope === "frames") return [FRAMES_KEY, FRAMES_SUMMARY_KEY];
   if (scope === "actions") return [ACTIONS_KEY];

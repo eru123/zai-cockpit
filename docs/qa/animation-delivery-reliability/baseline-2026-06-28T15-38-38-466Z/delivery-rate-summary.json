@@ -1,5 +1,5 @@
 {
-  "schema": "image-cockpit.animation-delivery-rate-summary.v1",
+  "schema": "zai-cockpit.animation-delivery-rate-summary.v1",
   "createdAt": "2026-06-28T15:56:18.662Z",
   "runnerMode": "real",
   "baselineDir": "docs/qa/animation-delivery-reliability/baseline-2026-06-28T15-38-38-466Z",

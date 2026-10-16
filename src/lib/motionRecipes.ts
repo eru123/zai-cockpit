@@ -1,6 +1,6 @@
 import type { AnimationActionQualityProfile } from "../types";
 
-export const MOTION_RECIPE_SCHEMA = "image-cockpit.motion-recipe.v1" as const;
+export const MOTION_RECIPE_SCHEMA = "zai-cockpit.motion-recipe.v1" as const;
 export const MOTION_RECIPE_VERSION = 1 as const;
 export const MOTION_RECIPE_COMPILER_VERSION = "1.2.0" as const;
 

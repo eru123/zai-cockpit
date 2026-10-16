@@ -1,13 +1,13 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
-const qaDir = resolve(process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_QA_DIR || join("docs", "qa", "animation-delivery-reliability"));
-const runnerMode = (process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_ROLLUP_RUNNER || "real").toLowerCase();
-const minRate = Number(process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_ROLLUP_MIN_RATE ?? "0.9");
-const minTrials = Math.max(1, Number(process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_ROLLUP_MIN_TRIALS ?? (runnerMode === "real" ? "10" : "1")));
-const writeReports = process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_ROLLUP_WRITE !== "0";
-const outputPrefix = process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_ROLLUP_OUTPUT_PREFIX || `delivery-rollup-${runnerMode}`;
-const createdAtFrom = parseOptionalDate(process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_ROLLUP_CREATED_AT_FROM);
+const qaDir = resolve(process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_QA_DIR || join("docs", "qa", "animation-delivery-reliability"));
+const runnerMode = (process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_ROLLUP_RUNNER || "real").toLowerCase();
+const minRate = Number(process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_ROLLUP_MIN_RATE ?? "0.9");
+const minTrials = Math.max(1, Number(process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_ROLLUP_MIN_TRIALS ?? (runnerMode === "real" ? "10" : "1")));
+const writeReports = process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_ROLLUP_WRITE !== "0";
+const outputPrefix = process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_ROLLUP_OUTPUT_PREFIX || `delivery-rollup-${runnerMode}`;
+const createdAtFrom = parseOptionalDate(process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_ROLLUP_CREATED_AT_FROM);
 
 const baselines = await readBaselines();
 const summary = summarize(baselines);
@@ -80,7 +80,7 @@ function summarize(records) {
     "pass";
 
   return {
-    schema: "image-cockpit.animation-delivery-rollup.v1",
+    schema: "zai-cockpit.animation-delivery-rollup.v1",
     createdAt: new Date().toISOString(),
     qaDir: toReportPath(qaDir),
     runnerMode,
@@ -136,7 +136,7 @@ function parseOptionalDate(value) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    console.error(`Ignoring invalid IMAGE_COCKPIT_ANIMATION_DELIVERY_ROLLUP_CREATED_AT_FROM: ${value}`);
+    console.error(`Ignoring invalid ZAI_COCKPIT_ANIMATION_DELIVERY_ROLLUP_CREATED_AT_FROM: ${value}`);
     return null;
   }
   return date;

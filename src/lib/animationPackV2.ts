@@ -12,7 +12,7 @@ import type {
 } from "../types";
 import { dataUrlToBlob, downloadBlob } from "./image";
 
-export const ANIMATION_PACK_V2_SCHEMA = "image-cockpit.animation.v2" as const;
+export const ANIMATION_PACK_V2_SCHEMA = "zai-cockpit.animation.v2" as const;
 
 export interface CreateAnimationPackV2Input {
   title: string;
@@ -95,7 +95,7 @@ export function createAnimationPackV2(input: CreateAnimationPackV2Input): Animat
     generationProfile: input.generationProfile ?? "unknown",
     provenance: {
       createdAt: input.createdAt ?? new Date().toISOString(),
-      createdWith: "Image Cockpit for Codex Workflows",
+      createdWith: "Zai Cockpit",
       sourceName: input.sourceName,
       sourceJobId: input.sourceJobId
     },
@@ -159,7 +159,7 @@ export function parseAnimationPack(value: string | unknown, migration?: { defaul
   if (!parsed || typeof parsed !== "object") throw new Error("Animation pack manifest must be a JSON object.");
   const schema = (parsed as { schema?: unknown }).schema;
   if (schema === ANIMATION_PACK_V2_SCHEMA) return validateAnimationPackV2(parsed);
-  if (schema === "image-cockpit.animation.v1") return migrateAnimationPackV1(parsed as AnimationPackManifest, migration);
+  if (schema === "zai-cockpit.animation.v1") return migrateAnimationPackV1(parsed as AnimationPackManifest, migration);
   throw new Error(`Unsupported animation pack schema: ${String(schema ?? "missing")}.`);
 }
 
@@ -167,7 +167,7 @@ export function migrateAnimationPackV1(
   manifest: AnimationPackManifest,
   options: { defaultFps?: number; loopMode?: AnimationPackV2LoopMode } = {}
 ): AnimationPackV2 {
-  if (manifest.schema !== "image-cockpit.animation.v1") throw new Error("Animation Pack v1 migration requires a v1 manifest.");
+  if (manifest.schema !== "zai-cockpit.animation.v1") throw new Error("Animation Pack v1 migration requires a v1 manifest.");
   const fps = options.defaultFps ?? 12;
   const pack = createAnimationPackV2({
     title: manifest.title,
@@ -184,7 +184,7 @@ export function migrateAnimationPackV1(
   });
   pack.kind = manifest.kind;
   pack.provenance.createdWith = manifest.createdWith;
-  pack.provenance.migratedFrom = "image-cockpit.animation.v1";
+  pack.provenance.migratedFrom = "zai-cockpit.animation.v1";
   pack.files.sheet = manifest.files.sheet;
   return validateAnimationPackV2(pack);
 }
@@ -192,7 +192,7 @@ export function migrateAnimationPackV1(
 export function packV2ToLegacyManifest(pack: AnimationPackV2): AnimationPackManifest {
   const valid = validateAnimationPackV2(pack);
   return {
-    schema: "image-cockpit.animation.v1",
+    schema: "zai-cockpit.animation.v1",
     title: valid.title,
     kind: valid.kind,
     action: valid.actionId,
@@ -342,7 +342,7 @@ export function buildAnimationPackV2EngineExports(pack: AnimationPackV2): Animat
     }));
   });
   return [
-    engine(valid.files.engine.generic, { schema: "image-cockpit.generic-animation.v1", ...common }),
+    engine(valid.files.engine.generic, { schema: "zai-cockpit.generic-animation.v1", ...common }),
     engine(valid.files.engine.godot, {
       resourceType: "SpriteFrames",
       spriteSheet: valid.files.sheet,
@@ -393,7 +393,7 @@ export function buildAnimationPackV2EngineExports(pack: AnimationPackV2): Animat
       }
     }),
     engine(valid.files.engine.unity, {
-      schema: "image-cockpit.unity-common-atlas.v1",
+      schema: "zai-cockpit.unity-common-atlas.v1",
       packageIncluded: false,
       note: "Common JSON/atlas handoff only; no Unity package is generated.",
       ...common
@@ -415,7 +415,7 @@ export async function createAnimationPackV2Zip(pack: AnimationPackV2, sheet: Blo
 
 export async function exportAnimationPackV2(pack: AnimationPackV2, sheet: Blob | string) {
   const blob = await createAnimationPackV2Zip(pack, sheet);
-  downloadBlob(blob, `${slug(pack.title) || "animation"}.image-cockpit-animation-v2.zip`);
+  downloadBlob(blob, `${slug(pack.title) || "animation"}.zai-cockpit-animation-v2.zip`);
 }
 
 export function addPackPoint(pack: AnimationPackV2, kind: "pivot" | "anchor" | "socket", frameIndex: number, name?: string) {

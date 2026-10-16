@@ -238,7 +238,7 @@ export function VfxCompositeStage({
 
   function saveSetup() {
     const serialized = serializeVfxCompositeManifest(draft);
-    localStorage.setItem("image-cockpit.vfx-composite.last", serialized);
+    localStorage.setItem("zai-cockpit.vfx-composite.last", serialized);
     setSavedSnapshot(serialized);
     setMessage(isJa ? "Composite設定を保存した" : "Composite setup saved");
   }
@@ -259,7 +259,7 @@ export function VfxCompositeStage({
       const base = safeName(draft.title);
       if (kind === "gif") downloadBlob(artifacts.previewGif, `${base}.composite.gif`);
       if (kind === "apng") downloadBlob(artifacts.previewApng, `${base}.composite.apng`);
-      if (kind === "pack") downloadBlob(artifacts.pack, `${base}.image-cockpit-vfx-composite.zip`);
+      if (kind === "pack") downloadBlob(artifacts.pack, `${base}.zai-cockpit-vfx-composite.zip`);
       if (kind === "sheet") downloadBlob(await createCompositeSheetBlob(artifacts.frames), `${base}.composite-sheet.png`);
       setSavedSnapshot(serializeVfxCompositeManifest(draft));
       setMessage(isJa ? "Composite export完了" : "Composite export complete");

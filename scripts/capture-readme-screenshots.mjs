@@ -6,19 +6,19 @@ import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 
 const nodeCommand = process.execPath;
-const browserCommand = process.env.IMAGE_COCKPIT_BROWSER_COMMAND || findBrowserCommand();
-const outputDir = resolve(process.env.IMAGE_COCKPIT_README_SCREENSHOT_DIR || "docs/demo/readme");
+const browserCommand = process.env.ZAI_COCKPIT_BROWSER_COMMAND || findBrowserCommand();
+const outputDir = resolve(process.env.ZAI_COCKPIT_README_SCREENSHOT_DIR || "docs/demo/readme");
 const viewport = {
-  width: Number(process.env.IMAGE_COCKPIT_README_SCREENSHOT_WIDTH || 1600),
-  height: Number(process.env.IMAGE_COCKPIT_README_SCREENSHOT_HEIGHT || 900)
+  width: Number(process.env.ZAI_COCKPIT_README_SCREENSHOT_WIDTH || 1600),
+  height: Number(process.env.ZAI_COCKPIT_README_SCREENSHOT_HEIGHT || 900)
 };
 
 if (!browserCommand) {
-  console.error("README screenshot capture requires Chrome or Edge. Set IMAGE_COCKPIT_BROWSER_COMMAND to a browser executable.");
+  console.error("README screenshot capture requires Chrome or Edge. Set ZAI_COCKPIT_BROWSER_COMMAND to a browser executable.");
   process.exit(1);
 }
 
-const tempRoot = await mkdtempCompat(join(tmpdir(), "image-cockpit-readme-capture-"));
+const tempRoot = await mkdtempCompat(join(tmpdir(), "zai-cockpit-readme-capture-"));
 const handoffDir = join(tempRoot, "handoff");
 const chromeProfileDir = join(tempRoot, "chrome-profile");
 const apiPort = await getOpenPort();
@@ -34,15 +34,15 @@ let cdp;
 try {
   await mkdir(outputDir, { recursive: true });
   apiServer = startProcess(nodeCommand, ["node_modules/tsx/dist/cli.mjs", "server/index.ts"], {
-    IMAGE_COCKPIT_API_PORT: String(apiPort),
-    IMAGE_COCKPIT_HANDOFF_DIR: handoffDir,
-    IMAGE_COCKPIT_CODEX_AUTORUN: "0"
+    ZAI_COCKPIT_API_PORT: String(apiPort),
+    ZAI_COCKPIT_HANDOFF_DIR: handoffDir,
+    ZAI_COCKPIT_RUNNER_AUTORUN: "0"
   });
   await waitForHttp(`http://127.0.0.1:${apiPort}/api/providers`, "local API");
 
   viteServer = startProcess(nodeCommand, ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", String(vitePort), "--strictPort"], {
-    IMAGE_COCKPIT_API_TARGET: `http://127.0.0.1:${apiPort}`,
-    VITE_IMAGE_COCKPIT_SUPERVISOR_PORT: String(supervisorPort)
+    ZAI_COCKPIT_API_TARGET: `http://127.0.0.1:${apiPort}`,
+    VITE_ZAI_COCKPIT_SUPERVISOR_PORT: String(supervisorPort)
   });
   await waitForHttp(`http://127.0.0.1:${vitePort}/`, "Vite app");
 
@@ -67,8 +67,8 @@ try {
   await cdp.send("Runtime.enable");
   await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
     source: `
-      localStorage.setItem("image-cockpit.language", "en");
-      localStorage.removeItem("image-cockpit.pendingCodexJob");
+      localStorage.setItem("zai-cockpit.language", "en");
+      localStorage.removeItem("zai-cockpit.pendingZaiJob");
     `
   });
   await cdp.send("Emulation.setDeviceMetricsOverride", {
@@ -126,10 +126,10 @@ async function openApp() {
   await cdp.send("Page.navigate", { url: `http://127.0.0.1:${vitePort}/` });
   await waitForEval(
     () => `Boolean(document.querySelector(".source-panel > .workflow-tabs")) && document.body.innerText.length > 100`,
-    "Image Cockpit workspace"
+    "Zai Cockpit workspace"
   );
   await evaluate(`(() => {
-    localStorage.setItem("image-cockpit.language", "en");
+    localStorage.setItem("zai-cockpit.language", "en");
     document.querySelector(".source-panel")?.scrollTo(0, 0);
     document.querySelector(".history-list")?.scrollTo(0, 0);
     document.querySelector(".result-preview-frame")?.scrollTo(0, 0);
@@ -279,7 +279,7 @@ async function capture(name) {
 
 async function assertNoLocalPrivateText(label) {
   const text = await evaluate(`document.body.innerText`);
-  const blocked = [/C:\\\\/i, /D:\\\\/i, /Users\\\\/i, /AppData/i, /codex-handoff/i, /tmp/i, /Temp/i, /codex-job-/i];
+  const blocked = [/C:\\\\/i, /D:\\\\/i, /Users\\\\/i, /AppData/i, /zai-handoff/i, /tmp/i, /Temp/i, /zai-job-/i];
   const match = blocked.find((pattern) => pattern.test(text));
   if (match) throw new Error(`${label} includes private or temporary text matching ${match}`);
 }
@@ -319,11 +319,11 @@ async function waitForEval(expressionFactory, label, timeoutMs = 10000) {
 }
 
 function seedReadmeStateInBrowser(mode) {
-  const HISTORY_KEY = "image-cockpit.v3.history";
-  const FRAMES_KEY = "image-cockpit.v3.frames";
-  const ACTIONS_KEY = "image-cockpit.v3.actions";
-  const LIBRARY_KEY = "image-cockpit.v3.animation-library";
-  const DB_NAME = "image-cockpit-local-state";
+  const HISTORY_KEY = "zai-cockpit.v3.history";
+  const FRAMES_KEY = "zai-cockpit.v3.frames";
+  const ACTIONS_KEY = "zai-cockpit.v3.actions";
+  const LIBRARY_KEY = "zai-cockpit.v3.animation-library";
+  const DB_NAME = "zai-cockpit-local-state";
   const STORE_NAME = "state";
   const createdAt = "2026-06-26T00:00:00.000Z";
   const cell = { width: 256, height: 256 };
@@ -420,7 +420,7 @@ function seedReadmeStateInBrowser(mode) {
       id: "readme-source-boy-adventurer",
       name: "boy-adventurer-prompt-example.png",
       dataUrl: boyDataUrl,
-      provider: "codex-handoff",
+      provider: "zai-handoff",
       prompt: "Basic Character prompt example: cheerful young boy adventurer, full-body pixel art, transparent background.",
       seed: "readme-capture",
       size: `${boyInfo.width}x${boyInfo.height}`,
@@ -432,7 +432,7 @@ function seedReadmeStateInBrowser(mode) {
       id: "readme-source-forest-mage",
       name: "forest-mage-idle-prompt-example.png",
       dataUrl: mageDataUrl,
-      provider: "codex-handoff",
+      provider: "zai-handoff",
       prompt: "Prompt example source prepared for animation generation.",
       seed: "readme-capture",
       size: `${mageInfo.width}x${mageInfo.height}`,
@@ -444,7 +444,7 @@ function seedReadmeStateInBrowser(mode) {
       id: "readme-animation-idle-breathing",
       name: "boy-adventurer-idle-breathing-5-direction-sheet.png",
       dataUrl: sheetDataUrl,
-      provider: "codex-handoff",
+      provider: "zai-handoff",
       prompt: "Idle Breathing official preset: stable five-direction sprite sheet with clean frames.",
       seed: "readme-capture",
       size: `${sheetInfo.width}x${sheetInfo.height}`,
@@ -466,8 +466,8 @@ function seedReadmeStateInBrowser(mode) {
       ? [animationItem, sourceItem, mageItem]
       : [sourceItem, mageItem, animationItem];
 
-    localStorage.setItem("image-cockpit.language", "en");
-    localStorage.removeItem("image-cockpit.pendingCodexJob");
+    localStorage.setItem("zai-cockpit.language", "en");
+    localStorage.removeItem("zai-cockpit.pendingZaiJob");
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
     localStorage.setItem(FRAMES_KEY, JSON.stringify(frames));
     localStorage.setItem(ACTIONS_KEY, JSON.stringify(actions));

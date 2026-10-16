@@ -1,5 +1,5 @@
 {
-  "schema": "image-cockpit.animation-review-calibration.v1",
+  "schema": "zai-cockpit.animation-review-calibration.v1",
   "exportedAt": "2026-07-15T00:00:00.000Z",
   "tournamentId": "fixture-best-three-candidates",
   "sourceFingerprint": "sha256:fixture-source",

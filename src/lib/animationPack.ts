@@ -3,7 +3,7 @@ import type { AnimationLibraryItem, AnimationPackManifest, HistoryItem, MotionRe
 import { createId } from "./image";
 import { ANIMATION_PACK_V2_SCHEMA, migrateAnimationPackV1, packV2ToLegacyManifest, validateAnimationPackV2 } from "./animationPackV2";
 
-export const ANIMATION_PACK_SCHEMA = "image-cockpit.animation.v1";
+export const ANIMATION_PACK_SCHEMA = "zai-cockpit.animation.v1";
 const MAX_PACK_SIZE_BYTES = 30 * 1024 * 1024;
 const MAX_EMBEDDED_FILE_SIZE_BYTES = 12 * 1024 * 1024;
 

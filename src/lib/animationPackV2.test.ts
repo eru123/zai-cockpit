@@ -82,7 +82,7 @@ describe("Animation Pack v2 timeline", () => {
   });
 
   it("rejects unknown schemas with a precise error", () => {
-    expect(() => parseAnimationPack({ schema: "image-cockpit.animation.v99" })).toThrow(/unsupported.*v99/i);
+    expect(() => parseAnimationPack({ schema: "zai-cockpit.animation.v99" })).toThrow(/unsupported.*v99/i);
   });
 
   it("rejects Windows separators in portable file references", () => {
@@ -104,7 +104,7 @@ describe("Animation Pack v2 timeline", () => {
 describe("Animation Pack v2 compatibility and engine handoff", () => {
   it("migrates v1 equal-duration frames from FPS and maps legacy ping-pong", () => {
     const migrated = migrateAnimationPackV1(makeLegacyManifest(), { defaultFps: 10 });
-    expect(migrated.provenance.migratedFrom).toBe("image-cockpit.animation.v1");
+    expect(migrated.provenance.migratedFrom).toBe("zai-cockpit.animation.v1");
     expect(migrated.frameDurations).toEqual(Array(8).fill(100));
     expect(migrated.loopMode).toBe("ping-pong");
   });
@@ -177,7 +177,7 @@ function makePack(frameCount = 8, directionCount = 5): AnimationPackV2 {
 
 function makeLegacyManifest(): AnimationPackManifest {
   return {
-    schema: "image-cockpit.animation.v1",
+    schema: "zai-cockpit.animation.v1",
     title: "Legacy Run",
     kind: "user",
     action: "run",
@@ -187,7 +187,7 @@ function makeLegacyManifest(): AnimationPackManifest {
     framesPerDirection: 8,
     playback: "ping-pong-reverse",
     createdAt: "2026-07-01T00:00:00.000Z",
-    createdWith: "Image Cockpit",
+    createdWith: "Zai Cockpit",
     files: { sheet: "sheet.png" }
   };
 }

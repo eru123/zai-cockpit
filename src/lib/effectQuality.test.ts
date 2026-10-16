@@ -19,7 +19,7 @@ describe("Effect Quality Gate v2 shadow metrics", () => {
       [sample(), sample({ brightness: 0.76 }), sample({ brightness: 0.72 })],
       { loopExpected: true, energyEnvelope: "sustain", expectedPeakFrame: 1, recordedAt: "2026-07-15T00:00:00.000Z" }
     );
-    expect(report.metricVersion).toBe("image-cockpit.effect-quality.v2");
+    expect(report.metricVersion).toBe("zai-cockpit.effect-quality.v2");
     expect(report.loopSeamScore).toBeGreaterThan(90);
     expect(report.eventPeakDeltaFrames).toBe(0);
     expect(report.shadowWarnings).toEqual([]);

@@ -3,11 +3,11 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
 const nodeCommand = process.execPath;
-const runnerMode = (process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_RUNNER || "mock").toLowerCase();
-const trialCount = Math.max(1, Number(process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_TRIALS ?? "3"));
-const minRate = Number(process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_MIN_RATE ?? (runnerMode === "mock" ? "1" : "0"));
-const keepRuntimeHandoff = process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_KEEP_HANDOFF === "1";
-const pruneFailedRuntimeHandoff = process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_PRUNE_FAILED_HANDOFF === "1";
+const runnerMode = (process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_RUNNER || "mock").toLowerCase();
+const trialCount = Math.max(1, Number(process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_TRIALS ?? "3"));
+const minRate = Number(process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_MIN_RATE ?? (runnerMode === "mock" ? "1" : "0"));
+const keepRuntimeHandoff = process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_KEEP_HANDOFF === "1";
+const pruneFailedRuntimeHandoff = process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_PRUNE_FAILED_HANDOFF === "1";
 const runtimeHandoffPolicy = keepRuntimeHandoff
   ? "keep-all"
   : pruneFailedRuntimeHandoff
@@ -15,7 +15,7 @@ const runtimeHandoffPolicy = keepRuntimeHandoff
     : "keep-failed";
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 const baselineDir = resolve(
-  process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_BASELINE_DIR ||
+  process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_BASELINE_DIR ||
     join("docs", "qa", "animation-delivery-reliability", `baseline-${timestamp}`)
 );
 
@@ -86,7 +86,7 @@ function runTrial(reportDir) {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        IMAGE_COCKPIT_ANIMATION_DELIVERY_REPORT_DIR: reportDir
+        ZAI_COCKPIT_ANIMATION_DELIVERY_REPORT_DIR: reportDir
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true
@@ -133,7 +133,7 @@ function summarizeTrials(allTrials, runs) {
   const falseSuccessCount = allTrials.filter((trial) => trial.falseSuccess).length;
   const stuckRunningCount = allTrials.filter((trial) => trial.stuckRunning).length;
   return {
-    schema: "image-cockpit.animation-delivery-rate-summary.v1",
+    schema: "zai-cockpit.animation-delivery-rate-summary.v1",
     createdAt: new Date().toISOString(),
     runnerMode,
     baselineDir: toReportPath(baselineDir),

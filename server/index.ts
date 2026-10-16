@@ -1,62 +1,56 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { closeSync, createWriteStream, existsSync, openSync, readFileSync, readSync, readdirSync, writeFileSync } from "node:fs";
+import { closeSync, createWriteStream, existsSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { copyFile, mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { basename, delimiter, extname, join, resolve, sep } from "node:path";
+import { basename, delimiter, dirname, extname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { evaluateBestFirstQualifiedCandidate } from "../src/lib/animationTournamentGate.js";
 import { generateLocalImages, type LocalGenerationRequest } from "./local-generator.js";
 
 loadDotEnv(resolve(".env"));
 
-const port = Number(process.env.IMAGE_COCKPIT_API_PORT ?? 8787);
-const handoffRoot = resolve(process.env.IMAGE_COCKPIT_HANDOFF_DIR ?? "codex-handoff");
+const port = Number(process.env.ZAI_COCKPIT_API_PORT ?? 8787);
+const handoffRoot = resolve(process.env.ZAI_COCKPIT_HANDOFF_DIR ?? "zai-handoff");
 const inboxDir = join(handoffRoot, "inbox");
 const outboxDir = join(handoffRoot, "outbox");
 const tournamentWorkRootDir = join(outboxDir, ".tournaments");
 const assetsDir = join(handoffRoot, "assets");
 const statusDir = join(handoffRoot, "status");
 const logsDir = join(handoffRoot, "logs");
-const codexAutoRun = process.env.IMAGE_COCKPIT_CODEX_AUTORUN !== "0";
-const codexCommand = process.env.IMAGE_COCKPIT_CODEX_COMMAND ?? "codex";
-const codexCommandCandidates = resolveCommandCandidates(codexCommand);
-const codexLaunchCommand = selectCodexLaunchCommand(codexCommand, codexCommandCandidates);
-const codexSandbox = process.env.IMAGE_COCKPIT_CODEX_SANDBOX ?? "workspace-write";
-const codexApproval = process.env.IMAGE_COCKPIT_CODEX_APPROVAL ?? "never";
-const codexHelpArgs = parseJsonStringArray("IMAGE_COCKPIT_CODEX_HELP_ARGS_JSON", ["--help"]);
-const codexExecArgs = parseJsonStringArray("IMAGE_COCKPIT_CODEX_EXEC_ARGS_JSON", [
-  "exec",
-  "-c",
-  `approval_policy=${JSON.stringify(codexApproval)}`,
-  "--sandbox",
-  codexSandbox,
-  "-"
-]);
-const codexRunnerMode = detectCodexRunnerMode(codexCommand, codexLaunchCommand, codexHelpArgs, codexExecArgs);
-const allowMockRunner = process.env.IMAGE_COCKPIT_ALLOW_MOCK_RUNNER === "1";
-const runnerStaleTimeoutMs = parsePositiveNumber("IMAGE_COCKPIT_CODEX_STALE_MS", 30 * 60 * 1000);
-const runnerStaleLogIdleMs = parsePositiveNumber("IMAGE_COCKPIT_CODEX_STALE_LOG_IDLE_MS", 5 * 60 * 1000);
-const runnerCapacityCooldownMs = parsePositiveNumber("IMAGE_COCKPIT_CODEX_CAPACITY_COOLDOWN_MS", 15 * 60 * 1000);
+const serverDir = dirname(fileURLToPath(import.meta.url));
+const zaiAgentRunnerScript = resolve(serverDir, "..", "scripts", "zai-agent-runner.mjs");
+const zaiAutoRun = process.env.ZAI_COCKPIT_RUNNER_AUTORUN !== "0";
+const zaiCommand = process.env.ZAI_COCKPIT_RUNNER_COMMAND ?? process.execPath;
+const zaiCommandCandidates = resolveCommandCandidates(zaiCommand);
+const zaiLaunchCommand = selectZaiLaunchCommand(zaiCommand, zaiCommandCandidates);
+const zaiHelpArgs = parseJsonStringArray("ZAI_COCKPIT_RUNNER_HELP_ARGS_JSON", [zaiAgentRunnerScript, "--preflight"]);
+const zaiExecArgs = parseJsonStringArray("ZAI_COCKPIT_RUNNER_EXEC_ARGS_JSON", [zaiAgentRunnerScript]);
+const zaiRunnerMode = detectZaiRunnerMode(zaiCommand, zaiLaunchCommand, zaiHelpArgs, zaiExecArgs);
+const allowMockRunner = process.env.ZAI_COCKPIT_ALLOW_MOCK_RUNNER === "1";
+const runnerStaleTimeoutMs = parsePositiveNumber("ZAI_COCKPIT_RUNNER_STALE_MS", 30 * 60 * 1000);
+const runnerStaleLogIdleMs = parsePositiveNumber("ZAI_COCKPIT_RUNNER_STALE_LOG_IDLE_MS", 5 * 60 * 1000);
+const runnerCapacityCooldownMs = parsePositiveNumber("ZAI_COCKPIT_RUNNER_CAPACITY_COOLDOWN_MS", 15 * 60 * 1000);
 const runnerLogTailDefaultBytes = 24 * 1024;
 const runnerLogTailMaxBytes = 96 * 1024;
-const resultRoutePrefix = "/api/codex/results/";
+const resultRoutePrefix = "/api/zai/results/";
 const runnerPreflightTimeoutMs = 4000;
 const directionSplitSlugs = ["front", "front-three-quarter", "side", "back-three-quarter", "back"];
 const directionSplitNames = ["front", "front three-quarter", "side", "back three-quarter", "back"];
-const directionSplitManifestSchema = "image-cockpit.direction-split-animation.v1";
-const artifactStableMs = parsePositiveNumber("IMAGE_COCKPIT_ARTIFACT_STABLE_MS", 1500);
-const maxActiveCodexJobs = 3;
+const directionSplitManifestSchema = "zai-cockpit.direction-split-animation.v1";
+const artifactStableMs = parsePositiveNumber("ZAI_COCKPIT_ARTIFACT_STABLE_MS", 1500);
+const maxActiveZaiJobs = 3;
 
-const runnerStatuses = new Map<string, CodexRunnerStatus>();
+const runnerStatuses = new Map<string, ZaiRunnerStatus>();
 const runnerProcesses = new Map<string, ReturnType<typeof spawn>>();
-const resumingRunnerJobs = new Map<string, Promise<CodexRunnerStatus>>();
+const resumingRunnerJobs = new Map<string, Promise<ZaiRunnerStatus>>();
 const cancellingRunnerJobIds = new Set<string>();
 const animationTournamentLocks = new Map<string, Promise<void>>();
-let codexRunnerAdmissionTail: Promise<void> = Promise.resolve();
+let zaiRunnerAdmissionTail: Promise<void> = Promise.resolve();
 let animationTournamentRegistrationTail: Promise<void> = Promise.resolve();
 let cachedRunnerCapacityBlock: RunnerCapacityBlock | null = null;
 
-type CodexJobRequest = {
+type ZaiJobRequest = {
   workflowMode?: string;
   prompt?: string;
   negativePrompt?: string;
@@ -177,7 +171,7 @@ type AnimationHumanReview = {
 };
 
 type AnimationTournamentManifest = {
-  schema: "image-cockpit.animation-tournament.v1";
+  schema: "zai-cockpit.animation-tournament.v1";
   schemaVersion: 1;
   tournamentId: string;
   idempotencyKey: string;
@@ -256,11 +250,11 @@ class HttpError extends Error {
   }
 }
 
-type CodexWorkflowMode = "image-generate" | "image-edit" | "sprite-generate" | "sprite-edit" | "effect-animation";
-type CodexRunnerState = "running" | "completed" | "failed" | "unavailable" | "disabled" | "unknown";
-type CodexRunnerPreflightState = "ready" | "disabled" | "unavailable";
-type CodexRunnerMode = "codex" | "custom" | "mock";
-type CodexFailureKind =
+type ZaiWorkflowMode = "image-generate" | "image-edit" | "sprite-generate" | "sprite-edit" | "effect-animation";
+type ZaiRunnerState = "running" | "completed" | "failed" | "unavailable" | "disabled" | "unknown";
+type ZaiRunnerPreflightState = "ready" | "disabled" | "unavailable";
+type ZaiRunnerMode = "zai" | "custom" | "mock";
+type ZaiFailureKind =
   | "policy_or_safety"
   | "usage_limit"
   | "imagegen_unavailable"
@@ -268,8 +262,8 @@ type CodexFailureKind =
   | "no_image_returned"
   | "unknown";
 
-type CodexJobDiagnostic = {
-  kind: CodexFailureKind;
+type ZaiJobDiagnostic = {
+  kind: ZaiFailureKind;
   title: string;
   userMessage: string;
   suggestion?: string;
@@ -277,9 +271,9 @@ type CodexJobDiagnostic = {
   logPath?: string;
 };
 
-type CodexRunnerStatus = {
+type ZaiRunnerStatus = {
   jobId: string;
-  state: CodexRunnerState;
+  state: ZaiRunnerState;
   message: string;
   command?: string;
   requestedCommand?: string;
@@ -295,11 +289,11 @@ type CodexRunnerStatus = {
   logPath?: string;
   statusPath?: string;
   outboxDir?: string;
-  diagnostic?: CodexJobDiagnostic;
+  diagnostic?: ZaiJobDiagnostic;
 };
 
 type RunnerCapacityBlock = {
-  kind: Extract<CodexFailureKind, "usage_limit">;
+  kind: Extract<ZaiFailureKind, "usage_limit">;
   title: string;
   userMessage: string;
   suggestion?: string;
@@ -308,9 +302,9 @@ type RunnerCapacityBlock = {
   expiresAt: string;
 };
 
-type CodexArtifactQuality = "gold" | "silver" | "bronze" | "blocked" | "waiting";
+type ZaiArtifactQuality = "gold" | "silver" | "bronze" | "blocked" | "waiting";
 
-type CodexResultQualityClassification =
+type ZaiResultQualityClassification =
   | "usable-final"
   | "quality-failed"
   | "quarantined-candidate"
@@ -318,8 +312,8 @@ type CodexResultQualityClassification =
   | "running"
   | "failed";
 
-type CodexResultQualityGate = {
-  classification: CodexResultQualityClassification;
+type ZaiResultQualityGate = {
+  classification: ZaiResultQualityClassification;
   reason: string;
   code?: string;
   historyAllowed: boolean;
@@ -328,7 +322,7 @@ type CodexResultQualityGate = {
   warnings?: string[];
 };
 
-type CodexResultQualityGateRequest = {
+type ZaiResultQualityGateRequest = {
   classification?: unknown;
   reason?: unknown;
   code?: unknown;
@@ -336,7 +330,7 @@ type CodexResultQualityGateRequest = {
 };
 
 type AnimationQualityReportV2 = Record<string, unknown> & {
-  metricVersion: "image-cockpit.animation-quality.v2";
+  metricVersion: "zai-cockpit.animation-quality.v2";
   policyVersion: string;
 };
 
@@ -344,13 +338,13 @@ type AnimationQualityReportRequest = {
   report?: unknown;
 };
 
-type CodexArtifactStatus = {
+type ZaiArtifactStatus = {
   jobId: string;
   artifactKind: "direction-split";
   detected: boolean;
   ready: boolean;
   verified: boolean;
-  quality: CodexArtifactQuality;
+  quality: ZaiArtifactQuality;
   reason: string;
   missingDirections: string[];
   warnings: string[];
@@ -358,7 +352,7 @@ type CodexArtifactStatus = {
   manifestName?: string;
   stable: boolean;
   candidateCount: number;
-  qualityGate?: CodexResultQualityGate;
+  qualityGate?: ZaiResultQualityGate;
   animationQuality?: AnimationQualityReportV2;
   chromaKey?: {
     expected?: string;
@@ -386,17 +380,17 @@ type DirectionSplitSourceManifest = {
   fromStaging: boolean;
 } | null;
 
-type CodexRunnerPreflight = {
-  state: CodexRunnerPreflightState;
+type ZaiRunnerPreflight = {
+  state: ZaiRunnerPreflightState;
   message: string;
   command: string;
   launchCommand: string;
-  mode: CodexRunnerMode;
+  mode: ZaiRunnerMode;
   mockRunnerAllowed: boolean;
   checkedAt: string;
   autorun: boolean;
-  sandbox: string;
-  approval: string;
+  runnerScript?: string;
+  endpointMode?: string;
   resolvedCommandPaths: string[];
   errorCode?: string;
   setupHint?: string;
@@ -419,10 +413,10 @@ const server = createServer(async (request, response) => {
     const pathname = requestUrl.pathname;
 
     if (request.method === "GET" && pathname === "/api/health") {
-      const runner = await checkCodexRunnerPreflight();
+      const runner = await checkZaiRunnerPreflight();
       sendJson(response, 200, {
-        app: "image-cockpit",
-        version: "0.2.1",
+        app: "zai-cockpit",
+        version: "0.1.0",
         role: "api",
         port,
         handoffRoot,
@@ -454,20 +448,20 @@ const server = createServer(async (request, response) => {
             message: "Generate local PNG images without external services"
           },
           {
-            id: "codex-handoff",
-            label: "Codex Handoff",
+            id: "zai-handoff",
+            label: "Zai Handoff",
             enabled: true,
             path: inboxDir,
-            message: codexAutoRun
-              ? `Write local jobs and start ${codexCommand} exec when available`
-              : "Write local jobs for manual Codex pickup"
+            message: zaiAutoRun
+              ? `Write local jobs and start the Z.ai agent runner when available`
+              : "Write local jobs for manual Zai pickup"
           },
           {
             id: "local-inbox",
             label: "Local Inbox",
             enabled: true,
             path: outboxDir,
-            message: "Import results returned by Codex"
+            message: "Import results returned by Zai"
           }
         ]
       });
@@ -500,24 +494,24 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    if (request.method === "GET" && pathname === "/api/codex/runner") {
-      sendJson(response, 200, { runner: await checkCodexRunnerPreflight() });
+    if (request.method === "GET" && pathname === "/api/zai/runner") {
+      sendJson(response, 200, { runner: await checkZaiRunnerPreflight() });
       return;
     }
 
-    if (request.method === "GET" && pathname === "/api/codex/capacity") {
-      const active = await activeCodexRunnerCount();
+    if (request.method === "GET" && pathname === "/api/zai/capacity") {
+      const active = await activeZaiRunnerCount();
       sendJson(response, 200, {
         capacity: {
-          limit: maxActiveCodexJobs,
+          limit: maxActiveZaiJobs,
           active,
-          available: Math.max(0, maxActiveCodexJobs - active)
+          available: Math.max(0, maxActiveZaiJobs - active)
         }
       });
       return;
     }
 
-    if (request.method === "GET" && pathname === "/api/codex/jobs") {
+    if (request.method === "GET" && pathname === "/api/zai/jobs") {
       const files = await readdir(inboxDir);
       sendJson(response, 200, {
         inboxPath: inboxDir,
@@ -526,7 +520,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const jobStatusMatch = pathname.match(/^\/api\/codex\/jobs\/([^/]+)\/status$/);
+    const jobStatusMatch = pathname.match(/^\/api\/zai\/jobs\/([^/]+)\/status$/);
     if (request.method === "GET" && jobStatusMatch) {
       const jobId = decodeURIComponent(jobStatusMatch[1]);
       if (!isSafeJobId(jobId)) {
@@ -537,18 +531,18 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const jobCancelMatch = pathname.match(/^\/api\/codex\/jobs\/([^/]+)\/cancel$/);
+    const jobCancelMatch = pathname.match(/^\/api\/zai\/jobs\/([^/]+)\/cancel$/);
     if (request.method === "POST" && jobCancelMatch) {
       const jobId = decodeURIComponent(jobCancelMatch[1]);
       if (!isSafeJobId(jobId)) {
         sendJson(response, 400, { error: "Unsupported or unsafe job id" });
         return;
       }
-      sendJson(response, 200, await cancelCodexRunner(jobId));
+      sendJson(response, 200, await cancelZaiRunner(jobId));
       return;
     }
 
-    const jobLogMatch = pathname.match(/^\/api\/codex\/jobs\/([^/]+)\/log$/);
+    const jobLogMatch = pathname.match(/^\/api\/zai\/jobs\/([^/]+)\/log$/);
     if (request.method === "GET" && jobLogMatch) {
       const jobId = decodeURIComponent(jobLogMatch[1]);
       if (!isSafeJobId(jobId)) {
@@ -560,20 +554,20 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const qualityGateMatch = pathname.match(/^\/api\/codex\/artifacts\/([^/]+)\/quality-gate$/);
+    const qualityGateMatch = pathname.match(/^\/api\/zai\/artifacts\/([^/]+)\/quality-gate$/);
     if (request.method === "POST" && qualityGateMatch) {
       const jobId = decodeURIComponent(qualityGateMatch[1]);
       if (!isSafeJobId(jobId)) {
         sendJson(response, 400, { error: "Unsupported or unsafe job id" });
         return;
       }
-      const gate = qualityGateFromRequest((await readJson(request)) as CodexResultQualityGateRequest);
+      const gate = qualityGateFromRequest((await readJson(request)) as ZaiResultQualityGateRequest);
       const writeResult = await writeDirectionSplitQualityGate(jobId, gate);
       sendJson(response, 200, writeResult);
       return;
     }
 
-    const animationQualityMatch = pathname.match(/^\/api\/codex\/artifacts\/([^/]+)\/animation-quality$/);
+    const animationQualityMatch = pathname.match(/^\/api\/zai\/artifacts\/([^/]+)\/animation-quality$/);
     if (request.method === "POST" && animationQualityMatch) {
       const jobId = decodeURIComponent(animationQualityMatch[1]);
       if (!isSafeJobId(jobId)) {
@@ -589,7 +583,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    if (request.method === "GET" && pathname === "/api/codex/results") {
+    if (request.method === "GET" && pathname === "/api/zai/results") {
       const requestedLimit = Number(requestUrl.searchParams.get("limit") ?? 20);
       const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.floor(requestedLimit), 1), 200) : 20;
       sendJson(response, 200, {
@@ -599,7 +593,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const jobResultsMatch = pathname.match(/^\/api\/codex\/jobs\/([^/]+)\/results$/);
+    const jobResultsMatch = pathname.match(/^\/api\/zai\/jobs\/([^/]+)\/results$/);
     if (request.method === "GET" && jobResultsMatch) {
       const jobId = decodeURIComponent(jobResultsMatch[1]);
       if (!isSafeJobId(jobId)) {
@@ -640,7 +634,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const jobResultFileMatch = pathname.match(/^\/api\/codex\/jobs\/([^/]+)\/results\/(.+)$/);
+    const jobResultFileMatch = pathname.match(/^\/api\/zai\/jobs\/([^/]+)\/results\/(.+)$/);
     if (request.method === "GET" && jobResultFileMatch) {
       const jobId = decodeURIComponent(jobResultFileMatch[1]);
       const name = decodeURIComponent(jobResultFileMatch[2]);
@@ -667,13 +661,13 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    if (request.method === "GET" && pathname === "/api/codex/tournaments") {
+    if (request.method === "GET" && pathname === "/api/zai/tournaments") {
       const manifests = await listAnimationTournamentManifests();
       sendJson(response, 200, { tournaments: manifests });
       return;
     }
 
-    if (request.method === "POST" && pathname === "/api/codex/tournaments") {
+    if (request.method === "POST" && pathname === "/api/zai/tournaments") {
       const registration = (await readJson(request)) as AnimationTournamentRegistrationRequest;
       const result = registration.startInitialCandidates === true
         ? await registerAndStartAnimationTournament(registration)
@@ -682,7 +676,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const tournamentManifestMatch = pathname.match(/^\/api\/codex\/tournaments\/([^/]+)$/);
+    const tournamentManifestMatch = pathname.match(/^\/api\/zai\/tournaments\/([^/]+)$/);
     if (request.method === "GET" && tournamentManifestMatch) {
       const tournamentId = decodeURIComponent(tournamentManifestMatch[1]);
       if (!isSafeTournamentId(tournamentId)) {
@@ -698,7 +692,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const tournamentInitialCandidatesMatch = pathname.match(/^\/api\/codex\/tournaments\/([^/]+)\/initial-candidates$/);
+    const tournamentInitialCandidatesMatch = pathname.match(/^\/api\/zai\/tournaments\/([^/]+)\/initial-candidates$/);
     if (request.method === "POST" && tournamentInitialCandidatesMatch) {
       const tournamentId = decodeURIComponent(tournamentInitialCandidatesMatch[1]);
       if (!isSafeTournamentId(tournamentId)) {
@@ -710,7 +704,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const tournamentCandidateMatch = pathname.match(/^\/api\/codex\/tournaments\/([^/]+)\/candidates$/);
+    const tournamentCandidateMatch = pathname.match(/^\/api\/zai\/tournaments\/([^/]+)\/candidates$/);
     if (request.method === "POST" && tournamentCandidateMatch) {
       const tournamentId = decodeURIComponent(tournamentCandidateMatch[1]);
       const body = (await readJson(request)) as { candidateIndex?: unknown; reason?: unknown };
@@ -728,7 +722,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const tournamentEvaluationMatch = pathname.match(/^\/api\/codex\/tournaments\/([^/]+)\/evaluation$/);
+    const tournamentEvaluationMatch = pathname.match(/^\/api\/zai\/tournaments\/([^/]+)\/evaluation$/);
     if (request.method === "POST" && tournamentEvaluationMatch) {
       const tournamentId = decodeURIComponent(tournamentEvaluationMatch[1]);
       if (!isSafeTournamentId(tournamentId)) {
@@ -742,7 +736,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const tournamentCancelMatch = pathname.match(/^\/api\/codex\/tournaments\/([^/]+)\/cancel$/);
+    const tournamentCancelMatch = pathname.match(/^\/api\/zai\/tournaments\/([^/]+)\/cancel$/);
     if (request.method === "POST" && tournamentCancelMatch) {
       const tournamentId = decodeURIComponent(tournamentCancelMatch[1]);
       if (!isSafeTournamentId(tournamentId)) {
@@ -753,7 +747,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const tournamentRepairMatch = pathname.match(/^\/api\/codex\/tournaments\/([^/]+)\/repairs$/);
+    const tournamentRepairMatch = pathname.match(/^\/api\/zai\/tournaments\/([^/]+)\/repairs$/);
     if (request.method === "POST" && tournamentRepairMatch) {
       const tournamentId = decodeURIComponent(tournamentRepairMatch[1]);
       const body = (await readJson(request)) as { directions?: unknown };
@@ -766,7 +760,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const tournamentRepairAcceptMatch = pathname.match(/^\/api\/codex\/tournaments\/([^/]+)\/repairs\/accept$/);
+    const tournamentRepairAcceptMatch = pathname.match(/^\/api\/zai\/tournaments\/([^/]+)\/repairs\/accept$/);
     if (request.method === "POST" && tournamentRepairAcceptMatch) {
       const tournamentId = decodeURIComponent(tournamentRepairAcceptMatch[1]);
       const body = (await readJson(request)) as { jobId?: unknown };
@@ -779,7 +773,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const tournamentReviewMatch = pathname.match(/^\/api\/codex\/tournaments\/([^/]+)\/review$/);
+    const tournamentReviewMatch = pathname.match(/^\/api\/zai\/tournaments\/([^/]+)\/review$/);
     if (request.method === "POST" && tournamentReviewMatch) {
       const tournamentId = decodeURIComponent(tournamentReviewMatch[1]);
       if (!isSafeTournamentId(tournamentId)) {
@@ -791,7 +785,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const motionPilotExpandMatch = pathname.match(/^\/api\/codex\/tournaments\/([^/]+)\/pilot\/expand$/);
+    const motionPilotExpandMatch = pathname.match(/^\/api\/zai\/tournaments\/([^/]+)\/pilot\/expand$/);
     if (request.method === "POST" && motionPilotExpandMatch) {
       const tournamentId = decodeURIComponent(motionPilotExpandMatch[1]);
       const body = (await readJson(request)) as { jobId?: unknown };
@@ -805,7 +799,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const motionPilotFallbackMatch = pathname.match(/^\/api\/codex\/tournaments\/([^/]+)\/pilot\/fallback$/);
+    const motionPilotFallbackMatch = pathname.match(/^\/api\/zai\/tournaments\/([^/]+)\/pilot\/fallback$/);
     if (request.method === "POST" && motionPilotFallbackMatch) {
       const tournamentId = decodeURIComponent(motionPilotFallbackMatch[1]);
       const body = (await readJson(request)) as { reason?: unknown };
@@ -817,7 +811,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const tournamentWinnerMatch = pathname.match(/^\/api\/codex\/tournaments\/([^/]+)\/winner$/);
+    const tournamentWinnerMatch = pathname.match(/^\/api\/zai\/tournaments\/([^/]+)\/winner$/);
     if (request.method === "POST" && tournamentWinnerMatch) {
       const tournamentId = decodeURIComponent(tournamentWinnerMatch[1]);
       const body = (await readJson(request)) as { jobId?: unknown; decision?: AnimationTournamentWinnerDecisionRequest };
@@ -835,10 +829,10 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    if (request.method === "POST" && pathname === "/api/codex/jobs") {
-      const body = (await readJson(request)) as CodexJobRequest;
+    if (request.method === "POST" && pathname === "/api/zai/jobs") {
+      const body = (await readJson(request)) as ZaiJobRequest;
       if (!body.prompt?.trim()) {
-        sendJson(response, 400, { error: "Prompt is required for a Codex handoff job" });
+        sendJson(response, 400, { error: "Prompt is required for a Zai handoff job" });
         return;
       }
       if (hasTournamentScopedJobFields(body)) {
@@ -862,7 +856,7 @@ const server = createServer(async (request, response) => {
         );
       }
 
-      const result = await createCodexJob(body);
+      const result = await createZaiJob(body);
       sendJson(response, result.reused ? 200 : 201, result);
       return;
     }
@@ -882,8 +876,8 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`Image Cockpit local handoff server listening on http://127.0.0.1:${port}`);
-  console.log(`Codex handoff inbox: ${inboxDir}`);
+  console.log(`Zai Cockpit local handoff server listening on http://127.0.0.1:${port}`);
+  console.log(`Zai handoff inbox: ${inboxDir}`);
 });
 
 async function ensureHandoffDirs() {
@@ -905,29 +899,29 @@ async function isDirectoryReadable(path: string) {
   }
 }
 
-type CreateCodexJobOptions = {
+type CreateZaiJobOptions = {
   admissionLockHeld?: boolean;
   skipSlotCheck?: boolean;
   onJobCreated?: (jobId: string) => void;
 };
 
-async function createCodexJob(body: CodexJobRequest, options: CreateCodexJobOptions = {}) {
-  if (options.admissionLockHeld) return createCodexJobUnlocked(body, options);
-  return withCodexRunnerAdmissionLock(() => createCodexJobUnlocked(body, options));
+async function createZaiJob(body: ZaiJobRequest, options: CreateZaiJobOptions = {}) {
+  if (options.admissionLockHeld) return createZaiJobUnlocked(body, options);
+  return withZaiRunnerAdmissionLock(() => createZaiJobUnlocked(body, options));
 }
 
-async function createCodexJobUnlocked(body: CodexJobRequest, options: CreateCodexJobOptions = {}) {
+async function createZaiJobUnlocked(body: ZaiJobRequest, options: CreateZaiJobOptions = {}) {
   const workflowMode = normalizeWorkflowMode(body.workflowMode);
   const tournamentId = resolveTournamentIdForJobRequest(workflowMode, body);
   if (tournamentId && body.idempotencyKey) {
     const manifest = await readAnimationTournamentManifest(tournamentId);
     const existing = manifest?.candidates.find((candidate) => candidate.idempotencyKey === body.idempotencyKey && candidate.jobId);
-    if (existing?.jobId) return codexJobResponse(existing.jobId, true);
+    if (existing?.jobId) return zaiJobResponse(existing.jobId, true);
   }
-  if (!options.skipSlotCheck) await assertCodexRunnerSlotAvailable();
+  if (!options.skipSlotCheck) await assertZaiRunnerSlotAvailable();
 
   const createdAt = new Date().toISOString();
-  const id = createCodexJobId(createdAt);
+  const id = createZaiJobId(createdAt);
   const includeSelectedImage = workflowUsesSelectedImage(workflowMode);
   const includeSpriteContext = workflowUsesSpriteContext(workflowMode);
   const includeAnnotations = workflowMode === "image-edit";
@@ -946,7 +940,7 @@ async function createCodexJobUnlocked(body: CodexJobRequest, options: CreateCode
   const job = {
     id,
     createdAt,
-    kind: "image-cockpit.codex-handoff",
+    kind: "zai-cockpit.zai-handoff",
     workflowMode,
     intent: workflowIntent(workflowMode),
     prompt: body.prompt,
@@ -970,7 +964,7 @@ async function createCodexJobUnlocked(body: CodexJobRequest, options: CreateCode
     annotationContext: {
       annotations,
       annotationCount: annotations.length,
-      coordinateSpace: "Image Cockpit canvas coordinates plus source image normalized and pixel rectangles",
+      coordinateSpace: "Zai Cockpit canvas coordinates plus source image normalized and pixel rectangles",
       canvasSize: { width: 920, height: 520 }
     },
     spriteContext: {
@@ -1004,14 +998,14 @@ async function createCodexJobUnlocked(body: CodexJobRequest, options: CreateCode
       expected: ["png", "webp", "gif", "json"]
     },
     notes: [
-      "This app does not call OpenAI APIs directly.",
-      "Codex or the user should perform generation/editing externally and place results in the outbox or import them through the UI.",
+      "Generation runs through the local Z.ai agent runner with the configured Z.ai account.",
+      "Z.ai or the user should perform generation/editing externally and place results in the outbox or import them through the UI.",
       ...workflowNotes(workflowMode)
     ]
   };
   const path = join(inboxDir, `${id}.json`);
   await writeFile(path, JSON.stringify(job, null, 2), "utf8");
-  const runner = await startCodexRunner({ id, createdAt, path, outboxDir: jobOutboxDir });
+  const runner = await startZaiRunner({ id, createdAt, path, outboxDir: jobOutboxDir });
   options.onJobCreated?.(id);
   if (tournamentId) {
     await attachJobToAnimationTournament(tournamentId, normalizeCandidateIndex(body.tournamentCandidateIndex), id, createdAt, runner, repairDirections);
@@ -1019,7 +1013,7 @@ async function createCodexJobUnlocked(body: CodexJobRequest, options: CreateCode
   return { id, path, inboxPath: inboxDir, outboxPath: jobOutboxDir, createdAt, runner, reused: false };
 }
 
-async function codexJobResponse(jobId: string, reused: boolean) {
+async function zaiJobResponse(jobId: string, reused: boolean) {
   const path = join(inboxDir, `${jobId}.json`);
   const parsed = parseJsonText<{ createdAt?: string; returnTo?: { outboxDir?: string } }>(await readFile(path, "utf8"));
   const runner = await getRunnerStatus(jobId);
@@ -1082,7 +1076,7 @@ async function registerAndStartAnimationTournament(registration: AnimationTourna
         };
       }
 
-      return withCodexRunnerAdmissionLock(async () => {
+      return withZaiRunnerAdmissionLock(async () => {
         await assertAnimationInitialBundleAdmissionAvailable(prepared.initialCandidateCount);
         const registered = await createPreparedAnimationTournament(registration, tournamentId, idempotencyKey, prepared);
         const bundle = await startAnimationTournamentInitialCandidateBundleUnlocked(tournamentId);
@@ -1112,7 +1106,7 @@ async function registerAndStartAnimationTournament(registration: AnimationTourna
       return {
         created: registered.created,
         reused: true,
-        jobs: await Promise.all(startedCandidates.map((candidate) => codexJobResponse(candidate.jobId as string, true))),
+        jobs: await Promise.all(startedCandidates.map((candidate) => zaiJobResponse(candidate.jobId as string, true))),
         tournament: refreshed
       };
     }
@@ -1125,7 +1119,7 @@ async function registerAndStartAnimationTournament(registration: AnimationTourna
       });
     }
 
-    return withCodexRunnerAdmissionLock(async () => {
+    return withZaiRunnerAdmissionLock(async () => {
       const profile = normalizeAnimationGenerationProfile(manifest.generationProfile);
       const profilePlan = animationGenerationProfilePlan(profile);
       assertAnimationGenerationProfileRequestCounts(registration, profile, profilePlan);
@@ -1145,7 +1139,7 @@ async function registerAndStartAnimationTournament(registration: AnimationTourna
 
 async function startAnimationTournamentInitialCandidateBundle(tournamentId: string) {
   return withAnimationTournamentLock(tournamentId, () =>
-    withCodexRunnerAdmissionLock(() => startAnimationTournamentInitialCandidateBundleUnlocked(tournamentId))
+    withZaiRunnerAdmissionLock(() => startAnimationTournamentInitialCandidateBundleUnlocked(tournamentId))
   );
 }
 
@@ -1159,7 +1153,7 @@ async function startAnimationTournamentInitialCandidateBundleUnlocked(tournament
     assertAnimationInitialBundleReusable(refreshed);
     return {
       reused: true,
-      jobs: await Promise.all(startedCandidates.map((candidate) => codexJobResponse(candidate.jobId as string, true))),
+      jobs: await Promise.all(startedCandidates.map((candidate) => zaiJobResponse(candidate.jobId as string, true))),
       tournament: refreshed
     };
   }
@@ -1171,7 +1165,7 @@ async function startAnimationTournamentInitialCandidateBundleUnlocked(tournament
   }
 
   await assertAnimationInitialBundleAdmissionAvailable(initialCandidates.length);
-  const jobs: Awaited<ReturnType<typeof createCodexJob>>[] = [];
+  const jobs: Awaited<ReturnType<typeof createZaiJob>>[] = [];
   const createdJobIds = new Set<string>();
   try {
     for (const candidate of initialCandidates) {
@@ -1249,7 +1243,7 @@ async function rollbackAnimationInitialCandidateBundle(
     if (!status || (status.state !== "running" && !status.cancellationPending)) {
       return { ok: true, jobId, status };
     }
-    return cancelCodexRunner(jobId).catch((error) => ({
+    return cancelZaiRunner(jobId).catch((error) => ({
       ok: false,
       jobId,
       status,
@@ -1342,7 +1336,7 @@ async function prepareAnimationTournamentRegistration(
     ? requestedDirections.includes(requestedPilotDirection) ? requestedPilotDirection : requestedDirections.includes("side") ? "side" : requestedDirections[0]
     : undefined;
   if (!registration.jobTemplate || typeof registration.jobTemplate !== "object") throw new Error("Tournament job template is required.");
-  const jobTemplate = JSON.parse(JSON.stringify(registration.jobTemplate)) as CodexJobRequest;
+  const jobTemplate = JSON.parse(JSON.stringify(registration.jobTemplate)) as ZaiJobRequest;
   if (!jobTemplate.prompt?.trim()) throw new Error("Tournament job template prompt is required.");
   const selectedImageAsset = await writeSelectedImageAsset(tournamentId, jobTemplate);
   const sourceFingerprint = typeof registration.sourceFingerprint === "string" && registration.sourceFingerprint.trim()
@@ -1416,7 +1410,7 @@ async function createPreparedAnimationTournament(
   } = prepared;
   const now = new Date().toISOString();
   const manifest: AnimationTournamentManifest = {
-    schema: "image-cockpit.animation-tournament.v1",
+    schema: "zai-cockpit.animation-tournament.v1",
     schemaVersion: 1,
     tournamentId,
     idempotencyKey,
@@ -1476,7 +1470,7 @@ type AnimationTournamentSemanticInput = {
   initialCandidateCount: number;
   pilotMode: boolean;
   pilotDirection?: string;
-  jobTemplate: CodexJobRequest;
+  jobTemplate: ZaiJobRequest;
 };
 
 function animationTournamentSemanticKey(input: AnimationTournamentSemanticInput) {
@@ -1513,7 +1507,7 @@ function animationTournamentSemanticKey(input: AnimationTournamentSemanticInput)
 
 async function animationTournamentSemanticKeyFromManifest(manifest: AnimationTournamentManifest) {
   if (manifest.semanticKey) return manifest.semanticKey;
-  const jobTemplate = parseJsonText<CodexJobRequest>(
+  const jobTemplate = parseJsonText<ZaiJobRequest>(
     await readFile(animationTournamentTemplatePath(manifest.tournamentId), "utf8")
   );
   return animationTournamentSemanticKey({
@@ -1575,7 +1569,7 @@ type StartAnimationTournamentCandidateOptions = {
 
 async function startAnimationTournamentCandidate(tournamentId: string, candidateIndex: number, reason?: string) {
   return withAnimationTournamentLock(tournamentId, () =>
-    withCodexRunnerAdmissionLock(() =>
+    withZaiRunnerAdmissionLock(() =>
       startAnimationTournamentCandidateUnlocked(
         tournamentId,
         candidateIndex,
@@ -1596,7 +1590,7 @@ async function startAnimationTournamentCandidateUnlocked(
   assertAnimationGenerationProfileManifestCounts(manifest);
   const candidate = manifest.candidates[candidateIndex];
   if (!candidate) throw new Error("Tournament candidate index is outside the registered plan.");
-  if (candidate.jobId) return { reused: true, job: await codexJobResponse(candidate.jobId, true), tournament: await refreshAnimationTournamentManifestUnlocked(tournamentId) };
+  if (candidate.jobId) return { reused: true, job: await zaiJobResponse(candidate.jobId, true), tournament: await refreshAnimationTournamentManifestUnlocked(tournamentId) };
   if (candidateIndex < manifest.initialCandidateCount && !options.allowInitialCandidate) {
     throw new HttpError(
       409,
@@ -1653,12 +1647,12 @@ async function startAnimationTournamentCandidateUnlocked(
     }
     await assertAnimationInitialBundleAdmissionAvailable(1);
   }
-  const template = parseJsonText<CodexJobRequest>(await readFile(animationTournamentTemplatePath(tournamentId), "utf8"));
+  const template = parseJsonText<ZaiJobRequest>(await readFile(animationTournamentTemplatePath(tournamentId), "utf8"));
   const candidateLabel = `candidate ${candidateIndex + 1}/${manifest.maximumCandidateCount}`;
   const pilotDirections = manifest.pilotMode && manifest.pilotDirection ? [manifest.pilotDirection] : undefined;
   const candidateDirections = pilotDirections ?? manifest.requestedDirections;
   const candidateFrameCount = normalizeMotionFrameCount(template.framesPerDirection) ?? 8;
-  const body: CodexJobRequest = {
+  const body: ZaiJobRequest = {
     ...template,
     directions: candidateDirections,
     grid: { columns: candidateFrameCount, rows: candidateDirections.length, gutter: 0 },
@@ -1684,7 +1678,7 @@ async function startAnimationTournamentCandidateUnlocked(
   candidate.reason = normalizedReason;
   candidate.updatedAt = new Date().toISOString();
   await writeAnimationTournamentManifest(manifest);
-  const job = await createCodexJob(body, {
+  const job = await createZaiJob(body, {
     admissionLockHeld: options.admissionLockHeld,
     skipSlotCheck: options.skipSlotCheck,
     onJobCreated: options.onJobCreated
@@ -1697,7 +1691,7 @@ async function attachJobToAnimationTournament(
   candidateIndex: number,
   jobId: string,
   createdAt: string,
-  runner: CodexRunnerStatus,
+  runner: ZaiRunnerStatus,
   repairDirections: string[] = []
 ) {
   const manifest = await readAnimationTournamentManifest(tournamentId);
@@ -2032,12 +2026,12 @@ async function cancelAnimationTournamentUnlocked(tournamentId: string) {
     const status = await getRunnerStatus(candidate.jobId);
     if (status.state === "running" || status.cancellationPending) {
       if (runnerProcesses.has(candidate.jobId)) {
-        results.push(await cancelCodexRunner(candidate.jobId));
+        results.push(await cancelZaiRunner(candidate.jobId));
       } else {
         results.push(await cancelUntrackedRunnerStatus(
           status,
-          "Codex runner cancellation persisted after the animation tournament was cancelled.",
-          "Codex runner restart was blocked after the animation tournament was cancelled"
+          "Zai runner cancellation persisted after the animation tournament was cancelled.",
+          "Zai runner restart was blocked after the animation tournament was cancelled"
         ));
       }
     }
@@ -2051,7 +2045,7 @@ async function cancelAnimationTournamentUnlocked(tournamentId: string) {
 
 async function startMotionPilotExpansion(tournamentId: string, winnerJobId: string) {
   return withAnimationTournamentLock(tournamentId, () =>
-    withCodexRunnerAdmissionLock(() => startMotionPilotExpansionUnlocked(tournamentId, winnerJobId))
+    withZaiRunnerAdmissionLock(() => startMotionPilotExpansionUnlocked(tournamentId, winnerJobId))
   );
 }
 
@@ -2066,9 +2060,9 @@ async function startMotionPilotExpansionUnlocked(tournamentId: string, winnerJob
     throw new Error("Motion Pilot winner differs from the saved human review winner.");
   }
   if (manifest.expansionJobId) {
-    return { reused: true, job: await codexJobResponse(manifest.expansionJobId, true), tournament: await refreshAnimationTournamentManifestUnlocked(tournamentId) };
+    return { reused: true, job: await zaiJobResponse(manifest.expansionJobId, true), tournament: await refreshAnimationTournamentManifestUnlocked(tournamentId) };
   }
-  await assertCodexRunnerSlotAvailable();
+  await assertZaiRunnerSlotAvailable();
 
   const winnerDir = tournamentJobOutboxDir(tournamentId, winnerJobId);
   const pilotFile = await findDirectionSplitCandidateFile(winnerJobId, directionSlug(manifest.pilotDirection), winnerDir);
@@ -2077,7 +2071,7 @@ async function startMotionPilotExpansionUnlocked(tournamentId: string, winnerJob
   const expansionDirections = manifest.requestedDirections.filter((direction) => direction !== manifest.pilotDirection);
   if (expansionDirections.length === 0) throw new Error("Motion Pilot has no remaining directions to expand.");
 
-  const template = parseJsonText<CodexJobRequest>(await readFile(animationTournamentTemplatePath(tournamentId), "utf8"));
+  const template = parseJsonText<ZaiJobRequest>(await readFile(animationTournamentTemplatePath(tournamentId), "utf8"));
   const frameCount = normalizeMotionFrameCount(template.framesPerDirection) ?? 8;
   const expansionIndex = manifest.candidates.length;
   const idempotencyKey = `${manifest.idempotencyKey}:pilot-expansion:${directionSlug(manifest.pilotDirection)}`;
@@ -2107,7 +2101,7 @@ async function startMotionPilotExpansionUnlocked(tournamentId: string, winnerJob
   });
   await writeAnimationTournamentManifest(manifest);
 
-  const body: CodexJobRequest = {
+  const body: ZaiJobRequest = {
     ...template,
     directions: expansionDirections,
     grid: { columns: frameCount, rows: expansionDirections.length, gutter: 0 },
@@ -2130,7 +2124,7 @@ async function startMotionPilotExpansionUnlocked(tournamentId: string, winnerJob
       "Do not regenerate the accepted pilot direction. Preserve the full Motion Recipe phase contract across every expansion direction."
     ].filter(Boolean).join("\n")
   };
-  const job = await createCodexJob(body, { admissionLockHeld: true, skipSlotCheck: true });
+  const job = await createZaiJob(body, { admissionLockHeld: true, skipSlotCheck: true });
   const updated = await readAnimationTournamentManifestRequired(tournamentId);
   updated.expansionJobId = job.id;
   updated.directionOutputCount = updated.pilotCandidateIds?.length ?? updated.initialCandidateCount;
@@ -2146,7 +2140,7 @@ async function fallbackMotionPilotTournament(tournamentId: string, reason: strin
     if (!manifest.pilotMode || (manifest.pilotState !== "review" && manifest.pilotState !== "failed")) {
       throw new Error("Motion Pilot fallback requires review-ready or failed pilot candidates.");
     }
-    const template = parseJsonText<CodexJobRequest>(await readFile(animationTournamentTemplatePath(tournamentId), "utf8"));
+    const template = parseJsonText<ZaiJobRequest>(await readFile(animationTournamentTemplatePath(tournamentId), "utf8"));
     const fallbackTournamentId = `${tournamentId}-fallback`.slice(0, 96);
     const fallback = await registerAnimationTournament({
       tournamentId: fallbackTournamentId,
@@ -2187,7 +2181,7 @@ async function fallbackMotionPilotTournament(tournamentId: string, reason: strin
 
 async function startAnimationDirectionRepair(tournamentId: string, requestedDirections: unknown) {
   return withAnimationTournamentLock(tournamentId, () =>
-    withCodexRunnerAdmissionLock(() => startAnimationDirectionRepairUnlocked(tournamentId, requestedDirections))
+    withZaiRunnerAdmissionLock(() => startAnimationDirectionRepairUnlocked(tournamentId, requestedDirections))
   );
 }
 
@@ -2203,11 +2197,11 @@ async function startAnimationDirectionRepairUnlocked(tournamentId: string, reque
     candidate.state !== "failed" && candidate.state !== "cancelled"
   );
   if (existing?.jobId) {
-    return { reused: true, job: await codexJobResponse(existing.jobId, true), tournament: await refreshAnimationTournamentManifestUnlocked(tournamentId) };
+    return { reused: true, job: await zaiJobResponse(existing.jobId, true), tournament: await refreshAnimationTournamentManifestUnlocked(tournamentId) };
   }
-  await assertCodexRunnerSlotAvailable();
+  await assertZaiRunnerSlotAvailable();
 
-  const template = parseJsonText<CodexJobRequest>(await readFile(animationTournamentTemplatePath(tournamentId), "utf8"));
+  const template = parseJsonText<ZaiJobRequest>(await readFile(animationTournamentTemplatePath(tournamentId), "utf8"));
   const repairFrameCount = normalizeMotionFrameCount(template.framesPerDirection) ?? 8;
   const repairIndex = manifest.candidates.length;
   const idempotencyKey = `${manifest.idempotencyKey}:repair:${manifest.retryCount + 1}:${directions.map(directionSlug).sort().join("+")}`;
@@ -2226,7 +2220,7 @@ async function startAnimationDirectionRepairUnlocked(tournamentId: string, reque
   });
   await writeAnimationTournamentManifest(manifest);
 
-  const body: CodexJobRequest = {
+  const body: ZaiJobRequest = {
     ...template,
     directions,
     grid: { columns: repairFrameCount, rows: directions.length, gutter: 0 },
@@ -2249,7 +2243,7 @@ async function startAnimationDirectionRepairUnlocked(tournamentId: string, reque
       `Use the same source fingerprint, motion recipe or preset, ${repairFrameCount}-frame contract, cell size, chroma key, adjacent direction pose language, timing, palette, silhouette, and topology-specific contact line.`
     ].filter(Boolean).join("\n")
   };
-  const job = await createCodexJob(body, { admissionLockHeld: true, skipSlotCheck: true });
+  const job = await createZaiJob(body, { admissionLockHeld: true, skipSlotCheck: true });
   return { reused: false, job, tournament: await refreshAnimationTournamentManifestUnlocked(tournamentId) };
 }
 
@@ -2479,7 +2473,7 @@ async function listAnimationTournamentManifests() {
 async function readAnimationTournamentManifest(tournamentId: string) {
   try {
     const manifest = parseJsonText<AnimationTournamentManifest>(await readFile(animationTournamentManifestPath(tournamentId), "utf8"));
-    return manifest.schema === "image-cockpit.animation-tournament.v1" ? manifest : null;
+    return manifest.schema === "zai-cockpit.animation-tournament.v1" ? manifest : null;
   } catch {
     return null;
   }
@@ -2539,13 +2533,13 @@ async function withAnimationTournamentLock<T>(tournamentId: string, action: () =
   }
 }
 
-async function withCodexRunnerAdmissionLock<T>(action: () => Promise<T>) {
-  const previous = codexRunnerAdmissionTail;
+async function withZaiRunnerAdmissionLock<T>(action: () => Promise<T>) {
+  const previous = zaiRunnerAdmissionTail;
   let release = () => {};
   const current = new Promise<void>((resolveLock) => {
     release = resolveLock;
   });
-  codexRunnerAdmissionTail = previous.then(() => current);
+  zaiRunnerAdmissionTail = previous.then(() => current);
   await previous;
   try {
     return await action();
@@ -2618,7 +2612,7 @@ function normalizeDirectionNames(value: unknown) {
 }
 
 function normalizeStandardSpriteJobDirections(
-  workflowMode: CodexWorkflowMode,
+  workflowMode: ZaiWorkflowMode,
   spriteVariant: string,
   value: unknown,
   repairDirections: string[],
@@ -2669,7 +2663,7 @@ function normalizePositiveInteger(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
 }
 
-function normalizeMotionRecipeContext(body: CodexJobRequest) {
+function normalizeMotionRecipeContext(body: ZaiJobRequest) {
   const raw = body.motionRecipe && typeof body.motionRecipe === "object"
     ? body.motionRecipe as Record<string, unknown>
     : undefined;
@@ -2705,7 +2699,7 @@ async function hashFile(path: string) {
   return createHash("sha256").update(await readFile(path)).digest("hex");
 }
 
-async function writeSelectedImageAsset(jobId: string, body: CodexJobRequest) {
+async function writeSelectedImageAsset(jobId: string, body: ZaiJobRequest) {
   const existingAssetPath = resolveSafeAssetPath(body.selectedImageAssetPath);
   if (existingAssetPath) {
     const bytes = await readFile(existingAssetPath);
@@ -2752,7 +2746,7 @@ function resolveSafeAssetPath(value: unknown) {
   return candidate.startsWith(root) && existsSync(candidate) ? candidate : null;
 }
 
-function normalizeWorkflowMode(value?: string): CodexWorkflowMode {
+function normalizeWorkflowMode(value?: string): ZaiWorkflowMode {
   if (
     value === "image-generate" ||
     value === "image-edit" ||
@@ -2765,31 +2759,31 @@ function normalizeWorkflowMode(value?: string): CodexWorkflowMode {
   return "image-generate";
 }
 
-function workflowUsesSelectedImage(mode: CodexWorkflowMode) {
+function workflowUsesSelectedImage(mode: ZaiWorkflowMode) {
   return mode === "image-edit" || mode === "sprite-generate";
 }
 
-function workflowUsesSpriteContext(mode: CodexWorkflowMode) {
+function workflowUsesSpriteContext(mode: ZaiWorkflowMode) {
   return mode === "sprite-generate" || mode === "sprite-edit" || mode === "effect-animation";
 }
 
-function workflowIntent(mode: CodexWorkflowMode) {
+function workflowIntent(mode: ZaiWorkflowMode) {
   if (mode === "image-edit") {
-    return "Ask local Codex to revise the selected source image using annotations and edit notes, then return image files to the outbox.";
+    return "Ask local Zai to revise the selected source image using annotations and edit notes, then return image files to the outbox.";
   }
   if (mode === "sprite-generate") {
-    return "Ask local Codex to inspect the selected source image and use imagegen / built-in image_gen to create a chroma-key animation sprite sheet.";
+    return "Ask local Zai to inspect the selected source image and use imagegen / built-in image_gen to create a chroma-key animation sprite sheet.";
   }
   if (mode === "sprite-edit") {
-    return "Ask local Codex to revise sprite-sheet frames or metadata when available, or record sprite edit context for manual handoff.";
+    return "Ask local Zai to revise sprite-sheet frames or metadata when available, or record sprite edit context for manual handoff.";
   }
   if (mode === "effect-animation") {
-    return "Ask local Codex to use imagegen / built-in image_gen to create a transparent game VFX animation sheet and metadata.";
+    return "Ask local Zai to use imagegen / built-in image_gen to create a transparent game VFX animation sheet and metadata.";
   }
-  return "Ask local Codex to use imagegen / built-in image_gen to generate a real pixel-art image from the prompt, then return image files to the outbox.";
+  return "Ask local Zai to use imagegen / built-in image_gen to generate a real pixel-art image from the prompt, then return image files to the outbox.";
 }
 
-function workflowNotes(mode: CodexWorkflowMode) {
+function workflowNotes(mode: ZaiWorkflowMode) {
   const blockerSidecarNote =
     "If built-in imagegen / image_gen is unavailable, do not create any procedural, SVG, canvas, diagram, geometric, or placeholder image. Return a blocked JSON sidecar with reasonKind=imagegen_unavailable instead. If image generation/editing is blocked by safety or policy, do not create a placeholder image. Write only a small JSON sidecar with status=blocked, reasonKind, userMessage, and suggestion.";
   if (mode === "image-edit") {
@@ -2819,7 +2813,7 @@ function workflowNotes(mode: CodexWorkflowMode) {
       "Each direction image is an animation sheet, not a still direction reference image: all populated cells must show the requested action progressing over time. Do not paste, upscale, or lightly nudge one still pose into every frame.",
       "Before publishing standard animation output, compare neighboring frames in each direction. If the frame-to-frame motion is nearly identical, regenerate that direction with clearer pose, limb, cloth, hair, equipment, or breathing changes while keeping the same character and grounded baseline.",
       "Reject and retry the sprite sheet if any cell has a cropped head, missing feet, multiple heads, a head below the feet, inconsistent scale, body fragments, or a different character.",
-      "Use the requested chroma-key background color as a flat simple background in every cell so Image Cockpit can remove it after import.",
+      "Use the requested chroma-key background color as a flat simple background in every cell so Zai Cockpit can remove it after import.",
       "For standard direction-split output, keep every intermediate, source, QA, and candidate file under outbox/.staging/<job-id>/ or another non-root work folder while work is still in progress. Do not write, copy, or manifest any root outbox <job-id>-*.png or <job-id>-manifest.json until the complete requested direction set is normalized, self-checked, and no further regeneration is planned. The final step must publish only the requested final direction PNG/WebP files plus the final manifest into the root outbox, with the manifest written last. Keep *-qa.json, work files, temporary files, contact sheets, comparison sheets, and debug images outside the root.",
       "Avoid readable text, logos, watermarks, labels, UI words, numbers, scenery, and complex backgrounds.",
       blockerSidecarNote
@@ -2856,18 +2850,18 @@ function workflowNotes(mode: CodexWorkflowMode) {
   ];
 }
 
-async function startCodexRunner(
+async function startZaiRunner(
   job: { id: string; createdAt: string; path: string; outboxDir: string },
   resume?: { initialStartedAt?: string; resumeCount?: number }
 ) {
   const statusPath = join(statusDir, `${job.id}.json`);
   const logPath = join(logsDir, `${job.id}.log`);
 
-  if (!codexAutoRun) {
-    const status: CodexRunnerStatus = {
+  if (!zaiAutoRun) {
+    const status: ZaiRunnerStatus = {
       jobId: job.id,
       state: "disabled",
-      message: "Codex autorun is disabled. Run the job manually or set IMAGE_COCKPIT_CODEX_AUTORUN=1.",
+      message: "Zai autorun is disabled. Run the job manually or set ZAI_COCKPIT_RUNNER_AUTORUN=1.",
       statusPath,
       logPath
     };
@@ -2878,7 +2872,7 @@ async function startCodexRunner(
   const capacityBlock = await getRunnerCapacityBlock();
   if (capacityBlock) {
     const finishedAt = new Date().toISOString();
-    const status: CodexRunnerStatus = {
+    const status: ZaiRunnerStatus = {
       jobId: job.id,
       state: "unavailable",
       message: capacityBlock.userMessage,
@@ -2889,7 +2883,7 @@ async function startCodexRunner(
     };
     await writeFile(
       logPath,
-      `[${finishedAt}] Codex runner was not started: ${capacityBlock.title}: ${capacityBlock.userMessage}\n`,
+      `[${finishedAt}] Zai runner was not started: ${capacityBlock.title}: ${capacityBlock.userMessage}\n`,
       "utf8"
     );
     await writeRunnerStatus(status);
@@ -2899,12 +2893,12 @@ async function startCodexRunner(
   if (isMockRunnerBlocked()) {
     const finishedAt = new Date().toISOString();
     const diagnostic = mockRunnerBlockedDiagnostic();
-    const status: CodexRunnerStatus = {
+    const status: ZaiRunnerStatus = {
       jobId: job.id,
       state: "unavailable",
       message: diagnostic.userMessage,
-      command: codexLaunchCommand,
-      requestedCommand: codexCommand,
+      command: zaiLaunchCommand,
+      requestedCommand: zaiCommand,
       statusPath,
       logPath,
       outboxDir: job.outboxDir,
@@ -2913,7 +2907,7 @@ async function startCodexRunner(
     };
     await writeFile(
       logPath,
-      `[${finishedAt}] Codex runner was not started: ${diagnostic.title}: ${diagnostic.userMessage}\n`,
+      `[${finishedAt}] Zai runner was not started: ${diagnostic.title}: ${diagnostic.userMessage}\n`,
       "utf8"
     );
     await writeRunnerStatus(status);
@@ -2921,12 +2915,14 @@ async function startCodexRunner(
   }
 
   const startedAt = new Date().toISOString();
-  const status: CodexRunnerStatus = {
+  const status: ZaiRunnerStatus = {
     jobId: job.id,
     state: "running",
-    message: resume ? `Resumed ${codexCommand} exec for ${job.id} after the API process restarted` : `Started ${codexCommand} exec for ${job.id}`,
-    command: codexLaunchCommand,
-    requestedCommand: codexCommand,
+    message: resume
+      ? `Resumed the Z.ai agent runner for ${job.id} after the API process restarted`
+      : `Started the Z.ai agent runner for ${job.id}`,
+    command: zaiLaunchCommand,
+    requestedCommand: zaiCommand,
     startedAt,
     initialStartedAt: resume?.initialStartedAt ?? startedAt,
     resumedAt: resume ? startedAt : undefined,
@@ -2939,23 +2935,23 @@ async function startCodexRunner(
   await writeRunnerStatus(status);
 
   const logStream = createWriteStream(logPath, { flags: "a" });
-  const prompt = buildCodexRunnerPrompt(job, Boolean(resume));
-  logStream.write(`[${startedAt}] Starting ${codexLaunchCommand} exec for ${job.id}\n`);
+  const prompt = buildZaiRunnerPrompt(job, Boolean(resume));
+  logStream.write(`[${startedAt}] Starting ${zaiLaunchCommand} ${zaiExecArgs.join(" ")} for ${job.id}\n`);
   logStream.write(`Job path: ${job.path}\n`);
   logStream.write(`Outbox: ${job.outboxDir}\n\n`);
 
   let settled = false;
   try {
     const child = spawn(
-      codexLaunchCommand,
-      codexExecArgs,
+      zaiLaunchCommand,
+      zaiExecArgs,
       {
         cwd: process.cwd(),
         env: {
           ...process.env,
-          IMAGE_COCKPIT_JOB_ID: job.id,
-          IMAGE_COCKPIT_JOB_PATH: job.path,
-          IMAGE_COCKPIT_OUTBOX_DIR: job.outboxDir
+          ZAI_COCKPIT_JOB_ID: job.id,
+          ZAI_COCKPIT_JOB_PATH: job.path,
+          ZAI_COCKPIT_OUTBOX_DIR: job.outboxDir
         },
         windowsHide: true
       }
@@ -2985,7 +2981,7 @@ async function startCodexRunner(
       runnerProcesses.delete(job.id);
       cancellingRunnerJobIds.delete(job.id);
       const finishedAt = new Date().toISOString();
-      const errorStatus: CodexRunnerStatus = {
+      const errorStatus: ZaiRunnerStatus = {
         ...status,
         state: isRunnerUnavailableError(error) ? "unavailable" : "failed",
         message: error.message,
@@ -3002,10 +2998,14 @@ async function startCodexRunner(
       runnerProcesses.delete(job.id);
       const wasCancelled = cancellingRunnerJobIds.delete(job.id);
       const finishedAt = new Date().toISOString();
-      const completedStatus: CodexRunnerStatus = {
+      const completedStatus: ZaiRunnerStatus = {
         ...status,
         state: wasCancelled ? "failed" : exitCode === 0 ? "completed" : "failed",
-        message: wasCancelled ? "Codex runner cancelled after an animation tournament winner was chosen." : exitCode === 0 ? "Codex exec completed" : `Codex exec exited with code ${exitCode}`,
+        message: wasCancelled
+          ? "Zai runner cancelled after an animation tournament winner was chosen."
+          : exitCode === 0
+            ? "Zai agent runner completed"
+            : `Zai agent runner exited with code ${exitCode}`,
         finishedAt,
         exitCode,
         signal
@@ -3016,10 +3016,10 @@ async function startCodexRunner(
     });
   } catch (error) {
     const finishedAt = new Date().toISOString();
-    const errorStatus: CodexRunnerStatus = {
+    const errorStatus: ZaiRunnerStatus = {
       ...status,
       state: isRunnerUnavailableError(error) ? "unavailable" : "failed",
-      message: error instanceof Error ? error.message : "Could not start Codex exec",
+      message: error instanceof Error ? error.message : "Could not start the Zai agent runner",
       finishedAt
     };
     await writeRunnerStatus(errorStatus);
@@ -3031,14 +3031,14 @@ async function startCodexRunner(
   return status;
 }
 
-async function checkCodexRunnerPreflight(): Promise<CodexRunnerPreflight> {
+async function checkZaiRunnerPreflight(): Promise<ZaiRunnerPreflight> {
   const base = createRunnerPreflightBase();
-  if (!codexAutoRun) {
+  if (!zaiAutoRun) {
     return {
       ...base,
       state: "disabled",
-      message: "Codex autorun is disabled. Jobs will be written for manual pickup.",
-      setupHint: "Set IMAGE_COCKPIT_CODEX_AUTORUN=1 to let Image Cockpit try to start codex exec."
+      message: "Zai autorun is disabled. Jobs will be written for manual pickup.",
+      setupHint: "Set ZAI_COCKPIT_RUNNER_AUTORUN=1 to let Zai Cockpit start the Z.ai agent runner."
     };
   }
 
@@ -3070,7 +3070,7 @@ async function checkCodexRunnerPreflight(): Promise<CodexRunnerPreflight> {
     let timeoutId: NodeJS.Timeout | undefined;
     let child: ReturnType<typeof spawn> | null = null;
 
-    const finish = (preflight: Pick<CodexRunnerPreflight, "state" | "message"> & Partial<CodexRunnerPreflight>) => {
+    const finish = (preflight: Pick<ZaiRunnerPreflight, "state" | "message"> & Partial<ZaiRunnerPreflight>) => {
       if (settled) return;
       settled = true;
       if (timeoutId) clearTimeout(timeoutId);
@@ -3081,13 +3081,13 @@ async function checkCodexRunnerPreflight(): Promise<CodexRunnerPreflight> {
       if (child && !child.killed) child.kill();
       finish({
         state: "unavailable",
-        message: `Codex runner check timed out after ${runnerPreflightTimeoutMs}ms.`,
-        setupHint: codexRunnerSetupHint()
+        message: `Zai runner check timed out after ${runnerPreflightTimeoutMs}ms.`,
+        setupHint: zaiRunnerSetupHint()
       });
     }, runnerPreflightTimeoutMs);
 
     try {
-      child = spawn(codexLaunchCommand, codexHelpArgs, {
+      child = spawn(zaiLaunchCommand, zaiHelpArgs, {
         cwd: process.cwd(),
         stdio: ["ignore", "ignore", "pipe"],
         windowsHide: true
@@ -3102,7 +3102,7 @@ async function checkCodexRunnerPreflight(): Promise<CodexRunnerPreflight> {
           state: "unavailable",
           message: error.message,
           errorCode: error.code,
-          setupHint: codexRunnerSetupHint(error)
+          setupHint: zaiRunnerSetupHint(error)
         });
       });
 
@@ -3111,26 +3111,28 @@ async function checkCodexRunnerPreflight(): Promise<CodexRunnerPreflight> {
           finish({
             state: "ready",
             message:
-              codexRunnerMode === "mock"
-                ? "Mock/test runner is executable. This does not prove that Codex imagegen is available."
-                : `${codexLaunchCommand} is executable from the local handoff server.`
+              zaiRunnerMode === "mock"
+                ? "Mock/test runner is executable. This does not prove that Z.ai image generation is available."
+                : zaiRunnerMode === "zai"
+                  ? "Built-in Z.ai agent runner is configured and passed preflight."
+                  : `${zaiLaunchCommand} is executable from the local handoff server.`
           });
           return;
         }
 
         finish({
           state: "unavailable",
-          message: stderrText.trim() || `${codexLaunchCommand} ${codexHelpArgs.join(" ")} exited with code ${exitCode}`,
+          message: stderrText.trim() || `${zaiLaunchCommand} ${zaiHelpArgs.join(" ")} exited with code ${exitCode}`,
           errorCode: exitCode === null ? undefined : String(exitCode),
-          setupHint: codexRunnerSetupHint()
+          setupHint: zaiRunnerSetupHint()
         });
       });
     } catch (error) {
       finish({
         state: "unavailable",
-        message: error instanceof Error ? error.message : "Could not start Codex runner check.",
+        message: error instanceof Error ? error.message : "Could not start Zai runner check.",
         errorCode: error && typeof error === "object" && "code" in error ? String((error as NodeJS.ErrnoException).code) : undefined,
-        setupHint: codexRunnerSetupHint(error)
+        setupHint: zaiRunnerSetupHint(error)
       });
     }
   });
@@ -3138,18 +3140,23 @@ async function checkCodexRunnerPreflight(): Promise<CodexRunnerPreflight> {
 
 function createRunnerPreflightBase() {
   return {
-    state: "unavailable" as CodexRunnerPreflightState,
+    state: "unavailable" as ZaiRunnerPreflightState,
     message: "",
-    command: codexCommand,
-    launchCommand: codexLaunchCommand,
-    mode: codexRunnerMode,
+    command: zaiCommand,
+    launchCommand: zaiLaunchCommand,
+    mode: zaiRunnerMode,
     mockRunnerAllowed: allowMockRunner,
     checkedAt: new Date().toISOString(),
-    autorun: codexAutoRun,
-    sandbox: codexSandbox,
-    approval: codexApproval,
-    resolvedCommandPaths: codexCommandCandidates.slice(0, 8)
+    autorun: zaiAutoRun,
+    runnerScript: zaiRunnerMode === "zai" ? zaiAgentRunnerScript : undefined,
+    endpointMode: zaiRunnerMode === "zai" ? resolveZaiEndpointMode() : undefined,
+    resolvedCommandPaths: zaiCommandCandidates.slice(0, 8)
   };
+}
+
+function resolveZaiEndpointMode() {
+  const mode = (process.env.ZAI_ENDPOINT_MODE ?? "auto").toLowerCase();
+  return mode === "coding" || mode === "api" ? mode : "auto";
 }
 
 function parseJsonStringArray(envKey: string, fallback: string[]) {
@@ -3173,21 +3180,18 @@ function parsePositiveNumber(envKey: string, fallback: number) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function codexRunnerSetupHint(error?: unknown) {
+function zaiRunnerSetupHint(error?: unknown) {
   if (error && typeof error === "object" && "code" in error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "ENOENT") {
-      return "Install Codex CLI or set IMAGE_COCKPIT_CODEX_COMMAND to the full executable path.";
+      return "Check that Node.js is installed and set ZAI_COCKPIT_RUNNER_COMMAND to the full executable path.";
     }
     if (code === "EACCES" || code === "EPERM") {
-      if (isWindowsAppsLaunchLikely()) {
-        return "The resolved Codex command is the WindowsApps Codex Desktop executable, which may be blocked from subprocess launch. Use manual handoff, or set IMAGE_COCKPIT_CODEX_COMMAND to a terminal-runnable Codex CLI or wrapper.";
-      }
-      return "Check that the configured Codex command can run from this shell, or set IMAGE_COCKPIT_CODEX_COMMAND to a runnable executable path.";
+      return "Check that the configured runner command can run from this shell, or set ZAI_COCKPIT_RUNNER_COMMAND to a runnable executable path.";
     }
   }
 
-  return "Set IMAGE_COCKPIT_CODEX_COMMAND to a runnable Codex CLI path, or set IMAGE_COCKPIT_CODEX_AUTORUN=0 for manual handoff.";
+  return "Set ZAI_API_KEY for the built-in Z.ai agent runner, set ZAI_COCKPIT_RUNNER_COMMAND for a custom runner, or set ZAI_COCKPIT_RUNNER_AUTORUN=0 for manual handoff.";
 }
 
 function resolveCommandCandidates(command: string) {
@@ -3203,81 +3207,55 @@ function resolveCommandCandidates(command: string) {
     });
   });
 
-  return Array.from(new Set([...candidates, ...knownCodexCliCandidates(command)]));
+  return Array.from(new Set(candidates));
 }
 
-function selectCodexLaunchCommand(command: string, candidates: string[]) {
-  if (command.includes("/") || command.includes("\\") || !isCodexCommandName(command)) return command;
-  return candidates.find(isLocalOpenAiCodexCliCommand) ?? candidates.find((candidate) => !isWindowsAppsCodexCommand(candidate)) ?? command;
+function selectZaiLaunchCommand(command: string, candidates: string[]) {
+  if (command.includes("/") || command.includes("\\")) return command;
+  return candidates[0] ?? command;
 }
 
-function detectCodexRunnerMode(
+function detectZaiRunnerMode(
   command: string,
   launchCommand: string,
   helpArgs: readonly string[],
   execArgs: readonly string[]
-): CodexRunnerMode {
+): ZaiRunnerMode {
   const modeProbe = [
     command,
     launchCommand,
     ...helpArgs,
     ...execArgs,
-    process.env.IMAGE_COCKPIT_MOCK_RUNNER_DELAY_MS ? "IMAGE_COCKPIT_MOCK_RUNNER_DELAY_MS" : ""
+    process.env.ZAI_COCKPIT_MOCK_RUNNER_DELAY_MS ? "ZAI_COCKPIT_MOCK_RUNNER_DELAY_MS" : ""
   ]
     .join("\n")
     .toLowerCase();
   if (
-    modeProbe.includes("mock-codex-runner") ||
+    modeProbe.includes("mock-zai-runner") ||
     modeProbe.includes("review-mock-runner") ||
-    modeProbe.includes("image-cockpit-ui-smoke") ||
-    modeProbe.includes("image_cockpit_mock_runner_delay_ms")
+    modeProbe.includes("zai-cockpit-ui-smoke") ||
+    modeProbe.includes("zai_cockpit_mock_runner_delay_ms")
   ) {
     return "mock";
   }
 
-  if (isCodexCommandName(basename(command)) || isCodexCommandName(basename(launchCommand))) return "codex";
+  if (modeProbe.includes("zai-agent-runner")) return "zai";
   return "custom";
 }
 
 function isMockRunnerBlocked() {
-  return codexRunnerMode === "mock" && !allowMockRunner;
+  return zaiRunnerMode === "mock" && !allowMockRunner;
 }
 
-function mockRunnerBlockedDiagnostic(): CodexJobDiagnostic {
+function mockRunnerBlockedDiagnostic(): ZaiJobDiagnostic {
   return {
     kind: "runner_failed",
     title: "Mock runner configured",
     userMessage:
-      "A mock/test Codex runner is configured, so Image Cockpit did not start it as a real image generation backend.",
+      "A mock/test Zai runner is configured, so Zai Cockpit did not start it as a real image generation backend.",
     suggestion:
-      "Use a real Codex CLI command for imagegen, or set IMAGE_COCKPIT_CODEX_AUTORUN=0 for manual handoff. Set IMAGE_COCKPIT_ALLOW_MOCK_RUNNER=1 only for automated smoke tests."
+      "Use the built-in Z.ai agent runner for generation, or set ZAI_COCKPIT_RUNNER_AUTORUN=0 for manual handoff. Set ZAI_COCKPIT_ALLOW_MOCK_RUNNER=1 only for automated smoke tests."
   };
-}
-
-function knownCodexCliCandidates(command: string) {
-  if (!isCodexCommandName(command)) return [];
-  const roots = [process.env.LOCALAPPDATA, process.env.USERPROFILE ? join(process.env.USERPROFILE, "AppData", "Local") : ""]
-    .filter(Boolean)
-    .map((root) => join(root as string, "OpenAI", "Codex", "bin"));
-  const candidates: string[] = [];
-
-  roots.forEach((root) => {
-    if (!existsSync(root)) return;
-    try {
-      readdirSync(root, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .forEach((entry) => {
-          ["codex.exe", "codex"].forEach((file) => {
-            const candidate = join(root, entry.name, file);
-            if (existsSync(candidate)) candidates.push(candidate);
-          });
-        });
-    } catch {
-      // Ignore discovery failures; explicit IMAGE_COCKPIT_CODEX_COMMAND remains available.
-    }
-  });
-
-  return candidates;
 }
 
 function commandExtensions() {
@@ -3290,89 +3268,62 @@ function commandHasExtension(command: string) {
   return Boolean(extname(command));
 }
 
-function isCodexCommandName(command: string) {
-  return /^codex(?:\.exe)?$/i.test(command);
-}
-
-function isLocalOpenAiCodexCliCommand(candidate: string) {
-  return /[\\/]AppData[\\/]Local[\\/]OpenAI[\\/]Codex[\\/]bin[\\/][^\\/]+[\\/]codex(?:\.exe)?$/i.test(candidate);
-}
-
-function isWindowsAppsCodexCommand(candidate: string) {
-  return /[\\/]WindowsApps[\\/]OpenAI\.Codex_/i.test(candidate) && /[\\/]codex(?:\.exe)?$/i.test(candidate);
-}
-
-function hasWindowsAppsCodexCandidate() {
-  return codexCommandCandidates.some(isWindowsAppsCodexCommand);
-}
-
-function isWindowsAppsLaunchLikely() {
-  const explicitLaunchCommandIsWindowsApps = isWindowsAppsCodexCommand(codexLaunchCommand);
-  const bareCommandWouldResolveThroughWindowsApps =
-    isCodexCommandName(codexLaunchCommand) && hasWindowsAppsCodexCandidate() && !codexCommandCandidates.some(isLocalOpenAiCodexCliCommand);
-  return explicitLaunchCommandIsWindowsApps || bareCommandWouldResolveThroughWindowsApps;
-}
-
-function buildCodexRunnerPrompt(job: { id: string; path: string; outboxDir: string }, resumed = false) {
+function buildZaiRunnerPrompt(job: { id: string; path: string; outboxDir: string }, resumed = false) {
   return [
-    "You are processing an Image Cockpit for Codex Workflows handoff job.",
+    "You are processing a Zai Cockpit handoff job using the provided runner tools.",
     "",
-    `Read this local JSON job file: ${job.path}`,
+    `Read this local JSON job file with the read_file tool: ${job.path}`,
     ...(resumed ? [
-      "This is a resumable retry after the API process restarted. Inspect the exact job outbox and its .staging subtree before generating anything new.",
+      "This is a resumable retry after the API process restarted. Inspect the exact job outbox and its .staging subtree with list_dir before generating anything new.",
       "Reuse direction sheets and intermediate files that already belong to this job and pass the job contract. Continue only missing or invalid directions, then verify the full set and write the final manifest last.",
-      "Do not restart completed direction generation merely because this is a fresh Codex process, and never borrow files from another candidate or job."
+      "Do not restart completed direction generation merely because this is a fresh runner process, and never borrow files from another candidate or job."
     ] : []),
-    "If selectedImage.assetPath is populated, inspect that source image before editing it.",
+    "If selectedImage.assetPath is populated, read the job JSON notes about that source image before editing or extending it.",
     "If selectedImage.assetPath is empty, treat the job as prompt-only unless the job notes say otherwise.",
-    "Trust the job JSON as the generation contract. Do not perform broad repository audits or read unrelated project docs/source files when the job prompt and jobNotes already provide the needed contract.",
-    "On Windows, do not use System.Drawing for image inspection because it may be unavailable. Use Python/Pillow, PNG header bytes, or another local image tool instead.",
-    "For workflowMode=image-generate, use the imagegen skill default built-in image generation path with built-in image_gen when available. Create a real raster image from the job prompt, never a procedural placeholder and never a procedural, SVG, canvas, diagram, geometric, or placeholder image.",
-    "For workflowMode=image-generate, if built-in imagegen / image_gen is unavailable, write only a small blocked JSON sidecar into the outbox with reasonKind=imagegen_unavailable and do not create a fake image.",
-    "For workflowMode=image-edit, inspect selectedImage.assetPath, use imagegen / built-in image_gen editing when available, follow numbered annotationContext region comments plus prompt/jobNotes, use imageRectNormalized/imageRectPixels when present, preserve the original canvas size/aspect ratio, keep the full character including head, hair, hands, equipment, and both feet visible, do not zoom, crop, or reframe into a portrait/detail shot, preserve transparency or use a flat chroma fallback, change only requested regions when possible, and return a real edited PNG or WebP with the job id filename prefix. Never create a procedural, SVG, canvas, diagram, geometric, or placeholder image.",
-    "For workflowMode=sprite-generate, inspect selectedImage.assetPath, then use imagegen / built-in image_gen when available to create the requested sprite sheet assets from the source character image. Never create a procedural, SVG, canvas, diagram, geometric, or placeholder image.",
+    "Trust the job JSON as the generation contract. Do not read unrelated project files when the job prompt and jobNotes already provide the needed contract.",
+    "You create images only through the generate_image tool. It renders a real raster image with the configured Z.ai image model and saves it under the outbox. Never emit procedural, SVG, canvas, diagram, geometric, or placeholder content as a final image.",
+    "For workflowMode=image-generate, call generate_image with a prompt built from the job prompt, then verify the saved file with image_info before publishing it.",
+    "For workflowMode=image-generate, if generate_image repeatedly fails or reports that image generation is unavailable, use report_blocker with reasonKind=imagegen_unavailable and do not create a fake image.",
+    "For workflowMode=image-edit, follow numbered annotationContext region comments plus prompt/jobNotes, use imageRectNormalized/imageRectPixels when present, describe the requested change precisely in the generate_image prompt including the full original scene composition, preserve the original canvas size/aspect ratio, keep the full character including head, hair, hands, equipment, and both feet visible, do not zoom, crop, or reframe into a portrait/detail shot, and return a real edited PNG or WebP with the job id filename prefix. Never create a procedural, SVG, canvas, diagram, geometric, or placeholder image.",
     "For workflowMode=sprite-generate, follow spriteContext.grid, spriteContext.cell, spriteContext.directions, spriteContext.variant, and spriteContext.chromaKey exactly. Keep one full-body character centered inside each strict cell with padding, no cropping, no duplicated heads, and no body parts crossing cells.",
     "For workflowMode=sprite-generate with spriteContext.variant=standard, return exactly one separate direction PNG/WebP image per entry in spriteContext.directions, using the direction name with spaces replaced by dashes as the filename suffix (full set: front, front-three-quarter, side, back-three-quarter, back). If spriteContext.directions is empty, return all five. Follow spriteContext.framesPerDirection exactly: 4 frames use 4x1, 6 frames use 3x2, 8 frames use 4x2, 12 frames use 4x3, 16 frames use 4x4, and 20 frames use 4x5, with spriteContext.cell dimensions and no gutters. Do not return only one combined multi-direction sheet, and do not return directions that were not requested.",
-    "For workflowMode=sprite-generate with spriteContext.variant=standard, keep this candidate as one Codex job. In the first generation wave, submit one independent built-in image_gen tool call per requested direction in one assistant turn. A normal initial candidate requests 1, 3, or 5 directions, so its initial maximum internal fan-out is 1, 3, or 5; five requested directions means five concurrent image_gen calls inside this one candidate. A Direction Repair or Motion Pilot expansion may request any 1-5 direction subset, and its initial maximum internal fan-out equals that pending subset count. Do not spawn direction child jobs, extra Codex jobs, or extra agents.",
-    "For every standard direction call, reserve a unique job-local staging destination under outbox/.staging/<job-id>/<direction-slug>/attempt-<n>/. Capture the exact path returned by that call and bind it one-to-one to that direction before copying or normalizing it. Never share one returned path between directions, identify output by a globally newest-file heuristic, or borrow another candidate's output.",
-    "For standard direction attempts, maintain outbox/.staging/<job-id>/<job-id>-direction-attempts.json and copy a sanitized summary into the final manifest as directionAttempts keyed by canonical direction slug. Each attempt must record attempt number, status accepted/failed/timeout/capacity, and ISO-8601 start and finish timestamps. An accepted attempt must record its artifactPath in the exact job-relative form .staging/<job-id>/<direction-slug>/attempt-<n>/<file>; a failed/timeout/capacity attempt must instead use one failureKind from imagegen_capacity, imagegen_timeout, imagegen_failed, no_image_returned, policy_or_safety, quality_failed, normalization_failed, or unknown. Do not expose absolute paths, URI paths, or another job's staging path in the final manifest.",
-    "As soon as one standard direction passes normalization and QA, mark it accepted and freeze its artifact. Never submit image_gen for it again and never overwrite or regenerate it. Retry only directions whose own attempt failed, timed out, or returned a capacity error; regenerating the complete requested direction set because one direction failed is prohibited.",
-    "When multiple standard direction calls fail, time out, or hit capacity together, retry only those affected directions. Track a concurrency ceiling separately from the actual wave size: a normal initial request starts at ceiling 5, 3, or 1 for its 5, 3, or 1 directions, and a Direction Repair or Motion Pilot subset starts at its requested count from 1 through 5; each actual wave size is min(concurrency ceiling, pending direction count). On capacity, reduce ceiling 5 or 4 to 3, then reduce ceiling 3 or 2 to 1, while ceiling 1 stays at 1. Thus two pending failures after a five-direction wave run together under the reduced ceiling of 3, not as a new ceiling of 2. After the ceiling shrinks, leave pending directions beyond the current wave size for the next assistant-turn retry wave and never fan back out above the reduced ceiling. This fallback must remain inside the existing Codex candidate job and must not create more Codex jobs.",
-    "Standard direction fan-out is runner-only. Do not create direction child-job UI, partial direction previews, or cross-job generation caches; same-job staging used for freeze and resumable retry is allowed.",
+    "For workflowMode=sprite-generate with spriteContext.variant=standard, call generate_image once per requested direction, one call per direction at a time, each with its own staging destination under outbox/.staging/<job-id>/<direction-slug>/attempt-<n>/. Bind each saved file one-to-one to its direction. Never share one file between directions or borrow another candidate's output.",
+    "For standard direction attempts, maintain outbox/.staging/<job-id>/<job-id>-direction-attempts.json with write_file and copy a sanitized summary into the final manifest as directionAttempts keyed by canonical direction slug. Each attempt must record attempt number, status accepted/failed/timeout/capacity, and ISO-8601 start and finish timestamps. An accepted attempt must record its artifactPath in the exact job-relative form .staging/<job-id>/<direction-slug>/attempt-<n>/<file>; a failed/timeout/capacity attempt must instead use one failureKind from imagegen_capacity, imagegen_timeout, imagegen_failed, no_image_returned, policy_or_safety, quality_failed, normalization_failed, or unknown. Do not expose absolute paths, URI paths, or another job's staging path in the final manifest.",
+    "As soon as one standard direction passes verification, mark it accepted and freeze its artifact. Never regenerate an accepted direction. Retry only directions whose own attempt failed, timed out, or returned a capacity error; regenerating the complete requested direction set because one direction failed is prohibited.",
+    "When standard direction calls fail, time out, or hit capacity together, retry only those affected directions, one call at a time. Keep the retry loop inside this single job and never request more directions than the job asked for.",
     "For workflowMode=sprite-generate with spriteContext.variant=standard, every populated cell in each direction image must be a distinct animation frame for spriteContext.action, not a repeated still pose. Static or nearly static rows are failed material even when the directions, padding, and chroma key are otherwise correct.",
     "For workflowMode=sprite-generate with spriteContext.motionRecipe.bodyTopology, use its topology-specific contact and anchor contract. Never invent humanoid feet for quadruped, serpentine/body-contact, floating, winged-flying, or multi-leg characters; evaluate paw contact, body contact, hover height, wing beat, or multi-contact support instead.",
     "For idle breathing, the feet must stay planted but most of the requested direction sheets must show readable frame-to-frame breathing or secondary motion: 2-4px shoulder/chest/head change plus hair, scarf, cape, cloth, or equipment follow-through. Regenerate any direction whose frames look nearly identical before writing the final manifest.",
-    "For standard direction-split output, keep generated direction images, source manifests, contact sheets, comparison sheets, QA files, and all candidates under outbox/.staging/<job-id>/ or another non-root work folder while work is still in progress. Do not write, copy, or manifest root outbox <job-id>-*.png or <job-id>-manifest.json until the complete requested direction set is normalized, self-checked, and no further regeneration is planned. The final runner step must publish only the requested final direction PNG/WebP files into the root outbox and write the final <job-id>-manifest.json last. Image Cockpit will verify artifacts after the runner has finished and may rewrite the manifest after completion.",
-    "For workflowMode=sprite-generate, inspect all cells before writing the final file and retry if any head is cut off, feet are missing, a head appears below feet, scale changes wildly, or the background is not flat chroma key.",
-    "For workflowMode=sprite-generate with spriteContext.variant=hatch-pet, use the installed hatch-pet skill/scripts when available. Build a Codex pet atlas with 8 columns x 9 rows, 192x208 cells, 1536x1872 total, transparent unused cells, contact-sheet QA, and final spritesheet PNG/WebP returned with the job id filename prefix. Include pet.json as a sidecar if produced.",
-    "For workflowMode=sprite-generate with spriteContext.variant=directional-hatch-pet, use the installed hatch-pet skill/scripts when available and return exactly five separate Codex pet atlas images: direction-01-front, direction-02-front-three-quarter, direction-03-side, direction-04-back-three-quarter, and direction-05-back. Each atlas must be 8 columns x 9 rows, 192x208 cells, 1536x1872 total, transparent unused cells, and use the job id filename prefix plus the direction suffix. Do not return only one giant combined sheet.",
-    "For workflowMode=effect-animation, use imagegen / built-in image_gen when available to create one real transparent PNG game VFX animation sheet. Never create a procedural, SVG, canvas, diagram, geometric, or placeholder image.",
+    "For standard direction-split output, keep generated direction images, source manifests, QA files, and all candidates under outbox/.staging/<job-id>/ or another non-root work folder while work is still in progress. Do not write, copy, or manifest root outbox <job-id>-*.png or <job-id>-manifest.json until the complete requested direction set is verified and no further regeneration is planned. The final runner step must publish only the requested final direction PNG/WebP files into the root outbox and write the final <job-id>-manifest.json last. Zai Cockpit will verify artifacts after the runner has finished and may rewrite the manifest after completion.",
+    "For workflowMode=sprite-generate, use image_info on each finished sheet and retry if dimensions do not match the requested grid or cell size, any head is cut off, feet are missing, a head appears below feet, scale changes wildly, or the background is not flat chroma key.",
+    "For workflowMode=sprite-generate with spriteContext.variant=hatch-pet, build a pet atlas with 8 columns x 9 rows, 192x208 cells, 1536x1872 total, transparent unused cells, contact-sheet QA, and final spritesheet PNG/WebP returned with the job id filename prefix. Include pet.json as a sidecar if produced.",
+    "For workflowMode=sprite-generate with spriteContext.variant=directional-hatch-pet, return exactly five separate pet atlas images: direction-01-front, direction-02-front-three-quarter, direction-03-side, direction-04-back-three-quarter, and direction-05-back. Each atlas must be 8 columns x 9 rows, 192x208 cells, 1536x1872 total, transparent unused cells, and use the job id filename prefix plus the direction suffix. Do not return only one giant combined sheet.",
+    "For workflowMode=effect-animation, use generate_image to create one real transparent PNG game VFX animation sheet. Never create a procedural, SVG, canvas, diagram, geometric, or placeholder image.",
     "For workflowMode=effect-animation, follow effectContext exactly: frameCount, frameSize, layout columns/rows, sheetSize, loopMode, anchor, style, palette, category, type, and blendMode. The final PNG must use the job id filename prefix and preferably include '-effect-sheet' in the name.",
     "For workflowMode=effect-animation, do not bake checkerboard, solid matte backgrounds, preview backgrounds, UI panels, text, logos, watermarks, frame numbers, labels, arrows, or border guides into the image. Use real alpha transparency and no gutters.",
     "For workflowMode=effect-animation, every populated frame must show readable temporal progression. Reject and retry if frames are static copies, clipped at cell bounds, overlap neighboring cells, or do not match the requested sheet layout.",
-    "For workflowMode=effect-animation, include a compact metadata JSON sidecar and a GIF preview when feasible, both using the same job id filename prefix. The PNG sheet is the required final artifact.",
+    "For workflowMode=effect-animation, include a compact metadata JSON sidecar when feasible, using the same job id filename prefix. The PNG sheet is the required final artifact.",
     "Use jobNotes, annotationContext, spriteContext, and effectContext only when those fields are populated for the workflow.",
-    "When using imagegen / built-in image_gen, isolate generated artifacts per job. Record the generated image path returned by the tool when available; otherwise record a before timestamp and only copy files created after that invocation. Do not blindly copy the newest file from CODEX_HOME/generated_images, because multiple tournament candidates may run in parallel. If you cannot confidently identify the image produced for this exact job and direction, regenerate that direction or return a blocker sidecar instead of mixing another candidate's image.",
     `Write final image result files only into this outbox directory: ${job.outboxDir}`,
     `Use this filename prefix for returned assets: ${job.id}`,
     "",
     "Important constraints:",
-    "- The Image Cockpit app itself must not call OpenAI APIs directly.",
+    "- Operate only through the provided tools (read_file, list_dir, write_file, generate_image, image_info, report_blocker, finish). Do not attempt any other network, shell, or filesystem access.",
     "- Do not modify project source files, package files, docs, git metadata, or configuration.",
-    "- Do not run git status, git diff, git clean, Remove-Item cleanup, or other repository/cleanup commands for this handoff job.",
     "- Do not write API keys, access tokens, model weights, or license-unclear assets.",
-    "- If built-in imagegen / image_gen is unavailable in this Codex environment, write no procedural, SVG, canvas, diagram, geometric, or placeholder image.",
+    "- If the generate_image tool is unavailable or keeps failing, write no procedural, SVG, canvas, diagram, geometric, or placeholder image.",
     "- Prefer PNG or WebP for still images. If you produce notes, write them as a small Markdown sidecar in the outbox. Do not place *-qa.json, work files, .tmp files, candidate-contact sheets, contact sheets, preview grids, AB galleries, or debug images in the outbox root.",
-    "- If image generation/editing is blocked by safety, policy, or unavailable imagegen capability, do not create a placeholder image.",
-    "- Write a small JSON blocker sidecar only, using this schema:",
+    "- If image generation/editing is blocked by safety or policy, do not create a placeholder image.",
+    "- Use report_blocker instead of writing the blocker sidecar by hand. It uses this schema:",
     '{ "status": "blocked", "reasonKind": "policy_or_safety" | "imagegen_unavailable" | "unknown", "userMessage": "A short user-safe reason.", "suggestion": "A short retry suggestion." }',
     "- Do not include hidden policy text, internal traces, API keys, access tokens, local absolute paths, or the full prompt in the blocker sidecar.",
+    "- When the job is done (results published or blocker reported), call the finish tool with a one-line summary.",
     "",
     "When finished, make sure all required usable image files are present in the outbox if generation/editing succeeded."
   ].join("\n");
 }
 
-async function writeRunnerStatus(status: CodexRunnerStatus) {
+async function writeRunnerStatus(status: ZaiRunnerStatus) {
   runnerStatuses.set(status.jobId, status);
   const enrichedStatus = await enrichRunnerStatus(status);
   runnerStatuses.set(enrichedStatus.jobId, enrichedStatus);
@@ -3392,7 +3343,7 @@ async function getRunnerCapacityBlock(): Promise<RunnerCapacityBlock | null> {
     await Promise.all(
       names.map(async (name) => {
         try {
-          const status = parseJsonText<CodexRunnerStatus>(await readFile(join(statusDir, name), "utf8"));
+          const status = parseJsonText<ZaiRunnerStatus>(await readFile(join(statusDir, name), "utf8"));
           const block = runnerCapacityBlockFromStatus(status);
           if (!block) return;
           if (!latestBlock || Date.parse(block.seenAt) > Date.parse(latestBlock.seenAt)) latestBlock = block;
@@ -3408,7 +3359,7 @@ async function getRunnerCapacityBlock(): Promise<RunnerCapacityBlock | null> {
   return latestBlock;
 }
 
-function rememberRunnerCapacityBlock(status: CodexRunnerStatus) {
+function rememberRunnerCapacityBlock(status: ZaiRunnerStatus) {
   const block = runnerCapacityBlockFromStatus(status);
   if (block) {
     cachedRunnerCapacityBlock = block;
@@ -3417,7 +3368,7 @@ function rememberRunnerCapacityBlock(status: CodexRunnerStatus) {
   if (status.state === "completed" && !status.diagnostic) cachedRunnerCapacityBlock = null;
 }
 
-function runnerCapacityBlockFromStatus(status: CodexRunnerStatus): RunnerCapacityBlock | null {
+function runnerCapacityBlockFromStatus(status: ZaiRunnerStatus): RunnerCapacityBlock | null {
   if (runnerCapacityCooldownMs <= 0 || status.diagnostic?.kind !== "usage_limit") return null;
   const seenAt = status.finishedAt ?? status.startedAt ?? new Date().toISOString();
   const seenAtMs = Date.parse(seenAt);
@@ -3438,7 +3389,7 @@ function isRunnerCapacityBlockActive(block: RunnerCapacityBlock | null): block i
   return Boolean(block && Date.parse(block.expiresAt) > Date.now());
 }
 
-function diagnosticFromRunnerCapacityBlock(block: RunnerCapacityBlock): CodexJobDiagnostic {
+function diagnosticFromRunnerCapacityBlock(block: RunnerCapacityBlock): ZaiJobDiagnostic {
   return {
     kind: block.kind,
     title: block.title,
@@ -3447,7 +3398,7 @@ function diagnosticFromRunnerCapacityBlock(block: RunnerCapacityBlock): CodexJob
   };
 }
 
-async function cancelCodexRunner(jobId: string) {
+async function cancelZaiRunner(jobId: string) {
   const currentStatus = await getRunnerStatus(jobId);
   const child = runnerProcesses.get(jobId);
   if (!child) {
@@ -3461,11 +3412,11 @@ async function cancelCodexRunner(jobId: string) {
 
   const finishedAt = new Date().toISOString();
   cancellingRunnerJobIds.add(jobId);
-  const cancelledStatus: CodexRunnerStatus = {
+  const cancelledStatus: ZaiRunnerStatus = {
     ...currentStatus,
     state: "failed",
     cancellationPending: true,
-    message: "Codex runner cancelled after an animation tournament winner was chosen.",
+    message: "Zai runner cancelled after an animation tournament winner was chosen.",
     finishedAt,
     exitCode: null,
     signal: "SIGTERM"
@@ -3499,7 +3450,7 @@ async function cancelCodexRunner(jobId: string) {
   };
 }
 
-async function activeCodexRunnerCount() {
+async function activeZaiRunnerCount() {
   const statusNames = await readdir(statusDir).catch(() => [] as string[]);
   const persistedActiveJobIds = (
     await Promise.all(
@@ -3509,7 +3460,7 @@ async function activeCodexRunnerCount() {
           const jobId = name.slice(0, -5);
           if (!isSafeJobId(jobId)) return null;
           try {
-            const status = parseJsonText<CodexRunnerStatus>(await readFile(join(statusDir, name), "utf8"));
+            const status = parseJsonText<ZaiRunnerStatus>(await readFile(join(statusDir, name), "utf8"));
             return status.state === "running" || status.cancellationPending ? jobId : null;
           } catch {
             return null;
@@ -3530,19 +3481,19 @@ async function activeCodexRunnerCount() {
   return activeJobIds.size;
 }
 
-async function assertCodexRunnerSlotAvailable() {
-  const activeCount = await activeCodexRunnerCount();
-  if (activeCount >= maxActiveCodexJobs) {
+async function assertZaiRunnerSlotAvailable() {
+  const activeCount = await activeZaiRunnerCount();
+  if (activeCount >= maxActiveZaiJobs) {
     throw new HttpError(
       409,
-      `Codex runner slots are full (${activeCount}/${maxActiveCodexJobs}). Wait for a job to finish before starting another.`,
+      `Zai runner slots are full (${activeCount}/${maxActiveZaiJobs}). Wait for a job to finish before starting another.`,
       "runner_slots_full",
       {
         requiredSlots: 1,
         capacity: {
-          limit: maxActiveCodexJobs,
+          limit: maxActiveZaiJobs,
           active: activeCount,
-          available: Math.max(0, maxActiveCodexJobs - activeCount)
+          available: Math.max(0, maxActiveZaiJobs - activeCount)
         },
         retryable: true
       }
@@ -3551,17 +3502,17 @@ async function assertCodexRunnerSlotAvailable() {
 }
 
 async function assertAnimationInitialBundleAdmissionAvailable(requiredSlots: number) {
-  const activeCount = await activeCodexRunnerCount();
-  const availableSlots = Math.max(0, maxActiveCodexJobs - activeCount);
+  const activeCount = await activeZaiRunnerCount();
+  const availableSlots = Math.max(0, maxActiveZaiJobs - activeCount);
   if (activeCount > 0 || requiredSlots > availableSlots) {
     throw new HttpError(
       409,
-      `Animation generation requires an idle ${maxActiveCodexJobs}-slot runner pool before its ${requiredSlots} initial candidate${requiredSlots === 1 ? "" : "s"} can start.`,
+      `Animation generation requires an idle ${maxActiveZaiJobs}-slot runner pool before its ${requiredSlots} initial candidate${requiredSlots === 1 ? "" : "s"} can start.`,
       "insufficient_runner_slots",
       {
         requiredSlots,
         capacity: {
-          limit: maxActiveCodexJobs,
+          limit: maxActiveZaiJobs,
           active: activeCount,
           available: availableSlots
         },
@@ -3571,13 +3522,13 @@ async function assertAnimationInitialBundleAdmissionAvailable(requiredSlots: num
   }
 }
 
-async function getRunnerStatus(jobId: string): Promise<CodexRunnerStatus> {
+async function getRunnerStatus(jobId: string): Promise<ZaiRunnerStatus> {
   const liveStatus = runnerStatuses.get(jobId);
   if (liveStatus) return enrichRunnerStatus(await normalizeRunningStatus(liveStatus));
 
   const statusPath = join(statusDir, `${jobId}.json`);
   try {
-    return enrichRunnerStatus(await normalizeRunningStatus(parseJsonText<CodexRunnerStatus>(await readFile(statusPath, "utf8"))));
+    return enrichRunnerStatus(await normalizeRunningStatus(parseJsonText<ZaiRunnerStatus>(await readFile(statusPath, "utf8"))));
   } catch {
     return enrichRunnerStatus({
       jobId,
@@ -3588,7 +3539,7 @@ async function getRunnerStatus(jobId: string): Promise<CodexRunnerStatus> {
   }
 }
 
-async function normalizeRunningStatus(status: CodexRunnerStatus): Promise<CodexRunnerStatus> {
+async function normalizeRunningStatus(status: ZaiRunnerStatus): Promise<ZaiRunnerStatus> {
   if (status.cancellationPending) {
     const reconciledCancellation = await persistedTournamentCancellationStatus(status);
     if (reconciledCancellation) {
@@ -3608,7 +3559,7 @@ async function normalizeRunningStatus(status: CodexRunnerStatus): Promise<CodexR
     if (resultDir) {
       const artifact = await inspectDirectionSplitArtifact(status.jobId, resultDir).catch(() => null);
       if (artifact?.ready && artifact.verified) {
-        const recoveredStatus: CodexRunnerStatus = {
+        const recoveredStatus: ZaiRunnerStatus = {
           ...status,
           state: "completed",
           message: "Recovered a verified artifact after the API process restarted.",
@@ -3620,7 +3571,7 @@ async function normalizeRunningStatus(status: CodexRunnerStatus): Promise<CodexR
       }
     }
 
-    return resumeUntrackedCodexRunner(status);
+    return resumeUntrackedZaiRunner(status);
   }
 
   const stale = await isRunnerStatusStale(status);
@@ -3630,7 +3581,7 @@ async function normalizeRunningStatus(status: CodexRunnerStatus): Promise<CodexR
     return {
       ...status,
       state: "completed",
-      message: "Codex returned an image before runner status could be finalized.",
+      message: "Zai returned an image before runner status could be finalized.",
       finishedAt: new Date().toISOString(),
       exitCode: null
     };
@@ -3639,13 +3590,13 @@ async function normalizeRunningStatus(status: CodexRunnerStatus): Promise<CodexR
   return {
     ...status,
     state: "failed",
-    message: "Codex runner timed out after log output stopped; no outbox result was returned.",
+    message: "Zai runner timed out after log output stopped; no outbox result was returned.",
     finishedAt: new Date().toISOString(),
     exitCode: null
   };
 }
 
-async function persistedTournamentCancellationStatus(status: CodexRunnerStatus): Promise<CodexRunnerStatus | null> {
+async function persistedTournamentCancellationStatus(status: ZaiRunnerStatus): Promise<ZaiRunnerStatus | null> {
   try {
     const job = parseJsonText<{ tournament?: { id?: unknown } }>(
       await readFile(join(inboxDir, `${status.jobId}.json`), "utf8")
@@ -3665,8 +3616,8 @@ async function persistedTournamentCancellationStatus(status: CodexRunnerStatus):
       ...status,
       state: "failed",
       message: termination.stopped
-        ? "Codex runner cancellation was recovered from the animation tournament manifest."
-        : `Codex runner restart was blocked by the animation tournament manifest, but process termination was not confirmed: ${termination.message}`,
+        ? "Zai runner cancellation was recovered from the animation tournament manifest."
+        : `Zai runner restart was blocked by the animation tournament manifest, but process termination was not confirmed: ${termination.message}`,
       cancellationPending: termination.stopped ? undefined : true,
       finishedAt: termination.stopped ? new Date().toISOString() : undefined,
       exitCode: null,
@@ -3691,7 +3642,7 @@ type PersistedRunnerProcessIdentity = {
   startedAt: string;
 };
 
-async function terminatePersistedRunnerProcess(status: CodexRunnerStatus) {
+async function terminatePersistedRunnerProcess(status: ZaiRunnerStatus) {
   const processId = status.processId;
   if (!Number.isSafeInteger(processId) || !processId || processId <= 0 || processId === process.pid) {
     return { stopped: false, message: "No safe persisted runner process id was available." };
@@ -3756,7 +3707,7 @@ async function terminatePersistedRunnerProcess(status: CodexRunnerStatus) {
 }
 
 function persistedRunnerIdentityMatches(
-  status: CodexRunnerStatus,
+  status: ZaiRunnerStatus,
   identity: PersistedRunnerProcessIdentity
 ) {
   const expectedCommand = status.command ?? "";
@@ -3876,7 +3827,7 @@ function runHiddenCommand(command: string, args: string[], timeoutMs: number): P
   });
 }
 
-async function isRunnerStatusStale(status: CodexRunnerStatus) {
+async function isRunnerStatusStale(status: ZaiRunnerStatus) {
   if (runnerStaleTimeoutMs <= 0) return false;
 
   const startedAtMs = status.startedAt ? Date.parse(status.startedAt) : NaN;
@@ -3899,7 +3850,7 @@ async function isRunnerStatusActivelyRunning(jobId: string) {
   let status = runnerStatuses.get(jobId);
   if (!status) {
     try {
-      status = parseJsonText<CodexRunnerStatus>(await readFile(join(statusDir, `${jobId}.json`), "utf8"));
+      status = parseJsonText<ZaiRunnerStatus>(await readFile(join(statusDir, `${jobId}.json`), "utf8"));
     } catch {
       return false;
     }
@@ -3908,7 +3859,7 @@ async function isRunnerStatusActivelyRunning(jobId: string) {
   return !(await isRunnerStatusStale(status));
 }
 
-async function enrichRunnerStatus(status: CodexRunnerStatus): Promise<CodexRunnerStatus> {
+async function enrichRunnerStatus(status: ZaiRunnerStatus): Promise<ZaiRunnerStatus> {
   if (!shouldBuildDiagnostic(status)) return status;
   const diagnostic = await getJobDiagnostic(status);
   if (diagnostic) return { ...status, diagnostic };
@@ -3917,11 +3868,11 @@ async function enrichRunnerStatus(status: CodexRunnerStatus): Promise<CodexRunne
   return statusWithoutDiagnostic;
 }
 
-function shouldBuildDiagnostic(status: CodexRunnerStatus) {
+function shouldBuildDiagnostic(status: ZaiRunnerStatus) {
   return status.state === "failed" || status.state === "unavailable" || status.state === "completed" || status.state === "unknown";
 }
 
-async function getJobDiagnostic(status: CodexRunnerStatus): Promise<CodexJobDiagnostic | null> {
+async function getJobDiagnostic(status: ZaiRunnerStatus): Promise<ZaiJobDiagnostic | null> {
   const resultDir = status.outboxDir ?? outboxDir;
   const [sidecar, logText, hasReturnedImage, directionSplitArtifact] = await Promise.all([
     findJobSidecar(status.jobId, resultDir),
@@ -3944,7 +3895,7 @@ async function getJobDiagnostic(status: CodexRunnerStatus): Promise<CodexJobDiag
   };
 }
 
-function classifyFailureKind(status: CodexRunnerStatus, text: string, hasReturnedImage: boolean): CodexFailureKind | null {
+function classifyFailureKind(status: ZaiRunnerStatus, text: string, hasReturnedImage: boolean): ZaiFailureKind | null {
   if (status.state === "completed" && !hasReturnedImage) return "no_image_returned";
   if (
     !hasReturnedImage &&
@@ -3984,7 +3935,7 @@ function classifyFailureKind(status: CodexRunnerStatus, text: string, hasReturne
   return null;
 }
 
-function diagnosticForKind(kind: CodexFailureKind): Omit<CodexJobDiagnostic, "sidecarPath" | "logPath"> {
+function diagnosticForKind(kind: ZaiFailureKind): Omit<ZaiJobDiagnostic, "sidecarPath" | "logPath"> {
   if (kind === "policy_or_safety") {
     return {
       kind,
@@ -3997,31 +3948,31 @@ function diagnosticForKind(kind: CodexFailureKind): Omit<CodexJobDiagnostic, "si
     return {
       kind,
       title: "Image generation unavailable",
-      userMessage: "Image generation is not available in this Codex environment.",
-      suggestion: "Use manual handoff or another local provider, then return an image to the outbox."
+      userMessage: "Image generation is not available for the configured Z.ai account or image model.",
+      suggestion: "Check ZAI_API_KEY access to the image model, or use manual handoff and return an image to the outbox."
     };
   }
   if (kind === "usage_limit") {
     return {
       kind,
-      title: "Codex usage limit reached",
-      userMessage: "Codex could not run this generation because the configured account hit its usage limit.",
-      suggestion: "Wait for the usage window to reset, upgrade the account, or switch to a runner/provider with available capacity."
+      title: "Z.ai usage limit reached",
+      userMessage: "Z.ai could not run this generation because the configured account hit its usage limit.",
+      suggestion: "Wait for the usage window to reset, upgrade the plan, or switch ZAI_ENDPOINT_MODE to a base with available capacity."
     };
   }
   if (kind === "runner_failed") {
     return {
       kind,
-      title: "Codex runner failed",
-      userMessage: "Codex runner stopped before returning an image.",
-      suggestion: "Check the runner setup or retry the job after adjusting the prompt."
+      title: "Z.ai runner failed",
+      userMessage: "The Z.ai agent runner stopped before returning an image.",
+      suggestion: "Check the runner log, verify ZAI_API_KEY and the configured models, then retry the job."
     };
   }
   if (kind === "no_image_returned") {
     return {
       kind,
       title: "No image returned",
-      userMessage: "Codex runner finished or stopped, but no returned image was found.",
+      userMessage: "The Z.ai agent runner finished or stopped, but no returned image was found.",
       suggestion: "Retry the job, or place a returned image with the job id prefix in the outbox."
     };
   }
@@ -4170,7 +4121,7 @@ async function inspectAllDirectionSplitArtifacts(resultDir = outboxDir) {
   return new Map(statuses.filter((status) => status.detected).map((status) => [status.jobId, status]));
 }
 
-async function inspectDirectionSplitArtifact(jobId: string, resultDir = outboxDir): Promise<CodexArtifactStatus> {
+async function inspectDirectionSplitArtifact(jobId: string, resultDir = outboxDir): Promise<ZaiArtifactStatus> {
   const missingDirections: string[] = [];
   const warnings: string[] = [];
   const files: string[] = [];
@@ -4354,7 +4305,7 @@ async function inspectDirectionSplitArtifact(jobId: string, resultDir = outboxDi
   if (manifestOrderWarning) warnings.push(manifestOrderWarning);
 
   if (await isRunnerStatusActivelyRunning(jobId)) {
-    const reason = "waiting for Codex runner to finish finalizing direction artifacts";
+    const reason = "waiting for Zai runner to finish finalizing direction artifacts";
     return {
       jobId,
       artifactKind: "direction-split",
@@ -4405,7 +4356,7 @@ async function inspectDirectionSplitArtifact(jobId: string, resultDir = outboxDi
   };
 }
 
-function emptyDirectionSplitArtifactStatus(jobId: string): CodexArtifactStatus {
+function emptyDirectionSplitArtifactStatus(jobId: string): ZaiArtifactStatus {
   return {
     jobId,
     artifactKind: "direction-split",
@@ -4867,7 +4818,7 @@ function sanitizeRunnerLogText(text: string) {
   return sanitized.trimEnd();
 }
 
-function normalizeFailureKind(value: unknown): CodexFailureKind | null {
+function normalizeFailureKind(value: unknown): ZaiFailureKind | null {
   if (
     value === "policy_or_safety" ||
     value === "imagegen_unavailable" ||
@@ -4885,14 +4836,14 @@ function matchesAny(value: string, markers: string[]) {
 }
 
 function makeQualityGate(
-  classification: CodexResultQualityClassification,
+  classification: ZaiResultQualityClassification,
   reason: string,
   code: string = classification,
   historyAllowed = classification === "usable-final",
   downloadAllowed = classification === "usable-final",
   retryable = classification !== "usable-final",
   warnings?: string[]
-): CodexResultQualityGate {
+): ZaiResultQualityGate {
   return {
     classification,
     reason,
@@ -4907,7 +4858,7 @@ function makeQualityGate(
 function qualityGateFromManifest(manifest: Record<string, unknown>) {
   const explicitGate = manifest.qualityGate;
   if (explicitGate && typeof explicitGate === "object") {
-    const gate = explicitGate as Partial<CodexResultQualityGate>;
+    const gate = explicitGate as Partial<ZaiResultQualityGate>;
     const classification = normalizeQualityClassification(gate.classification);
     if (classification) {
       return makeQualityGate(
@@ -4953,7 +4904,7 @@ function readManifestMotionRecipeValue(value: unknown) {
   };
 }
 
-async function resumeUntrackedCodexRunner(status: CodexRunnerStatus) {
+async function resumeUntrackedZaiRunner(status: ZaiRunnerStatus) {
   const existing = resumingRunnerJobs.get(status.jobId);
   if (existing) return existing;
 
@@ -4966,7 +4917,7 @@ async function resumeUntrackedCodexRunner(status: CodexRunnerStatus) {
       }>(await readFile(path, "utf8"));
       const resolvedOutboxDir = resolveSafeOutboxSubdir(job.returnTo?.outboxDir) ?? status.outboxDir ?? outboxDir;
       const nextResumeCount = Math.max(0, status.resumeCount ?? 0) + 1;
-      return startCodexRunner(
+      return startZaiRunner(
         {
           id: status.jobId,
           createdAt: job.createdAt ?? status.initialStartedAt ?? status.startedAt ?? new Date().toISOString(),
@@ -4979,10 +4930,10 @@ async function resumeUntrackedCodexRunner(status: CodexRunnerStatus) {
         }
       );
     } catch (error) {
-      const failedStatus: CodexRunnerStatus = {
+      const failedStatus: ZaiRunnerStatus = {
         ...status,
         state: "failed",
-        message: `Could not resume the untracked Codex runner: ${error instanceof Error ? error.message : "unknown error"}`,
+        message: `Could not resume the untracked Zai runner: ${error instanceof Error ? error.message : "unknown error"}`,
         finishedAt: new Date().toISOString(),
         exitCode: null
       };
@@ -5009,7 +4960,7 @@ function animationQualityFromManifest(manifest: Record<string, unknown>) {
 function normalizeAnimationQualityReport(value: unknown): AnimationQualityReportV2 | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const report = value as Record<string, unknown>;
-  if (report.metricVersion !== "image-cockpit.animation-quality.v2" || report.policyVersion !== "shadow-v1") return null;
+  if (report.metricVersion !== "zai-cockpit.animation-quality.v2" || report.policyVersion !== "shadow-v1") return null;
   if (report.hardGateUnchanged !== true) return null;
   try {
     const serialized = JSON.stringify(report);
@@ -5026,14 +4977,14 @@ function manifestQualityGateRecordedMtimeMs(sourceManifest: NonNullable<Directio
   return Number.isFinite(recordedTime) ? recordedTime : sourceManifest.mtimeMs;
 }
 
-function isSupersededSoftClientQualityGate(qualityGate: CodexResultQualityGate) {
+function isSupersededSoftClientQualityGate(qualityGate: ZaiResultQualityGate) {
   if (qualityGate.code !== "client-quality-gate-failed") return false;
   const reason = qualityGate.reason.toLowerCase();
   if (!/\bbbox (?:width|height) variation\b/.test(reason)) return false;
   return !/chroma key removal failed|transparency damage|detached component|blank normalized cell|no primary character|no character pixels|feet touch|top margin|expected \d+x\d+, got|missing direction|could not|decode failed/i.test(reason);
 }
 
-function qualityGateFromRequest(body: CodexResultQualityGateRequest) {
+function qualityGateFromRequest(body: ZaiResultQualityGateRequest) {
   const requested = normalizeQualityClassification(body.classification);
   const classification = requested && requested !== "usable-final" && requested !== "running" ? requested : "quality-failed";
   const reason =
@@ -5054,7 +5005,7 @@ function trimQualityGateText(value: string, maxLength: number) {
   return value.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
-async function writeDirectionSplitQualityGate(jobId: string, qualityGate: CodexResultQualityGate) {
+async function writeDirectionSplitQualityGate(jobId: string, qualityGate: ZaiResultQualityGate) {
   const resultDir = await resolveJobOutboxDir(jobId) ?? outboxDir;
   const manifestPaths = [
     join(resultDir, `${jobId}-manifest.json`),
@@ -5127,7 +5078,7 @@ async function readManifestObject(path: string): Promise<Record<string, unknown>
   }
 }
 
-function normalizeQualityClassification(value: unknown): CodexResultQualityClassification | null {
+function normalizeQualityClassification(value: unknown): ZaiResultQualityClassification | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase().replace(/[_\s]+/g, "-");
   if (normalized === "usable-final" || normalized === "gold" || normalized === "silver" || normalized === "verified") return "usable-final";
@@ -5138,7 +5089,7 @@ function normalizeQualityClassification(value: unknown): CodexResultQualityClass
   return null;
 }
 
-function qualityGateDefaultReason(classification: CodexResultQualityClassification) {
+function qualityGateDefaultReason(classification: ZaiResultQualityClassification) {
   if (classification === "quality-failed") return "Animation result failed the material quality gate.";
   if (classification === "quarantined-candidate") return "Candidate was quarantined and is not a final usable result.";
   if (classification === "debug-artifact") return "Debug or QA artifact is not a final usable result.";
@@ -5176,7 +5127,7 @@ async function listOutboxResults(resultDir = outboxDir) {
     .sort((a, b) => Date.parse(b.modifiedAt) - Date.parse(a.modifiedAt));
 }
 
-function qualityGateForOutboxResultName(name: string, artifact?: CodexArtifactStatus): CodexResultQualityGate {
+function qualityGateForOutboxResultName(name: string, artifact?: ZaiArtifactStatus): ZaiResultQualityGate {
   const filterName = normalizeOutboxResultNameForFiltering(name);
   if (filterName.includes("bronze-candidate")) {
     return makeQualityGate(
@@ -5202,14 +5153,14 @@ function qualityGateForOutboxResultName(name: string, artifact?: CodexArtifactSt
   return makeQualityGate("usable-final", "Usable final result.", "usable-final", true, true, false);
 }
 
-function resolveTournamentIdForJobRequest(workflowMode: CodexWorkflowMode, body: CodexJobRequest) {
+function resolveTournamentIdForJobRequest(workflowMode: ZaiWorkflowMode, body: ZaiJobRequest) {
   const spriteVariant = body.spriteVariant ?? "standard";
   return workflowMode === "sprite-generate" && spriteVariant === "standard" && isSafeTournamentId(body.tournamentId)
     ? body.tournamentId
     : "";
 }
 
-function hasTournamentScopedJobFields(body: CodexJobRequest) {
+function hasTournamentScopedJobFields(body: ZaiJobRequest) {
   return (
     body.tournamentId !== undefined ||
     body.tournamentCandidateIndex !== undefined ||
@@ -5254,12 +5205,12 @@ function resolveSafeOutboxSubdir(value: unknown) {
   return resolved === rootDir || resolved.startsWith(root) ? resolved : null;
 }
 
-async function readRunnerStatusSnapshot(jobId: string): Promise<CodexRunnerStatus> {
+async function readRunnerStatusSnapshot(jobId: string): Promise<ZaiRunnerStatus> {
   const liveStatus = runnerStatuses.get(jobId);
   if (liveStatus) return liveStatus;
   const statusPath = join(statusDir, `${jobId}.json`);
   try {
-    return parseJsonText<CodexRunnerStatus>(await readFile(statusPath, "utf8"));
+    return parseJsonText<ZaiRunnerStatus>(await readFile(statusPath, "utf8"));
   } catch {
     return {
       jobId,
@@ -5271,12 +5222,12 @@ async function readRunnerStatusSnapshot(jobId: string): Promise<CodexRunnerStatu
 }
 
 async function cancelUntrackedRunnerStatus(
-  status: CodexRunnerStatus,
+  status: ZaiRunnerStatus,
   stoppedMessage: string,
   pendingMessage: string
 ) {
   const termination = await terminatePersistedRunnerProcess(status);
-  const cancelledStatus: CodexRunnerStatus = {
+  const cancelledStatus: ZaiRunnerStatus = {
     ...status,
     state: "failed",
     message: termination.stopped
@@ -5308,7 +5259,7 @@ async function cancelTournamentLoserRunners(
     const status = await readRunnerStatusSnapshot(candidate.jobId);
     if (status.state !== "running" && !status.cancellationPending) continue;
     if (runnerProcesses.has(candidate.jobId)) {
-      const result = await cancelCodexRunner(candidate.jobId);
+      const result = await cancelZaiRunner(candidate.jobId);
       cancellationResults.push({
         jobId: candidate.jobId,
         ok: result.ok,
@@ -5318,8 +5269,8 @@ async function cancelTournamentLoserRunners(
     }
     const result = await cancelUntrackedRunnerStatus(
       status,
-      "Codex runner cancellation persisted after an animation tournament winner was chosen.",
-      "Codex runner restart was blocked after an animation tournament winner was chosen"
+      "Zai runner cancellation persisted after an animation tournament winner was chosen.",
+      "Zai runner restart was blocked after an animation tournament winner was chosen"
     );
     cancellationResults.push({ jobId: result.jobId, ok: result.ok, message: result.message });
   }
@@ -5453,17 +5404,17 @@ function resolveOutboxFileInDir(resultDir: string, name: string) {
 }
 
 function isSafeJobId(jobId: string) {
-  return /^codex-job-[A-Za-z0-9_-]+$/.test(jobId);
+  return /^zai-job-[A-Za-z0-9_-]+$/.test(jobId);
 }
 
 function isSafeTournamentId(value: unknown): value is string {
   return typeof value === "string" && /^[A-Za-z0-9_-]{1,96}$/.test(value);
 }
 
-function createCodexJobId(createdAt: string) {
+function createZaiJobId(createdAt: string) {
   const timestamp = createdAt.replace(/[:.]/g, "-");
   const suffix = Math.random().toString(36).slice(2, 8);
-  return `codex-job-${timestamp}-${suffix}`;
+  return `zai-job-${timestamp}-${suffix}`;
 }
 
 function isRunnerUnavailableError(error: unknown) {

@@ -6,10 +6,10 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     watch: {
-      ignored: ["**/codex-handoff/**"]
+      ignored: ["**/zai-handoff/**"]
     },
     proxy: {
-      "/api": process.env.IMAGE_COCKPIT_API_TARGET ?? "http://127.0.0.1:8787"
+      "/api": process.env.ZAI_COCKPIT_API_TARGET ?? "http://127.0.0.1:8787"
     }
   }
 });

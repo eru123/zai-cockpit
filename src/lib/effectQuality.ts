@@ -57,7 +57,7 @@ export function buildEffectQualityReportV2(
   if (eventPeakDeltaFrames !== null && Math.abs(eventPeakDeltaFrames) > 1) shadowWarnings.push("peak frame is offset from the requested event");
 
   return {
-    metricVersion: "image-cockpit.effect-quality.v2",
+    metricVersion: "zai-cockpit.effect-quality.v2",
     policyVersion: "shadow-v1",
     recordedAt: options.recordedAt ?? new Date().toISOString(),
     loopSeamScore,

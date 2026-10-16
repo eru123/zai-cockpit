@@ -207,7 +207,7 @@ export function buildAnimationCalibrationExport(input: {
   reports: Record<string, AnimationQualityReportV2 | undefined>;
 }) {
   return {
-    schema: "image-cockpit.animation-review-calibration.v1" as const,
+    schema: "zai-cockpit.animation-review-calibration.v1" as const,
     exportedAt: new Date().toISOString(),
     tournamentId: input.tournamentId,
     sourceFingerprint: input.sourceFingerprint,

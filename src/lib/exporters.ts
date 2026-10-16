@@ -282,7 +282,7 @@ export async function createAnimationPackZip(input: AnimationPackExportInput) {
 
 export async function exportAnimationPack(input: AnimationPackExportInput) {
   const blob = await createAnimationPackZip(input);
-  downloadBlob(blob, `${safePackBaseName(input.manifest.title)}.image-cockpit-animation.zip`);
+  downloadBlob(blob, `${safePackBaseName(input.manifest.title)}.zai-cockpit-animation.zip`);
 }
 
 export async function createEffectPackZip(input: EffectPackExportInput) {
@@ -310,7 +310,7 @@ export async function createEffectPackZip(input: EffectPackExportInput) {
 
 export async function exportEffectPack(input: EffectPackExportInput) {
   const blob = await createEffectPackZip(input);
-  downloadBlob(blob, `${safePackBaseName(input.metadata.name)}.image-cockpit-effect.zip`);
+  downloadBlob(blob, `${safePackBaseName(input.metadata.name)}.zai-cockpit-effect.zip`);
 }
 
 function normalizePackManifestFiles(manifest: AnimationPackManifest): AnimationPackManifest {
@@ -354,7 +354,7 @@ function safePackBaseName(title: string) {
     .replace(/\.[^.]+$/, "")
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return normalized || "image-cockpit-animation";
+  return normalized || "zai-cockpit-animation";
 }
 
 function buildAnimationPackMetadata(manifest: AnimationPackManifest) {

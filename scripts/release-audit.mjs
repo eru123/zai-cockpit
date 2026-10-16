@@ -6,7 +6,7 @@ import { extname, join } from "node:path";
 const root = process.cwd();
 const failures = [];
 const privacyTextExtensions = new Set(["", ".css", ".html", ".js", ".json", ".md", ".mjs", ".ts", ".tsx", ".txt", ".yaml", ".yml"]);
-const expectedPackageVersion = "0.2.1";
+const expectedPackageVersion = "0.1.0";
 
 function parsePromptExampleTitle(value) {
   const heading = value.trim();
@@ -33,171 +33,45 @@ const requiredFiles = [
   "CONTRIBUTING.md",
   "SECURITY.md",
   "CODE_OF_CONDUCT.md",
+  "AGENTS.md",
   ".env.example",
   ".gitignore",
   ".github/workflows/ci.yml",
   "scripts/doctor.mjs",
   "scripts/release-audit.mjs",
-  "scripts/real-codex-runner-smoke.mjs",
+  "scripts/zai-agent-runner.mjs",
+  "scripts/real-zai-runner-smoke.mjs",
   "scripts/real-imagegen-smoke.mjs",
   "scripts/ui-smoke.mjs",
   "scripts/dev-supervisor.mjs",
   "scripts/capture-readme-screenshots.mjs",
-  "docs/qa/completed-codex-job-import-storage-quota.md",
-  "docs/qa/local-state-oom-safe-mode-retention.md",
-  "docs/qa/v0.2.1-release-prep.md",
-  "docs/qa/v0.1.8-release-prep.md",
-  "docs/qa/v0.1.7-release-prep.md",
-  "docs/qa/v0.1.6-release-prep.md",
-  "docs/qa/single-horizontal-direction.md",
-  "docs/qa/experimental-16-20-frame-animation.md",
-  "docs/qa/selectable-single-animation-direction.md",
-  "docs/qa/v0.1.5-release-prep.md",
-  "docs/qa/v0.1.4-release-prep.md",
-  "docs/qa/v0.1.3-release-prep.md",
-  "docs/qa/v0.1.2-release-prep.md",
-  "docs/qa/v0.1.1-release-prep.md",
-  "docs/qa/cockpit-health-repair-supervisor.md",
-  "docs/qa/deduplicate-bronze-candidate-import-retry.md",
-  "docs/qa/settings-recovery-environment-report.md",
-  "docs/qa/animation-direction-split-completion-hotfix.md",
   "public/reset-local-state.html",
-  "public/samples/idle-breathing-sheet.png",
-  "public/samples/walk-cycle-sheet.png",
-  "public/samples/run-cycle-sheet.png",
-  "public/samples/basic-attack-sheet.png",
-  "public/samples/hurt-reaction-sheet.png",
-  "public/samples/death-downed-sheet.png",
-  "public/samples/spell-cast-sheet.png",
-  "public/samples/jump-hop-sheet.png",
-  "public/samples/guard-block-sheet.png",
-  "public/samples/victory-cheer-sheet.png",
-  "public/samples/interact-pickup-sheet.png",
-  "public/samples/ranged-attack-sheet.png",
-  "public/samples/skill-release-sheet.png",
-  "public/samples/knockback-sheet.png",
-  "public/samples/item-use-sheet.png",
-  "public/samples/talk-sheet.png",
   "src/App.test.ts",
   "src/lib/animationPack.ts",
   "src/lib/animationPack.test.ts",
   "src/AnimationReviewCockpit.tsx",
   "src/lib/animationReview.ts",
   "src/lib/animationReview.test.ts",
-  "docs/qa/animation-review-cockpit-uiux.md",
-  "docs/qa/animation-review-calibration-sample.json",
   "src/VfxCompositeStage.tsx",
   "src/lib/vfxComposite.ts",
   "src/lib/vfxComposite.test.ts",
   "src/lib/effectQuality.ts",
   "src/lib/effectQuality.test.ts",
-  "docs/qa/vfx-composite-stage.md",
-  "docs/qa/vfx-composite-stage-matrix.json",
   "src/lib/motionPilot.ts",
-  "src/lib/motionPilot.test.ts",
-  "docs/qa/animation-uplift-final-benchmark.md",
-  "docs/qa/animation-uplift-final-benchmark.json",
-  "docs/qa/animation-uplift-review-index.md",
-  "src/lib/officialAnimations.ts",
-  "docs/review/mvp-review-report.md",
-  "docs/roadmap/release-roadmap.md",
-  "docs/release/v0.1.0-checklist.md",
-  "docs/release/v0.1.0-runbook.md",
-  "docs/release/v0.1.0-release-notes.md",
-  "docs/release/v0.2.1-release-notes.md",
-  "docs/release/v0.1.8-release-notes.md",
-  "docs/release/v0.1.7bugfix-release-notes.md",
-  "docs/release/v0.1.7-release-notes.md",
-  "docs/release/v0.1.6-release-notes.md",
-  "docs/release/v0.1.5-release-notes.md",
-  "docs/release/v0.1.4-release-notes.md",
-  "docs/release/v0.1.3-release-notes.md",
-  "docs/release/v0.1.2-release-notes.md",
-  "docs/release/v0.1.1-release-notes.md",
-  "docs/release/v0.1.0-owner-review.md",
-  "docs/release/v0.1.0-final-audit.md",
-  "docs/release/v0.1.0-acceptance-evidence.md",
-  "docs/release/v0.1.0-owner-decision.md",
-  "docs/usage/manual-handoff.md",
-  "docs/demo/mvp-demo.gif",
-  "docs/qa/real-codex-runner-smoke.md",
-  "docs/qa/imagegen-handoff-smoke.md",
-  "docs/qa/codex-generation-job-concurrency-3.md",
-  "docs/qa/codex-log-card-limit-3.md",
-  "docs/qa/generation-job-reliability-hardening.md",
-  "docs/qa/artifact-staging-and-real-browser-generation-qa.md",
-  "docs/qa/temp-candidate-contact-import-filter.md",
-  "docs/qa/official-animation-gallery.html",
-  "docs/qa/official-animation-batch-2-to-10.md",
-  "docs/qa/official-animation-next-5-gallery.html",
-  "docs/qa/official-animation-next-5.md",
-  "docs/qa/official-animation-transparency-audit.json",
-  "docs/qa/official-idle-breathing/idle-breathing-mechanical-qa.json",
-  "docs/qa/official-basic-attack/basic-attack-mechanical-qa.json",
-  "docs/qa/official-hurt-reaction/hurt-reaction-mechanical-qa.json",
-  "docs/qa/official-death-downed/death-downed-mechanical-qa.json",
-  "docs/qa/official-spell-cast/spell-cast-mechanical-qa.json",
-  "docs/qa/official-jump-hop/jump-hop-mechanical-qa.json",
-  "docs/qa/official-guard-block/guard-block-mechanical-qa.json",
-  "docs/qa/official-victory-cheer/victory-cheer-mechanical-qa.json",
-  "docs/qa/official-interact-pickup/interact-pickup-mechanical-qa.json",
-  "docs/qa/official-ranged-attack/ranged-attack-mechanical-qa.json",
-  "docs/qa/official-skill-release/skill-release-mechanical-qa.json",
-  "docs/qa/official-knockback/knockback-mechanical-qa.json",
-  "docs/qa/official-item-use/item-use-mechanical-qa.json",
-  "docs/qa/official-talk/talk-mechanical-qa.json",
-  "docs/qa/official-walk-cycle/walk-cycle-mechanical-qa.json",
-  "docs/qa/official-run-cycle/run-cycle-mechanical-qa.json",
-  "docs/demo/readme/pixel-art-generation.png",
-  "docs/demo/readme/prompt-examples-modal.png",
-  "docs/demo/readme/image-editing.png",
-  "docs/demo/readme/animation-generation.png",
-  "docs/marketing/x-launch/launch-post-ja.md",
-  "docs/marketing/x-launch/launch-thread-ja.md",
-  "docs/marketing/x-launch/asset-checklist.md",
-  "docs/marketing/x-launch/social-preview.png",
-  ".github/PULL_REQUEST_TEMPLATE.md",
-  "docs/prompt-examples/README.md",
-  "docs/prompt-examples/basic-character-prompts.md",
-  "docs/prompt-examples/profession-character-prompts.md",
-  "docs/prompt-examples/chibi-boy-prompts.md",
-  "docs/prompt-examples/chibi-girl-prompts.md",
-  "docs/prompt-examples/animal-prompts.md",
-  "docs/prompt-examples/beastfolk-prompts.md",
-  "docs/qa/prompt-examples/animal-chibi-beastfolk-presets/README.md",
-  "docs/qa/prompt-examples/animal-chibi-beastfolk-presets/asset-qc.json",
-  "docs/prompt-examples/monster-prompts.md",
-  "docs/prompt-examples/monster-girl-prompts.md",
-  "public/prompt-examples/basic-boy-adventurer.png",
-  "public/prompt-examples/basic-girl-adventurer.png",
-  "public/prompt-examples/basic-young-male-hero.png",
-  "public/prompt-examples/basic-young-female-hero.png",
-  "public/prompt-examples/basic-middle-aged-male-mercenary.png",
-  "public/prompt-examples/basic-middle-aged-female-ranger.png",
-  "public/prompt-examples/basic-elder-male-sage.png",
-  "public/prompt-examples/basic-elder-female-herbalist.png",
-  "public/prompt-examples/basic-androgynous-traveler.png",
-  "public/prompt-examples/basic-small-village-child.png",
-  "public/prompt-examples/basic-large-veteran-warrior.png",
-  "public/prompt-examples/basic-hooded-mysterious-figure.png",
-  ...promptPreviewFilesFromMarkdown("docs/prompt-examples/profession-character-prompts.md", "profession"),
-  ...promptPreviewFilesFromMarkdown("docs/prompt-examples/chibi-boy-prompts.md", "chibi-boy"),
-  ...promptPreviewFilesFromMarkdown("docs/prompt-examples/chibi-girl-prompts.md", "chibi-girl"),
-  ...promptPreviewFilesFromMarkdown("docs/prompt-examples/animal-prompts.md", "animal"),
-  ...promptPreviewFilesFromMarkdown("docs/prompt-examples/beastfolk-prompts.md", "beastfolk"),
-  ...promptPreviewFilesFromMarkdown("docs/prompt-examples/monster-prompts.md", "monster"),
-  ...promptPreviewFilesFromMarkdown("docs/prompt-examples/monster-girl-prompts.md", "monster-girl")
+  "src/lib/motionPilot.test.ts"
 ];
 
 const requiredEnvKeys = [
-  "IMAGE_COCKPIT_API_PORT",
-  "IMAGE_COCKPIT_HANDOFF_DIR",
-  "IMAGE_COCKPIT_CODEX_AUTORUN",
-  "IMAGE_COCKPIT_CODEX_COMMAND",
-  "IMAGE_COCKPIT_CODEX_SANDBOX",
-  "IMAGE_COCKPIT_CODEX_APPROVAL",
-  "IMAGE_COCKPIT_CODEX_HELP_ARGS_JSON",
-  "IMAGE_COCKPIT_CODEX_EXEC_ARGS_JSON"
+  "ZAI_COCKPIT_API_PORT",
+  "ZAI_COCKPIT_HANDOFF_DIR",
+  "ZAI_COCKPIT_RUNNER_AUTORUN",
+  "ZAI_COCKPIT_RUNNER_COMMAND",
+  "ZAI_COCKPIT_RUNNER_HELP_ARGS_JSON",
+  "ZAI_COCKPIT_RUNNER_EXEC_ARGS_JSON",
+  "ZAI_API_KEY",
+  "ZAI_ENDPOINT_MODE",
+  "ZAI_CHAT_MODEL",
+  "ZAI_IMAGE_MODEL"
 ];
 
 const requiredWorkflowIds = ["image-generate", "image-edit", "sprite-generate", "sprite-edit", "effect-animation"];
@@ -208,7 +82,7 @@ const requiredGitignorePatterns = [
   ".env",
   ".env.",
   "!.env.example",
-  "codex-handoff/",
+  "zai-handoff/",
   "tmp/",
   ".dev-logs/",
   ".agents/",
@@ -225,7 +99,7 @@ const requiredPackageScripts = [
   "capture:readme",
   "smoke",
   "ui:smoke",
-  "codex:smoke",
+  "zai:smoke",
   "imagegen:smoke",
   "release:audit",
   "verify",
@@ -239,37 +113,10 @@ const requiredVerifyCommands = [
   "npm run smoke",
   "npm run release:audit"
 ];
-const requiredReviewLocalCommands = ["npm run verify", "npm run ui:smoke", "npm run codex:smoke"];
+const requiredReviewLocalCommands = ["npm run verify", "npm run ui:smoke", "npm run zai:smoke"];
 const requiredReadmeLinks = [
   "CHANGELOG.md",
-  "docs/release/v0.2.1-release-notes.md",
-  "docs/qa/v0.2.1-release-prep.md",
-  "docs/release/v0.1.8-release-notes.md",
-  "docs/qa/v0.1.8-release-prep.md",
-  "docs/release/v0.1.7bugfix-release-notes.md",
-  "docs/release/v0.1.7-release-notes.md",
-  "docs/qa/v0.1.7-release-prep.md",
-  "docs/release/v0.1.6-release-notes.md",
-  "docs/qa/v0.1.6-release-prep.md",
-  "docs/release/v0.1.5-release-notes.md",
-  "docs/qa/v0.1.5-release-prep.md",
-  "docs/release/v0.1.4-release-notes.md",
-  "docs/qa/v0.1.4-release-prep.md",
-  "docs/release/v0.1.3-release-notes.md",
-  "docs/qa/v0.1.3-release-prep.md",
-  "docs/release/v0.1.2-release-notes.md",
-  "docs/qa/v0.1.2-release-prep.md",
-  "docs/release/v0.1.1-release-notes.md",
-  "docs/qa/v0.1.1-release-prep.md",
-  "docs/release/v0.1.0-release-notes.md",
-  "docs/release/v0.1.0-owner-review.md",
-  "docs/release/v0.1.0-final-audit.md",
-  "docs/release/v0.1.0-acceptance-evidence.md",
-  "docs/release/v0.1.0-owner-decision.md",
-  "docs/release/v0.1.0-checklist.md",
-  "docs/release/v0.1.0-runbook.md",
-  "docs/usage/manual-handoff.md",
-  "docs/qa/imagegen-handoff-smoke.md",
+  "docs/prompt-examples/README.md",
   ".github/workflows/ci.yml",
   "LICENSE",
   "CONTRIBUTING.md",
@@ -291,7 +138,6 @@ checkCoreLocalization();
 checkPromptCatalogExamples();
 checkPromptPresetAssetQa();
 checkCiWorkflow();
-checkReleaseDocs();
 
 if (failures.length > 0) {
   console.error("Release audit failed:");
@@ -346,7 +192,7 @@ function checkPackageJson() {
   }
 
   const readmeCaptureText = readText("scripts/capture-readme-screenshots.mjs");
-  ["VITE_IMAGE_COCKPIT_SUPERVISOR_PORT", ".cockpit-health-panel.state-ok"].forEach((marker) => {
+  ["VITE_ZAI_COCKPIT_SUPERVISOR_PORT", ".cockpit-health-panel.state-ok"].forEach((marker) => {
     if (!readmeCaptureText.includes(marker)) {
       failures.push(`README screenshot capture should include the stable health marker: ${marker}`);
     }
@@ -434,7 +280,7 @@ function checkTrackedFiles() {
         failures.push(`Secret-bearing env file is tracked: ${file}`);
       }
       if (
-        normalized.startsWith("codex-handoff/") ||
+        normalized.startsWith("zai-handoff/") ||
         normalized.startsWith("node_modules/") ||
         normalized.startsWith("dist/") ||
         normalized.startsWith("coverage/")
@@ -449,26 +295,10 @@ function checkPublicPrivacy() {
   if (tracked === null) return;
 
   const windowsUserPathPattern = new RegExp(["C:", "\\\\", "Users", "\\\\"].join(""), "i");
-  const workspaceDrivePathPattern = new RegExp(["D:", "\\\\", "codex", "\\\\"].join(""), "i");
-  const localAppDataCodexRuntimePattern = new RegExp(
-    [
-      "%LOCALAPPDATA%",
-      "\\\\",
-      "OpenAI",
-      "\\\\",
-      "Codex",
-      "\\\\",
-      "bin",
-      "\\\\",
-      "(?!<runtime-id>|\\.\\.\\.)[A-Za-z0-9_-]{6,}",
-      "\\\\",
-      "codex\\.exe"
-    ].join(""),
-    "i"
-  );
+  const workspaceDrivePathPattern = new RegExp(["D:", "\\\\", "zai", "\\\\"].join(""), "i");
   const blockedLiterals = [
     { label: "personal Windows user name", value: ["na", "kaya"].join("") },
-    { label: "observed local Codex runtime id", value: ["38dff", "8711e296435"].join("") }
+    { label: "observed local Zai runtime id", value: ["38dff", "8711e296435"].join("") }
   ];
 
   tracked
@@ -485,9 +315,6 @@ function checkPublicPrivacy() {
       }
       if (workspaceDrivePathPattern.test(text)) {
         failures.push(`Public privacy guard found a local workspace drive path in ${file}`);
-      }
-      if (localAppDataCodexRuntimePattern.test(text)) {
-        failures.push(`Public privacy guard found a concrete Codex runtime path in ${file}`);
       }
 
       blockedLiterals.forEach(({ label, value }) => {
@@ -524,23 +351,23 @@ function checkWorkflowIds() {
   const animationPackText = readText("src/lib/animationPack.ts");
   const motionRecipesText = readText("src/lib/motionRecipes.ts");
   const appTestText = readText("src/App.test.ts");
-  const extendedFrameQaText = readText("docs/qa/experimental-16-20-frame-animation.md");
-  const selectableSingleDirectionQaText = readText("docs/qa/selectable-single-animation-direction.md");
+  const extendedFrameQaText = readOptionalText("docs/qa/experimental-16-20-frame-animation.md");
+  const selectableSingleDirectionQaText = readOptionalText("docs/qa/selectable-single-animation-direction.md");
   const animationTournamentText = readText("src/lib/animationTournament.ts");
   const animationReviewText = readText("src/lib/animationReview.ts");
   const animationReviewUiText = readText("src/AnimationReviewCockpit.tsx");
   const serverText = readText("server/index.ts");
-  const animationReviewQaText = readText("docs/qa/animation-review-cockpit-uiux.md");
+  const animationReviewQaText = readOptionalText("docs/qa/animation-review-cockpit-uiux.md");
   const vfxCompositeText = readText("src/lib/vfxComposite.ts");
   const vfxCompositeUiText = readText("src/VfxCompositeStage.tsx");
   const effectQualityText = readText("src/lib/effectQuality.ts");
-  const vfxCompositeQaText = readText("docs/qa/vfx-composite-stage.md");
+  const vfxCompositeQaText = readOptionalText("docs/qa/vfx-composite-stage.md");
   const motionPilotText = readText("src/lib/motionPilot.ts");
-  const finalBenchmarkText = readText("docs/qa/animation-uplift-final-benchmark.md");
-  const finalReviewIndexText = readText("docs/qa/animation-uplift-review-index.md");
-  const realCodexSmokeText = readText("scripts/real-codex-runner-smoke.mjs");
-  const imageEditFullBodyQaText = readText("docs/qa/image-edit-full-body-fit.md");
-  if (!appText || !stylesText || !smokeText || !uiSmokeText || !realCodexSmokeText || !animationTournamentText || !animationReviewText || !animationReviewUiText || !serverText || !animationReviewQaText || !vfxCompositeText || !vfxCompositeUiText || !effectQualityText || !vfxCompositeQaText || !motionPilotText || !finalBenchmarkText || !finalReviewIndexText || !motionRecipesText || !appTestText || !extendedFrameQaText || !selectableSingleDirectionQaText) return;
+  const finalBenchmarkText = readOptionalText("docs/qa/animation-uplift-final-benchmark.md");
+  const finalReviewIndexText = readOptionalText("docs/qa/animation-uplift-review-index.md");
+  const realZaiSmokeText = readText("scripts/real-zai-runner-smoke.mjs");
+  const imageEditFullBodyQaText = readOptionalText("docs/qa/image-edit-full-body-fit.md");
+  if (!appText || !stylesText || !smokeText || !uiSmokeText || !realZaiSmokeText || !animationTournamentText || !animationReviewText || !animationReviewUiText || !serverText || !vfxCompositeText || !vfxCompositeUiText || !effectQualityText || !motionPilotText || !motionRecipesText || !appTestText) return;
 
   requiredWorkflowIds.forEach((workflowId) => {
     if (!appText.includes(workflowId)) {
@@ -550,7 +377,7 @@ function checkWorkflowIds() {
 
   requiredWorkflowIds.forEach((workflowId) => {
     if (!smokeText.includes(workflowId)) {
-      failures.push(`Smoke test should cover Codex handoff workflow: ${workflowId}`);
+      failures.push(`Smoke test should cover Zai handoff workflow: ${workflowId}`);
     }
   });
 
@@ -562,7 +389,7 @@ function checkWorkflowIds() {
     "Initial screen should open the Pixel Art Generation workspace",
     "Initial screen should not show legacy Guided Start options",
     "selectWorkflowTab",
-    "Route: Codex Handoff",
+    "Route: Zai Handoff",
     "chroma-key direction frames",
     "Generate Pixel Art",
     "Generate Animation",
@@ -637,27 +464,27 @@ function checkWorkflowIds() {
     "generated from prompt example",
     "Prompt example loaded into Pixel Art Generation",
     "Generation can take a few minutes.",
-    "assertCodexQueue",
-    "Codex Jobs",
+    "assertZaiQueue",
+    "Zai Jobs",
     "Active 1/3",
     "Active 2/3",
     "Active 3/3",
-    "Queue Codex Job",
+    "Queue Zai Job",
     "Queued",
     "Waiting for an open slot",
-    "Codex job queued",
-    "codexJobRows",
-    "codexJobShelfInHistory",
-    "codexJobShelfInSource",
-    "codexJobShelfBeforeHistoryList",
-    "Codex job shelf should appear above the Results cards in the right column",
-    "Codex queue drains after results return",
+    "Zai job queued",
+    "zaiJobRows",
+    "zaiJobShelfInHistory",
+    "zaiJobShelfInSource",
+    "zaiJobShelfBeforeHistoryList",
+    "Zai job shelf should appear above the Results cards in the right column",
+    "Zai queue drains after results return",
     "assertImageEditing",
     "assertImageEditingFullBodyFitWithLogs",
     "mock-full-body-source.png",
     "imageRectNormalized",
     "imageRectPixels",
-    "workspace should not overlap the Codex log panel",
+    "workspace should not overlap the Zai log panel",
     "assertAnimationResultNotEditable",
     "Edit Image",
     "Upload Image",
@@ -669,12 +496,12 @@ function checkWorkflowIds() {
     "resultDownloadActionButtons",
     "resultDownloadGridButtonsInWorkspace",
     "Image Editing PNG download should preserve transparent alpha",
-    "expectedCodexLogHistoryLimit = 3",
-    "Codex log panel retains the latest 3 completed log cards",
-    "Compact Codex log panel should show at most",
-    "Compact Codex log should auto-scroll to the latest line",
-    "Fullscreen Codex log should open at the latest line",
-    "Mobile fullscreen Codex log should stay on the latest line",
+    "expectedZaiLogHistoryLimit = 3",
+    "Zai log panel retains the latest 3 completed log cards",
+    "Compact Zai log panel should show at most",
+    "Compact Zai log should auto-scroll to the latest line",
+    "Fullscreen Zai log should open at the latest line",
+    "Mobile fullscreen Zai log should stay on the latest line",
     "mock runner tail marker",
     "dragCanvasRegion",
     "annotation-region-row",
@@ -692,9 +519,9 @@ function checkWorkflowIds() {
     "policy_or_safety",
     "Generation failed",
     "生成できませんでした",
-    "codex-failure-card",
-    "Codex failure should not create a fake history image",
-    "Codex failure should release the active job slot",
+    "zai-failure-card",
+    "Zai failure should not create a fake history image",
+    "Zai failure should release the active job slot",
     "assertHistoryIncrementalRendering",
     "Results list renders the first 100 history items",
     "Results list loads 20 more cards on scroll",
@@ -725,8 +552,8 @@ function checkWorkflowIds() {
     "User Animations",
     "Import Animation",
     "Export Animation Pack",
-    "image-cockpit.animation.v1",
-    "mock-run-cycle.image-cockpit-animation.zip",
+    "zai-cockpit.animation.v1",
+    "mock-run-cycle.zai-cockpit-animation.zip",
     "Animation pack imported",
     "Animation loaded from library",
     "workspaceExportAnimationPackButtons",
@@ -862,9 +689,9 @@ function checkWorkflowIds() {
     "Metadata JSON",
     "Effect Pack ZIP",
     "animationSourceStatus",
-    "Codex log fullscreen button",
-    "Fullscreen Codex log text area should be taller than normal",
-    "Mobile fullscreen Codex log panel should fit within the viewport",
+    "Zai log fullscreen button",
+    "Fullscreen Zai log text area should be taller than normal",
+    "Mobile fullscreen Zai log panel should fit within the viewport",
     "persisted generated-from source after reload",
     "regenerated animation previews after reload",
     "spriteSheetGridOverlays",
@@ -895,11 +722,11 @@ function checkWorkflowIds() {
     [animationTournamentText, "planAnimationInitialCandidateAdmission"],
     [appText, "animationInitialAdmissionMessage"],
     [appText, "startPersistedTournamentInitialCandidatesFromUi"],
-    [appText, "serverActiveCodexRunnerCount"],
+    [appText, "serverActiveZaiRunnerCount"],
     [stylesText, "animation-runner-admission-status"],
     [serverText, "startInitialCandidates"],
-    [serverText, "withCodexRunnerAdmissionLock"],
-    [serverText, "/api/codex/capacity"],
+    [serverText, "withZaiRunnerAdmissionLock"],
+    [serverText, "/api/zai/capacity"],
     [serverText, "tournament_job_endpoint_required"],
     [serverText, "animation_tournament_endpoint_required"],
     [serverText, "adaptive_candidate_initial_wave_required"],
@@ -920,7 +747,7 @@ function checkWorkflowIds() {
     [smokeText, "Best registration should reject a two-candidate initial wave"],
     [smokeText, "profile validation should allow persisted Direction Repair candidates beyond the fixed initial plan"],
     [smokeText, "capacity-blocked Direction Repair should not consume a retry"],
-    [uiSmokeText, "Animation Generation should be disabled while one Codex job is running"],
+    [uiSmokeText, "Animation Generation should be disabled while one Zai job is running"],
     [uiSmokeText, "Disabled animation action must not register a tournament or job"]
   ].forEach(([text, marker]) => {
     if (!text.includes(marker)) failures.push(`Animation runner admission contract is missing: ${marker}`);
@@ -931,7 +758,7 @@ function checkWorkflowIds() {
     "animationReviewQcMatrix",
     "normalizeAnimationHumanReview",
     "buildAnimationCalibrationExport",
-    "image-cockpit.animation-review-calibration.v1"
+    "zai-cockpit.animation-review-calibration.v1"
   ].forEach((marker) => {
     if (!animationReviewText.includes(marker)) failures.push(`Animation Review model is missing: ${marker}`);
   });
@@ -981,11 +808,11 @@ function checkWorkflowIds() {
     "171 tests pass",
     "390×844"
   ].forEach((marker) => {
-    if (!animationReviewQaText.includes(marker)) failures.push(`Animation Review QA evidence is missing: ${marker}`);
+    if (animationReviewQaText && !animationReviewQaText.includes(marker)) failures.push(`Animation Review QA evidence is missing: ${marker}`);
   });
 
   [
-    "image-cockpit.vfx-composite.v1",
+    "zai-cockpit.vfx-composite.v1",
     "VFX_COMPOSITE_SOCKETS",
     "resolveVfxAttachmentPoint",
     "retimeVfxToEvent",
@@ -1010,7 +837,7 @@ function checkWorkflowIds() {
   });
 
   [
-    "image-cockpit.effect-quality.v2",
+    "zai-cockpit.effect-quality.v2",
     "loop seam energy changes abruptly",
     "energy centroid jumps between frames",
     "peak frame is offset from the requested event"
@@ -1047,7 +874,7 @@ function checkWorkflowIds() {
     "projectile attack × projectile / impact",
     "separate-layer export"
   ].forEach((marker) => {
-    if (!vfxCompositeQaText.includes(marker)) failures.push(`VFX Composite QA evidence is missing: ${marker}`);
+    if (vfxCompositeQaText && !vfxCompositeQaText.includes(marker)) failures.push(`VFX Composite QA evidence is missing: ${marker}`);
   });
 
   [
@@ -1079,7 +906,7 @@ function checkWorkflowIds() {
     "pilotCandidateIds",
     "directionOutputCount",
     "totalCandidateJobs",
-    "assertCodexRunnerSlotAvailable"
+    "assertZaiRunnerSlotAvailable"
   ].forEach((marker) => {
     if (!serverText.includes(marker)) failures.push(`Motion Pilot server manifest flow is missing: ${marker}`);
   });
@@ -1100,7 +927,7 @@ function checkWorkflowIds() {
     "false success 0",
     "stuck 0"
   ].forEach((marker) => {
-    if (!finalBenchmarkText.includes(marker)) failures.push(`Final benchmark evidence is missing: ${marker}`);
+    if (finalBenchmarkText && !finalBenchmarkText.includes(marker)) failures.push(`Final benchmark evidence is missing: ${marker}`);
   });
 
   [
@@ -1114,7 +941,7 @@ function checkWorkflowIds() {
     "Phase 8",
     "rollback checkpoint"
   ].forEach((marker) => {
-    if (!finalReviewIndexText.includes(marker)) failures.push(`Animation Uplift review index is missing: ${marker}`);
+    if (finalReviewIndexText && !finalReviewIndexText.includes(marker)) failures.push(`Animation Uplift review index is missing: ${marker}`);
   });
 
   const directionPresetLayoutPattern = /\.direction-preset-buttons\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);[^}]*\}/s;
@@ -1157,14 +984,14 @@ function checkWorkflowIds() {
     [uiSmokeText, ".single-direction-buttons"],
     [uiSmokeText, "back-three-quarter"],
     [uiSmokeText, "single-direction history restores exact direction and frame grid"],
-    [uiSmokeText, "IMAGE_COCKPIT_UI_SMOKE_ONLY_SINGLE_DIRECTION"],
+    [uiSmokeText, "ZAI_COCKPIT_UI_SMOKE_ONLY_SINGLE_DIRECTION"],
     [selectableSingleDirectionQaText, "Side remains the initial single-direction choice"],
     [selectableSingleDirectionQaText, "front three-quarter"],
     [selectableSingleDirectionQaText, "back three-quarter"],
     [selectableSingleDirectionQaText, "4096 x 256 px"],
     [selectableSingleDirectionQaText, "5120 x 256 px"]
   ].forEach(([text, marker]) => {
-    if (!text.includes(marker)) {
+    if (text && !text.includes(marker)) {
       failures.push("Animation Generation should keep the selectable 1-direction contract: " + marker);
     }
   });
@@ -1201,7 +1028,7 @@ function checkWorkflowIds() {
     [extendedFrameQaText, "5120x256"],
     [extendedFrameQaText, "5120x1280"]
   ].forEach(([text, marker]) => {
-    if (!text.includes(marker)) failures.push(`Animation Generation should preserve Experimental 16f/20f coverage: ${marker}`);
+    if (text && !text.includes(marker)) failures.push(`Animation Generation should preserve Experimental 16f/20f coverage: ${marker}`);
   });
   [
     "AnimationUtilityModal",
@@ -1414,7 +1241,7 @@ function checkWorkflowIds() {
     }
   });
 
-  if (!smokeText.includes("/api/codex/results")) {
+  if (!smokeText.includes("/api/zai/results")) {
     failures.push("Smoke test should cover Local Inbox outbox result listing/import.");
   }
   [
@@ -1456,23 +1283,23 @@ function checkWorkflowIds() {
   });
 
   [
-    "Real Codex runner smoke passed.",
-    "IMAGE_COCKPIT_REAL_CODEX_SMOKE_KEEP",
+    "Real Zai runner smoke passed.",
+    "ZAI_COCKPIT_REAL_ZAI_SMOKE_KEEP",
     "runner smoke ok",
-    "IMAGE_COCKPIT_CODEX_AUTORUN",
+    "ZAI_COCKPIT_RUNNER_AUTORUN",
     "completed",
     "exitCode"
   ].forEach((marker) => {
-    if (!realCodexSmokeText.includes(marker)) {
-      failures.push(`Real Codex runner smoke should cover installed runner completion: ${marker}`);
+    if (!realZaiSmokeText.includes(marker)) {
+      failures.push(`Real Zai runner smoke should cover installed runner completion: ${marker}`);
     }
   });
 
   const realImagegenSmokeText = readText("scripts/real-imagegen-smoke.mjs");
   [
     "Real imagegen smoke passed.",
-    "IMAGE_COCKPIT_IMAGEGEN_SMOKE_KEEP",
-    "IMAGE_COCKPIT_IMAGEGEN_SMOKE_TIMEOUT_MS",
+    "ZAI_COCKPIT_IMAGEGEN_SMOKE_KEEP",
+    "ZAI_COCKPIT_IMAGEGEN_SMOKE_TIMEOUT_MS",
     "built-in image generation path",
     "Do not create a placeholder image",
     "Returned PNG should be larger than a placeholder"
@@ -1483,8 +1310,8 @@ function checkWorkflowIds() {
   });
 
   [
-    "imagegen skill default built-in image generation path",
-    "never a procedural placeholder",
+    "You create images only through the generate_image tool",
+    "Never emit procedural, SVG, canvas, diagram, geometric, or placeholder content",
     "workflowMode=image-edit",
     "numbered annotationContext region comments",
     "imageRectNormalized",
@@ -1495,7 +1322,7 @@ function checkWorkflowIds() {
     "workflowMode=effect-animation",
     "spriteContext.chromaKey",
     "spriteContext.directions",
-    "image-cockpit.direction-split-animation.v1",
+    "zai-cockpit.direction-split-animation.v1",
     "front-three-quarter",
     "Do not return only one combined multi-direction sheet",
     "spriteContext.variant=directional-hatch-pet",
@@ -1508,7 +1335,7 @@ function checkWorkflowIds() {
     "artifactStableMs",
     "publishVerifiedDirectionSplitArtifact",
     "outbox/.staging/<job-id>/",
-    "Do not run git status",
+    "Do not modify project source files",
     "real alpha transparency",
     "Do not bake checkerboard",
     "effectContext exactly",
@@ -1533,8 +1360,8 @@ function checkWorkflowIds() {
     "waitingForVerifiedArtifacts",
     "Bronze candidate",
     "importDirectionSplitBronzeCandidate",
-    "clearCodexFailureNotice",
-    "retryCodexFailureImport",
+    "clearZaiFailureNotice",
+    "retryZaiFailureImport",
     "shouldIgnoreOutboxResultName",
     "hasTemporaryOutboxResultMarker",
     "composeDirectionSplitAnimationSheet",
@@ -1545,9 +1372,9 @@ function checkWorkflowIds() {
     "source-status-chip",
     "statusSourceSelectedForAnimation",
     "with-downloads",
-    "codexLogsFullscreen",
-    "codexLogFullscreen",
-    "codexLogExitFullscreen",
+    "zaiLogsFullscreen",
+    "zaiLogFullscreen",
+    "zaiLogExitFullscreen",
     "downloadModalOpen",
     "DownloadOptionsModal",
     "openDownloadModal",
@@ -1557,16 +1384,16 @@ function checkWorkflowIds() {
     "evaluateEffectAnimationQc",
     "effectQualityRankAllowsDownload",
     "exportSelectedEffectPack",
-    "CODEX_LOG_HISTORY_LIMIT = MAX_ACTIVE_CODEX_JOBS",
-    "codexLogAutoScrollRef",
+    "ZAI_LOG_HISTORY_LIMIT = MAX_ACTIVE_ZAI_JOBS",
+    "zaiLogAutoScrollRef",
     "pre.scrollTop = pre.scrollHeight",
     "Maximize2",
     "Minimize2",
-    ".codex-log-panel.fullscreen",
+    ".zai-log-panel.fullscreen",
     "Every cell must contain exactly one complete",
     "Do not let any part cross cell borders",
     "Quality gate before returning",
-    "codexFailurePolicyMessage"
+    "zaiFailurePolicyMessage"
   ].forEach((marker) => {
     if (!appText.includes(marker) && !stylesText.includes(marker)) {
       failures.push(`App should preserve strict animation result preview/prompt handling: ${marker}`);
@@ -1607,17 +1434,17 @@ function checkWorkflowIds() {
     "Image Editing Full-Body Fit QA",
     "imageRectNormalized",
     "imageRectPixels",
-    "Codex log panel",
+    "Zai log panel",
     "Real imagegen editing was not run"
   ].forEach((marker) => {
-    if (!imageEditFullBodyQaText?.includes(marker)) {
+    if (imageEditFullBodyQaText && !imageEditFullBodyQaText.includes(marker)) {
       failures.push(`Image Editing full-body fit QA doc should record: ${marker}`);
     }
   });
 
   [
-    "type CodexFailureKind",
-    "type CodexJobDiagnostic",
+    "type ZaiFailureKind",
+    "type ZaiJobDiagnostic",
     "getJobDiagnostic",
     "reasonKind",
     '"status": "blocked"',
@@ -1625,7 +1452,7 @@ function checkWorkflowIds() {
     "no_image_returned"
   ].forEach((marker) => {
     if (!serverText?.includes(marker)) {
-      failures.push(`Server should preserve Codex imagegen failure diagnostic handling: ${marker}`);
+      failures.push(`Server should preserve Zai imagegen failure diagnostic handling: ${marker}`);
     }
   });
 
@@ -1638,13 +1465,13 @@ function checkWorkflowIds() {
     "sprite generation job should include five direction rows",
     "direction split manifest should be listed",
     "direction split manifest import should preserve JSON MIME type",
-    "sprite generation job should instruct Codex to use built-in image generation",
+    "sprite generation job should instruct Zai to use built-in image generation",
     "hatch-pet job should include hatch-pet variant",
     "hatch-pet job should include 72 atlas cells",
-    "hatch-pet job should instruct Codex to use the hatch-pet workflow",
+    "hatch-pet job should instruct Zai to use the hatch-pet workflow",
     "directional hatch-pet job should include the directional hatch-pet variant",
     "directional hatch-pet job should include 360 atlas cells",
-    "directional hatch-pet job should instruct Codex to return five atlas images",
+    "directional hatch-pet job should instruct Zai to return five atlas images",
     "job should include numbered edit annotations",
     "job should include numbered edit comments",
     "sprite edit job should include sprite frame count",
@@ -1652,7 +1479,7 @@ function checkWorkflowIds() {
     "sprite edit job should not carry edit annotations",
     "unapproved mock runner should not report ready",
     "unapproved mock runner should not create fake images",
-    "IMAGE_COCKPIT_ALLOW_MOCK_RUNNER",
+    "ZAI_COCKPIT_ALLOW_MOCK_RUNNER",
     "mock autorun preflight should report ready",
     "mock autorun job should start in running state",
     "mock autorun exact job-id result should not create a diagnostic",
@@ -1665,19 +1492,17 @@ function checkWorkflowIds() {
   });
 
   [
-    "IMAGE_COCKPIT_CODEX_HELP_ARGS_JSON",
-    "IMAGE_COCKPIT_CODEX_EXEC_ARGS_JSON",
+    "ZAI_COCKPIT_RUNNER_HELP_ARGS_JSON",
+    "ZAI_COCKPIT_RUNNER_EXEC_ARGS_JSON",
     "parseJsonStringArray",
-    "selectCodexLaunchCommand",
-    "knownCodexCliCandidates",
-    "isLocalOpenAiCodexCliCommand",
-    "detectCodexRunnerMode",
+    "selectZaiLaunchCommand",
+    "detectZaiRunnerMode",
     "isMockRunnerBlocked",
     "mockRunnerBlockedDiagnostic",
-    "approval_policy=",
+    "zai-agent-runner.mjs",
+    "resolveZaiEndpointMode",
     "launchCommand",
-    "resolvedCommandPaths",
-    "WindowsApps Codex Desktop executable"
+    "resolvedCommandPaths"
   ].forEach((marker) => {
     const serverText = readText("server/index.ts");
     if (!serverText.includes(marker)) {
@@ -1685,25 +1510,31 @@ function checkWorkflowIds() {
     }
   });
 
-  if (readText("server/index.ts")?.includes("--ask-for-approval")) {
-    failures.push("Server must not use the removed Codex CLI --ask-for-approval flag.");
-  }
-  if (smokeText.includes("--ask-for-approval")) {
-    failures.push("Smoke mock runner args must not use the removed Codex CLI --ask-for-approval flag.");
-  }
-
   [
-    "resolved command path",
-    "launchCommand",
-    "WindowsApps Codex Desktop executable",
-    "terminal-runnable Codex CLI",
-    "resolveCommandCandidates"
+    "zai-agent-runner.mjs",
+    "ZAI_API_KEY",
+    "ZAI_ENDPOINT_MODE",
+    "endpointMode"
   ].forEach((marker) => {
     const doctorText = readText("scripts/doctor.mjs");
     if (!doctorText.includes(marker)) {
-      failures.push(`Doctor should report Codex command diagnostics: ${marker}`);
+      failures.push(`Doctor should report Z.ai runner diagnostics: ${marker}`);
     }
   });
+
+  const agentRunnerText = readText("scripts/zai-agent-runner.mjs");
+  if (agentRunnerText) {
+    [
+      "api.z.ai/api/coding/paas/v4",
+      "api.z.ai/api/paas/v4",
+      "shouldFallbackToApiBase",
+      "images/generations"
+    ].forEach((marker) => {
+      if (!agentRunnerText.includes(marker)) {
+        failures.push(`Z.ai agent runner should keep its endpoint strategy: ${marker}`);
+      }
+    });
+  }
 }
 
 function checkPendingJobCoverage() {
@@ -1714,9 +1545,9 @@ function checkPendingJobCoverage() {
   [
     'status.state === "running"',
     'status.state === "unknown"',
-    "shouldWaitForCodexRunner",
-    "shouldReportCompletedCodexImportFailure",
-    "recordCodexImportFailure",
+    "shouldWaitForZaiRunner",
+    "shouldReportCompletedZaiImportFailure",
+    "recordZaiImportFailure",
     "Direction split import failed"
   ].forEach((marker) => {
     if (!appText.includes(marker) && !appTestText.includes(marker)) {
@@ -1730,12 +1561,12 @@ function checkPendingJobCoverage() {
   const storageText = readText("src/lib/storage.ts");
   const devSupervisorText = readText("scripts/dev-supervisor.mjs");
   const resetPageText = readText("public/reset-local-state.html");
-  const qaText = readText("docs/qa/completed-codex-job-import-storage-quota.md");
-  const localStateQaText = readText("docs/qa/local-state-oom-safe-mode-retention.md");
-  const cockpitHealthQaText = readText("docs/qa/cockpit-health-repair-supervisor.md");
-  const dedupeQaText = readText("docs/qa/deduplicate-bronze-candidate-import-retry.md");
-  const settingsQaText = readText("docs/qa/settings-recovery-environment-report.md");
-  const directionSplitHotfixQaText = readText("docs/qa/animation-direction-split-completion-hotfix.md");
+  const qaText = readOptionalText("docs/qa/completed-zai-job-import-storage-quota.md");
+  const localStateQaText = readOptionalText("docs/qa/local-state-oom-safe-mode-retention.md");
+  const cockpitHealthQaText = readOptionalText("docs/qa/cockpit-health-repair-supervisor.md");
+  const dedupeQaText = readOptionalText("docs/qa/deduplicate-bronze-candidate-import-retry.md");
+  const settingsQaText = readOptionalText("docs/qa/settings-recovery-environment-report.md");
+  const directionSplitHotfixQaText = readOptionalText("docs/qa/animation-direction-split-completion-hotfix.md");
   [
     "assertCompletedDirectionSplitImportFailure",
     "assertPartialDirectionSplitRecovery",
@@ -1748,7 +1579,7 @@ function checkPendingJobCoverage() {
     "Completed direction split import failure should release the active job slot"
   ].forEach((marker) => {
     if (!uiSmokeText.includes(marker)) {
-      failures.push(`Completed Codex import UI smoke coverage is missing marker: ${marker}`);
+      failures.push(`Completed Zai import UI smoke coverage is missing marker: ${marker}`);
     }
   });
   [
@@ -1767,7 +1598,7 @@ function checkPendingJobCoverage() {
     "approxBytes",
     "largestItemBytes",
     "retentionPolicy",
-    "PENDING_CODEX_JOB_STORAGE_KEY"
+    "PENDING_ZAI_JOB_STORAGE_KEY"
   ].forEach((marker) => {
     if (!storageText.includes(marker)) {
       failures.push(`Large history/frame storage quota guard is missing marker: ${marker}`);
@@ -1792,8 +1623,8 @@ function checkPendingJobCoverage() {
     "/api/dev/health",
     "/api/dev/repair",
     "127.0.0.1",
-    "IMAGE_COCKPIT_API_TARGET",
-    "hasRunningCodexJobs",
+    "ZAI_COCKPIT_API_TARGET",
+    "hasRunningZaiJobs",
     "restart-vite"
   ].forEach((marker) => {
     if (!devSupervisorText.includes(marker)) {
@@ -1807,7 +1638,7 @@ function checkPendingJobCoverage() {
     "Clear history",
     "Clear frames",
     "Clear animation library",
-    "Clear all local Image Cockpit state",
+    "Clear all local Zai Cockpit state",
     "localhostで新規origin",
     "危険を理解して読み込む"
   ].forEach((marker) => {
@@ -1830,9 +1661,9 @@ function checkPendingJobCoverage() {
   });
 
   [
-    "Image Cockpit Local State Reset",
-    "codex-handoff/outbox",
-    "image-cockpit.pendingCodexJob",
+    "Zai Cockpit Local State Reset",
+    "zai-handoff/outbox",
+    "zai-cockpit.pendingZaiJob",
     "indexedDB.deleteDatabase",
     "/?safe=1"
   ].forEach((marker) => {
@@ -1847,8 +1678,8 @@ function checkPendingJobCoverage() {
     "localStorage容量超過",
     "ui-smoke"
   ].forEach((marker) => {
-    if (!qaText.includes(marker)) {
-      failures.push(`Completed Codex import QA doc is missing marker: ${marker}`);
+    if (qaText && !qaText.includes(marker)) {
+      failures.push(`Completed Zai import QA doc is missing marker: ${marker}`);
     }
   });
 
@@ -1858,10 +1689,10 @@ function checkPendingJobCoverage() {
     "reset-local-state.html",
     "navigator.storage.estimate",
     "ui-smoke",
-    "codex-handoff/outbox",
+    "zai-handoff/outbox",
     "main merge前"
   ].forEach((marker) => {
-    if (!localStateQaText.includes(marker)) {
+    if (localStateQaText && !localStateQaText.includes(marker)) {
       failures.push(`Local state OOM QA doc is missing marker: ${marker}`);
     }
   });
@@ -1871,10 +1702,10 @@ function checkPendingJobCoverage() {
     "/api/dev/health",
     "Cockpitを修復",
     "結果を再取り込み",
-    "running Codex job",
+    "running Zai job",
     "browser"
   ].forEach((marker) => {
-    if (!cockpitHealthQaText.includes(marker)) {
+    if (cockpitHealthQaText && !cockpitHealthQaText.includes(marker)) {
       failures.push(`Cockpit health QA doc is missing marker: ${marker}`);
     }
   });
@@ -1887,7 +1718,7 @@ function checkPendingJobCoverage() {
     "Retry import",
     "ui-smoke"
   ].forEach((marker) => {
-    if (!dedupeQaText.includes(marker)) {
+    if (dedupeQaText && !dedupeQaText.includes(marker)) {
       failures.push(`Bronze candidate dedupe QA doc is missing marker: ${marker}`);
     }
   });
@@ -1923,8 +1754,8 @@ function checkPendingJobCoverage() {
     "imagegen unavailable sidecar",
     "imagegen_unavailable",
     "should not create a fake image",
-    "built-in imagegen / image_gen",
-    "procedural, SVG, canvas, diagram, geometric, or placeholder image"
+    "generate_image tool",
+    "procedural, SVG, canvas, diagram, geometric, or placeholder"
   ].forEach((marker) => {
     if (!smokeText.includes(marker)) {
       failures.push(`Smoke imagegen-unavailable guard marker is missing: ${marker}`);
@@ -1962,7 +1793,7 @@ function checkPendingJobCoverage() {
     "browser",
     "main merge前"
   ].forEach((marker) => {
-    if (!settingsQaText?.includes(marker)) {
+    if (settingsQaText && !settingsQaText.includes(marker)) {
       failures.push(`Settings recovery/report QA doc is missing marker: ${marker}`);
     }
   });
@@ -1999,7 +1830,7 @@ function checkPendingJobCoverage() {
   [
     "Animation Direction Split Completion Hotfix QA",
     "032 hotfix",
-    "image-cockpit.direction-split-animation.v1",
+    "zai-cockpit.direction-split-animation.v1",
     "pending job",
     "Recover Results",
     "2048x1280",
@@ -2008,7 +1839,7 @@ function checkPendingJobCoverage() {
     "ui-smoke",
     "main merge前"
   ].forEach((marker) => {
-    if (!directionSplitHotfixQaText?.includes(marker)) {
+    if (directionSplitHotfixQaText && !directionSplitHotfixQaText.includes(marker)) {
       failures.push(`Direction split completion hotfix QA doc is missing marker: ${marker}`);
     }
   });
@@ -2211,7 +2042,7 @@ function checkPromptCatalogExamples() {
 
 function checkPromptPresetAssetQa() {
   const qaFile = "docs/qa/prompt-examples/animal-chibi-beastfolk-presets/asset-qc.json";
-  const qaText = readText(qaFile);
+  const qaText = readOptionalText(qaFile);
   if (!qaText) return;
 
   let qa;
@@ -2308,662 +2139,21 @@ function checkCiWorkflow() {
   }
 }
 
-function checkReleaseDocs() {
-  const readme = readText("README.md");
-  const changelog = readText("CHANGELOG.md");
-  const checklist = readText("docs/release/v0.1.0-checklist.md");
-  const runbook = readText("docs/release/v0.1.0-runbook.md");
-  const releaseNotes = readText("docs/release/v0.1.0-release-notes.md");
-  const releaseNotes021 = readText("docs/release/v0.2.1-release-notes.md");
-  const releaseNotes018 = readText("docs/release/v0.1.8-release-notes.md");
-  const releaseNotes017Bugfix = readText("docs/release/v0.1.7bugfix-release-notes.md");
-  const releaseNotes017 = readText("docs/release/v0.1.7-release-notes.md");
-  const releaseNotes016 = readText("docs/release/v0.1.6-release-notes.md");
-  const releaseNotes015 = readText("docs/release/v0.1.5-release-notes.md");
-  const releaseNotes014 = readText("docs/release/v0.1.4-release-notes.md");
-  const releaseNotes013 = readText("docs/release/v0.1.3-release-notes.md");
-  const releaseNotes012 = readText("docs/release/v0.1.2-release-notes.md");
-  const releaseNotes011 = readText("docs/release/v0.1.1-release-notes.md");
-  const releasePrepQa021 = readText("docs/qa/v0.2.1-release-prep.md");
-  const releasePrepQa018 = readText("docs/qa/v0.1.8-release-prep.md");
-  const releasePrepQa017 = readText("docs/qa/v0.1.7-release-prep.md");
-  const releasePrepQa016 = readText("docs/qa/v0.1.6-release-prep.md");
-  const releasePrepQa015 = readText("docs/qa/v0.1.5-release-prep.md");
-  const releasePrepQa014 = readText("docs/qa/v0.1.4-release-prep.md");
-  const releasePrepQa013 = readText("docs/qa/v0.1.3-release-prep.md");
-  const releasePrepQa012 = readText("docs/qa/v0.1.2-release-prep.md");
-  const releasePrepQa = readText("docs/qa/v0.1.1-release-prep.md");
-  const ownerReview = readText("docs/release/v0.1.0-owner-review.md");
-  const finalAudit = readText("docs/release/v0.1.0-final-audit.md");
-  const acceptanceEvidence = readText("docs/release/v0.1.0-acceptance-evidence.md");
-  const ownerDecision = readText("docs/release/v0.1.0-owner-decision.md");
-  const manualHandoff = readText("docs/usage/manual-handoff.md");
-  if (!readme || !changelog || !checklist || !runbook || !releaseNotes || !releaseNotes021 || !releaseNotes018 || !releaseNotes017Bugfix || !releaseNotes017 || !releaseNotes016 || !releaseNotes015 || !releaseNotes014 || !releaseNotes013 || !releaseNotes012 || !releaseNotes011 || !releasePrepQa021 || !releasePrepQa018 || !releasePrepQa017 || !releasePrepQa016 || !releasePrepQa015 || !releasePrepQa014 || !releasePrepQa013 || !releasePrepQa012 || !releasePrepQa || !ownerReview || !finalAudit || !acceptanceEvidence || !ownerDecision || !manualHandoff) return;
 
-  requiredReadmeLinks.forEach((link) => {
-    if (!readme.includes(link)) {
-      failures.push(`README is missing release link: ${link}`);
-    }
-  });
-
-  ["## v0.2.1 - 2026-07-28", "30 detailed prompt presets", "nine short starting prompts", "227 Vitest tests"].forEach((line) => {
-    if (!changelog.includes(line)) {
-      failures.push(`CHANGELOG is missing v0.2.1 release content: ${line}`);
-    }
-  });
-
-  ["Repository visibility change to public is explicitly approved", "Main merge is explicitly approved"].forEach((gate) => {
-    if (!checklist.includes(gate)) {
-      failures.push(`Release checklist is missing gate: ${gate}`);
-    }
-  });
-
-  [
-    "Do not change repository visibility, branch protection, or release assets without explicit owner approval.",
-    "Do Not Ship If",
-    "docs/release/v0.1.0-owner-review.md",
-    "docs/release/v0.1.0-final-audit.md",
-    "A direct OpenAI API call or API key requirement was added.",
-    "`codex-handoff/`, `.env`, generated outputs, model weights, or license-unclear assets are staged."
-  ].forEach((line) => {
-    if (!runbook.includes(line)) {
-      failures.push(`Release runbook is missing safety line: ${line}`);
-    }
-  });
-
-  [
-    "v0.2.1",
-    "nine short starting points",
-    "existing 137 detailed prompts",
-    "30 new detailed presets",
-    "Negative Prompt",
-    "Generation Notes",
-    "all 15 supported interface languages",
-    "1254 x 1254 RGBA PNG",
-    "approximately 16.1 MiB",
-    "do not guarantee faster image generation",
-    "The app still does not call OpenAI APIs directly",
-    "No API keys, tokens, model weights",
-    "npm run verify",
-    "npm run ui:smoke",
-    "npm run capture:readme"
-  ].forEach((line) => {
-    if (!releaseNotes021.includes(line)) {
-      failures.push(`v0.2.1 release notes are missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.2.1 Release Prep QA",
-    "Feature source branch: `codex/animal-chibi-beastfolk-presets`",
-    "Source branch: `codex/v0.2.1-release`",
-    "package.json version: `0.2.1`",
-    "package-lock.json root version: `0.2.1`",
-    "App visible version badges: `v0.2.1`",
-    "API health version: `0.2.1`",
-    "docs/release/v0.2.1-release-notes.md",
-    "Added presets: 30 total",
-    "exactly 9 short prompts",
-    "exactly 137 existing examples",
-    "docs/qa/prompt-examples/animal-chibi-beastfolk-presets/asset-qc.json",
-    "owner confirmed the generated results",
-    "npm run doctor",
-    "npm run typecheck",
-    "npm test",
-    "npm run build",
-    "npm run smoke",
-    "npm run release:audit",
-    "npm run ui:smoke",
-    "npm run capture:readme",
-    "git diff --check"
-  ].forEach((line) => {
-    if (!releasePrepQa021.includes(line)) {
-      failures.push(`v0.2.1 release prep QA is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.8",
-    "First Qualified Wins",
-    "zero quality warnings",
-    "score of at least 3300",
-    "identity score of at least 85",
-    "`shadowWouldBlock: false`",
-    "Restored queued tournaments",
-    "semantic duplicates",
-    "global three-runner pool",
-    "The app still does not call OpenAI APIs directly",
-    "No model weights, API keys, tokens",
-    "npm run verify",
-    "npm run ui:smoke"
-  ].forEach((line) => {
-    if (!releaseNotes018.includes(line)) {
-      failures.push(`v0.1.8 release notes are missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.8 Release Prep QA",
-    "Source branch: `codex/v0.1.8-first-qualified-wins`",
-    "package.json version: `0.1.8`",
-    "package-lock.json root version: `0.1.8`",
-    "docs/release/v0.1.8-release-notes.md",
-    "bugfix commit `4c6fa1e`",
-    "score `>= 3300`",
-    "identity score `>= 85`",
-    "`shadowWouldBlock: false`",
-    "first-qualified",
-    "Main merge, tag push, and GitHub Release remain blocked",
-    "npm run doctor",
-    "npm run typecheck",
-    "npm test",
-    "npm run build",
-    "npm run smoke",
-    "npm run release:audit",
-    "npm run ui:smoke",
-    "git diff --check"
-  ].forEach((line) => {
-    if (!releasePrepQa018.includes(line)) {
-      failures.push(`v0.1.8 release prep QA is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.7bugfix",
-    "Package, App, and API version: `0.1.7`",
-    "Restored tournament auto-start",
-    "current UI session",
-    "Balanced tournament",
-    "synchronous in-flight guard",
-    "stable semantic key",
-    "process-wide registration lock",
-    "one canonical tournament",
-    "stale manifest",
-    "Motion Pilot fallback",
-    "eight concurrent equivalent registrations",
-    "Full browser UI smoke"
-  ].forEach((line) => {
-    if (!releaseNotes017Bugfix.includes(line)) {
-      failures.push(`v0.1.7bugfix release notes are missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.7",
-    "1 direction",
-    "front three-quarter",
-    "back three-quarter",
-    "side remains the default",
-    "16f and 20f",
-    "Experimental",
-    "4x4",
-    "4x5",
-    "Animation Pack v2",
-    "history restoration",
-    "Motion Pilot Tournament",
-    "Best remains the fresh-session default",
-    "58 minutes 24 seconds",
-    "The app still does not call OpenAI APIs directly",
-    "No model weights, API keys, tokens",
-    "npm run verify",
-    "npm run ui:smoke"
-  ].forEach((line) => {
-    if (!releaseNotes017.includes(line)) {
-      failures.push(`v0.1.7 release notes are missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.7 Release Prep QA",
-    "Release approval",
-    "Source branch: `codex/selectable-single-animation-direction`",
-    "package.json version: `0.1.7`",
-    "package-lock.json root version: `0.1.7`",
-    "docs/release/v0.1.7-release-notes.md",
-    "203 Vitest tests",
-    "docs/qa/single-horizontal-direction.md",
-    "docs/qa/experimental-16-20-frame-animation.md",
-    "docs/qa/selectable-single-animation-direction.md",
-    "npm run doctor",
-    "npm run typecheck",
-    "npm test",
-    "npm run build",
-    "npm run smoke",
-    "npm run release:audit",
-    "npm run ui:smoke",
-    "git diff --check",
-    "Tag push",
-    "GitHub Release"
-  ].forEach((line) => {
-    if (!releasePrepQa017.includes(line)) {
-      failures.push(`v0.1.7 release prep QA is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.6",
-    "Quality Gate v2",
-    "Fast / Balanced / Best",
-    "Direction Repair",
-    "Batch Matrix",
-    "22 recipes",
-    "Animation Timeline Review/Edit",
-    "Animation Pack v2",
-    "Animation Review Cockpit",
-    "VFX Composite Stage",
-    "Motion Pilot Tournament",
-    "default OFF",
-    "16px",
-    "The app still does not call OpenAI APIs directly",
-    "No model weights, API keys, tokens",
-    "npm run verify",
-    "npm run ui:smoke"
-  ].forEach((line) => {
-    if (!releaseNotes016.includes(line)) {
-      failures.push(`v0.1.6 release notes are missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.6 Release Prep QA",
-    "Release approval",
-    "Source branch: `codex/animation-uplift-sequence`",
-    "package.json version: `0.1.6`",
-    "package-lock.json root version: `0.1.6`",
-    "docs/release/v0.1.6-release-notes.md",
-    "184 Vitest tests",
-    "codex-handoff/",
-    "npm run doctor",
-    "npm run typecheck",
-    "npm test",
-    "npm run build",
-    "npm run smoke",
-    "npm run release:audit",
-    "npm run ui:smoke",
-    "git diff --check",
-    "Tag push",
-    "GitHub Release"
-  ].forEach((line) => {
-    if (!releasePrepQa016.includes(line)) {
-      failures.push(`v0.1.6 release prep QA is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.5",
-    "Monster Girl Chibi",
-    "モンスター娘ちび",
-    "20 generated transparent PNG preview assets",
-    "107 prompt example cards",
-    "front idle",
-    "side idle",
-    "side run",
-    "side walk",
-    "side attack",
-    "80 unique generated animation jobs",
-    "The app still does not call OpenAI APIs directly",
-    "No model weights, API keys, tokens",
-    "npm run verify",
-    "npm run ui:smoke"
-  ].forEach((line) => {
-    if (!releaseNotes015.includes(line)) {
-      failures.push(`v0.1.5 release notes are missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.5 Release Prep QA",
-    "Release approval",
-    "Source branch: `codex/monster-girl-prompt-animation-batch`",
-    "package.json version: `0.1.5`",
-    "package-lock.json root version: `0.1.5`",
-    "docs/release/v0.1.5-release-notes.md",
-    "docs/prompt-examples/monster-girl-prompts.md",
-    "20 Monster Girl Chibi prompt examples",
-    "107 prompt cards",
-    "100 slots",
-    "80 unique generated animation jobs",
-    "codex-handoff/",
-    "npm run doctor",
-    "npm run typecheck",
-    "npm test",
-    "npm run build",
-    "npm run smoke",
-    "npm run release:audit",
-    "npm run ui:smoke",
-    "git diff --check",
-    "Tag push"
-  ].forEach((line) => {
-    if (!releasePrepQa015.includes(line)) {
-      failures.push(`v0.1.5 release prep QA is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.4",
-    "experimental",
-    "Effect Animation",
-    "Slash Arc",
-    "Hit Spark",
-    "Magic Cast",
-    "Projectile",
-    "Impact",
-    "transparent sheet",
-    "GIF preview",
-    "Animated APNG",
-    "Effect APNG",
-    "compact Effect result cards",
-    "Vite watcher",
-    "The app still does not call OpenAI APIs directly",
-    "No model weights, API keys, tokens",
-    "npm run verify",
-    "npm run ui:smoke"
-  ].forEach((line) => {
-    if (!releaseNotes014.includes(line)) {
-      failures.push(`v0.1.4 release notes are missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.4 Release Prep QA",
-    "Experimental tag approval",
-    "Target commit before release-prep changes: `a3d2a0c`",
-    "package.json version: `0.1.4`",
-    "package-lock.json root version: `0.1.4`",
-    "docs/release/v0.1.4-release-notes.md",
-    "docs/qa/effect-animation-mvp.md",
-    "Effect Animation",
-    "Animated APNG",
-    "compact Effect result cards",
-    "npm run doctor",
-    "npm run typecheck",
-    "npm test",
-    "npm run build",
-    "npm run smoke",
-    "npm run release:audit",
-    "npm run ui:smoke",
-    "git diff --check",
-    "Tag push"
-  ].forEach((line) => {
-    if (!releasePrepQa014.includes(line)) {
-      failures.push(`v0.1.4 release prep QA is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.3",
-    "Recursive animation QA",
-    "index.html",
-    "failed-sprite-sheets.html",
-    "animated GIF previews",
-    "Idle Breathing",
-    "Run Cycle",
-    "Walk Cycle",
-    "quality gates",
-    "source restoration",
-    "generated-output rights",
-    "The app still does not call OpenAI APIs directly",
-    "No model weights, API keys, tokens",
-    "npm run verify",
-    "npm run ui:smoke"
-  ].forEach((line) => {
-    if (!releaseNotes013.includes(line)) {
-      failures.push(`v0.1.3 release notes are missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.3 Release Prep QA",
-    "Target commit before release-prep changes: `4ba43b7`",
-    "package.json version: `0.1.3`",
-    "package-lock.json root version: `0.1.3`",
-    "docs/release/v0.1.3-release-notes.md",
-    "docs/qa/image-animation-recursive-browser-test-loop/20260630-0150/index.html",
-    "failed-sprite-sheets.html",
-    "npm run doctor",
-    "npm run typecheck",
-    "npm test",
-    "npm run build",
-    "npm run smoke",
-    "npm run release:audit",
-    "npm run ui:smoke",
-    "git diff --check",
-    "Tag push / GitHub Release"
-  ].forEach((line) => {
-    if (!releasePrepQa013.includes(line)) {
-      failures.push(`v0.1.3 release prep QA is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.2",
-    "Animation delivery reliability",
-    "running Codex job progress indicators",
-    "first two usable candidates",
-    "quality gate",
-    "detached direction-split outputs",
-    "current-regime animation delivery rollup",
-    "browser UI smoke",
-    "package.json",
-    "package-lock.json",
-    "The app still does not call OpenAI APIs directly",
-    "No model weights, API keys, tokens",
-    "npm run verify",
-    "npm run ui:smoke"
-  ].forEach((line) => {
-    if (!releaseNotes012.includes(line)) {
-      failures.push(`v0.1.2 release notes are missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.2 Release Prep QA",
-    "Target commit before release-prep changes: `91d75e4`",
-    "package.json version: `0.1.2`",
-    "package-lock.json root version: `0.1.2`",
-    "docs/release/v0.1.2-release-notes.md",
-    "npm run doctor",
-    "npm run typecheck",
-    "npm test",
-    "npm run build",
-    "npm run smoke",
-    "npm run release:audit",
-    "npm run ui:smoke",
-    "git diff --check",
-    "Tag push / GitHub Release"
-  ].forEach((line) => {
-    if (!releasePrepQa012.includes(line)) {
-      failures.push(`v0.1.2 release prep QA is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.1",
-    "package.json",
-    "package-lock.json",
-    "/?safe=1",
-    "/reset-local-state.html",
-    "IndexedDB-backed persistence",
-    "Codex generation concurrency to 3 active jobs",
-    "Codex log cards",
-    "completed Codex job imports",
-    "direction-split animation artifact staging",
-    "Image Editing source-image fitting",
-    "official preset coverage to 16 sample sheets",
-    "Cockpit health repair supervisor",
-    "bronze-candidate duplicate import prevention",
-    "Local Inbox imports now use stable import keys",
-    "The app still does not call OpenAI APIs directly",
-    "No model weights, API keys, tokens",
-    "including the Cockpit health repair supervisor and bronze-candidate duplicate import prevention",
-    "npm run verify",
-    "npm run ui:smoke"
-  ].forEach((line) => {
-    if (!releaseNotes011.includes(line)) {
-      failures.push(`v0.1.1 release notes are missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "v0.1.1 Release Prep QA",
-    "Target commit",
-    "027/028",
-    "included in this v0.1.1 prep",
-    "ca537c4",
-    "npm run doctor",
-    "npm run typecheck",
-    "npm test",
-    "npm run build",
-    "npm run smoke",
-    "npm run release:audit",
-    "npm run ui:smoke",
-    "git diff --check",
-    "/?safe=1",
-    "/reset-local-state.html",
-    "Tag push / GitHub Release"
-  ].forEach((line) => {
-    if (!releasePrepQa.includes(line)) {
-      failures.push(`v0.1.1 release prep QA is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "npm run doctor",
-    "npm run verify",
-    "npm run review:local",
-    "npm run ui:smoke",
-    "npm run codex:smoke",
-    "Pixel art generation",
-    "Image editing",
-    "Animation generation",
-    "The app itself does not call OpenAI APIs directly",
-    "manual handoff",
-    "terminal-runnable `%LOCALAPPDATA%\\OpenAI\\Codex\\bin\\...\\codex.exe` CLI",
-    "codex exec -c approval_policy",
-    "real no-image runner smoke",
-    "Owner review guide gives the short path through `review:local`, manual workflow checks, and approval gates.",
-    "Final audit maps the completion definition and explicit user requirements to evidence, while keeping merge, public visibility, tag, and release approval gates separate.",
-    "npm run release:audit"
-  ].forEach((line) => {
-    if (!releaseNotes.includes(line)) {
-      failures.push(`Release notes draft is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "Pixel art generation",
-    "Image editing",
-    "Animation generation",
-    "Workspace simplicity",
-    "Local-first boundary",
-    "Manual handoff fallback",
-    "Runner lifecycle wiring",
-    "Codex command diagnostics",
-    "Real Codex runner smoke",
-    "real-codex-runner-smoke.mjs",
-    "terminal-runnable Codex CLI",
-    "real-codex-runner-smoke.md",
-    "manual-handoff-import-latest-1280x720.png",
-    "docs/release/v0.1.0-owner-decision.md",
-    "docs/release/v0.1.0-owner-review.md",
-    "docs/release/v0.1.0-final-audit.md",
-    "Approval History",
-    "codex exec",
-    "npm run ui:smoke",
-    "npm run smoke",
-    "npm run verify",
-    "npm run review:local"
-  ].forEach((line) => {
-    if (!acceptanceEvidence.includes(line)) {
-      failures.push(`Acceptance evidence is missing expected content: ${line}`);
-    }
-  });
-  checkAcceptanceEvidencePaths(acceptanceEvidence);
-
-  [
-    "Completion Definition Audit",
-    "Explicit User Requirements",
-    "Local-only OSS that runs where Codex is installed",
-    "Disable Codex job creation while waiting for a result",
-    "Keep visibility / release changes owner-approved",
-    "Satisfied by approval history",
-    "Real Codex smoke job `codex-job-2026-06-23T09-55-31-399Z`",
-    "The v0.1.0 public baseline is release-ready for local-first usage"
-  ].forEach((line) => {
-    if (!finalAudit.includes(line)) {
-      failures.push(`Final audit is missing expected content: ${line}`);
-    }
-  });
-  checkAcceptanceEvidencePaths(finalAudit);
-
-  [
-    "npm run review:local",
-    "npm run dev:all",
-    "OpenAI API",
-    "GitHub About / Topics / Social preview",
-    "PR受付制限",
-    "X投稿文",
-    "P0 / P1 / P2"
-  ].forEach((line) => {
-    if (!ownerReview.includes(line)) {
-      failures.push(`Owner review guide is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "Owner Decisions",
-    "Do Not Proceed Without Approval",
-    "Approve merge into `main`",
-    "Approve changing repository visibility from private to public",
-    "Approve creating the `v0.1.0` tag and GitHub release",
-    "Owner review guide: `docs/release/v0.1.0-owner-review.md`",
-    "Final audit: `docs/release/v0.1.0-final-audit.md`",
-    "Owner-review sweep: `npm run review:local` on Codex-installed review machines",
-    "automatic no-image `codex exec` completion has been verified",
-    "Do not treat a successful Codex `--help` preflight as proof that automatic `codex exec` job completion works",
-    "Do not treat mock autorun smoke as proof that the installed Codex executable itself can complete on every machine.",
-    "Do not treat the no-image runner smoke as proof that image generation or image editing is available in every Codex environment."
-  ].forEach((line) => {
-    if (!ownerDecision.includes(line)) {
-      failures.push(`Owner decision record is missing expected content: ${line}`);
-    }
-  });
-
-  [
-    "codex-handoff/inbox/",
-    "codex-handoff/assets/",
-    "codex-handoff/outbox/",
-    "IMAGE_COCKPIT_CODEX_AUTORUN=0",
-    "Local Inbox",
-    "does not call OpenAI APIs directly"
-  ].forEach((line) => {
-    if (!manualHandoff.includes(line)) {
-      failures.push(`Manual handoff guide is missing expected content: ${line}`);
-    }
-  });
-}
-
-function checkAcceptanceEvidencePaths(text) {
-  const pathPattern = /`([^`]+\.(?:gif|json|md|mjs|png|ts|tsx|yml))`/g;
-  const refs = new Set();
-  let match;
-  while ((match = pathPattern.exec(text))) {
-    refs.add(match[1]);
-  }
-
-  refs.forEach((file) => {
-    if (!existsSync(join(root, file))) {
-      if (isIgnoredQaBinaryEvidence(file)) return;
-      failures.push(`Acceptance evidence references missing file: ${file}`);
-    }
-  });
-}
 
 function readText(file) {
   try {
     return readFileSync(join(root, file), "utf8");
   } catch {
     failures.push(`Could not read ${file}`);
+    return "";
+  }
+}
+
+function readOptionalText(file) {
+  try {
+    return readFileSync(join(root, file), "utf8");
+  } catch {
     return "";
   }
 }

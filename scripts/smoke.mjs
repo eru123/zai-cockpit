@@ -16,13 +16,13 @@ console.log("Smoke passed.");
 
 async function runManualHandoffSmoke() {
   const port = String(8900 + Math.floor(Math.random() * 400));
-  const handoffDir = await mkdtemp(join(tmpdir(), "image-cockpit-smoke-manual-"));
+  const handoffDir = await mkdtemp(join(tmpdir(), "zai-cockpit-smoke-manual-"));
   let server = startServer({
     port,
     handoffDir,
     env: {
-      IMAGE_COCKPIT_CODEX_AUTORUN: "0",
-      IMAGE_COCKPIT_ARTIFACT_STABLE_MS: "0"
+      ZAI_COCKPIT_RUNNER_AUTORUN: "0",
+      ZAI_COCKPIT_ARTIFACT_STABLE_MS: "0"
     }
   });
 
@@ -32,21 +32,21 @@ async function runManualHandoffSmoke() {
     const providers = await getJson(port, "/api/providers");
     assert(Array.isArray(providers.providers), "providers response should include providers");
     assert(providers.providers.some((provider) => provider.id === "local-generator"), "local-generator provider missing");
-    assert(providers.providers.some((provider) => provider.id === "codex-handoff"), "codex-handoff provider missing");
+    assert(providers.providers.some((provider) => provider.id === "zai-handoff"), "zai-handoff provider missing");
 
     const health = await getJson(port, "/api/health");
-    assert(health.app === "image-cockpit", "health response should identify Image Cockpit");
+    assert(health.app === "zai-cockpit", "health response should identify Zai Cockpit");
     assert(health.role === "api", "health response should identify the API role");
     assert(health.outboxReadable === true, "health response should confirm outbox readability");
 
-    const runnerPreflight = await getJson(port, "/api/codex/runner");
+    const runnerPreflight = await getJson(port, "/api/zai/runner");
     assert(runnerPreflight.runner?.state === "disabled", "autorun-off preflight should report disabled runner state");
     assert(runnerPreflight.runner?.autorun === false, "autorun-off preflight should include autorun=false");
 
     const directionManifestName = "manual-manifest.json";
     await writeFile(join(handoffDir, "outbox", "manual-return.png"), tinyPngBytes);
     await writeFile(join(handoffDir, "outbox", directionManifestName), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       directions: ["front", "front three-quarter", "side", "back three-quarter", "back"],
       framesPerDirection: 8
     }, null, 2), "utf8");
@@ -65,7 +65,7 @@ async function runManualHandoffSmoke() {
     await writeFile(join(handoffDir, "outbox", "manual-ab-gallery.png"), tinyPngBytes);
     await writeFile(join(handoffDir, "outbox", "manual-bronze-candidate-front.png"), tinyPngBytes);
 
-    const outboxList = await getJson(port, "/api/codex/results");
+    const outboxList = await getJson(port, "/api/zai/results");
     const manualReturn = outboxList.results.find((result) => result.name === "manual-return.png");
     const manualBronze = outboxList.results.find((result) => result.name === "manual-bronze-candidate-front.png");
     assert(manualReturn, "outbox image should be listed");
@@ -87,16 +87,16 @@ async function runManualHandoffSmoke() {
     assert(!outboxList.results.some((result) => result.name === "manual-debug-preview.png"), "debug outbox image should be ignored");
     assert(!outboxList.results.some((result) => result.name === "manual-preview-grid.png"), "preview grid outbox image should be ignored");
     assert(!outboxList.results.some((result) => result.name === "manual-ab-gallery.png"), "AB gallery outbox image should be ignored");
-    const importedOutbox = await getJson(port, "/api/codex/results/manual-return.png");
+    const importedOutbox = await getJson(port, "/api/zai/results/manual-return.png");
     assert(importedOutbox.mimeType === "image/png", "outbox import should preserve image MIME type");
     assert(importedOutbox.dataUrl === tinyPng, "outbox import should return a data URL");
-    const importedManifest = await getJson(port, `/api/codex/results/${directionManifestName}`);
+    const importedManifest = await getJson(port, `/api/zai/results/${directionManifestName}`);
     assert(importedManifest.mimeType === "application/json", "direction split manifest import should preserve JSON MIME type");
 
-    const artifactJobId = "codex-job-smoke-artifact-staging-Z";
+    const artifactJobId = "zai-job-smoke-artifact-staging-Z";
     const directionSlugs = ["front", "front-three-quarter", "back-three-quarter", "back"];
     await writeFile(join(handoffDir, "outbox", `${artifactJobId}-manifest.json`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId: artifactJobId,
       directionAttempts: {
         front: [{
@@ -135,18 +135,18 @@ async function runManualHandoffSmoke() {
     for (const slug of directionSlugs) {
       await writeFile(join(handoffDir, "outbox", `${artifactJobId}-${slug}.png`), tinyPngBytes);
     }
-    const incompleteArtifactList = await getJson(port, "/api/codex/results");
+    const incompleteArtifactList = await getJson(port, "/api/zai/results");
     const incompleteArtifact = incompleteArtifactList.results.find((result) => result.name === `${artifactJobId}-manifest.json`)?.artifact;
     assert(incompleteArtifact?.ready === false, "manifest-first direction split should wait while side.png is missing");
     assert(incompleteArtifact?.reason.includes("side"), "manifest-first direction split should report missing side");
     await writeFile(join(handoffDir, "outbox", `${artifactJobId}-side.png`), tinyPngBytes);
-    const verifiedArtifactList = await getJson(port, "/api/codex/results");
+    const verifiedArtifactList = await getJson(port, "/api/zai/results");
     const verifiedArtifact = verifiedArtifactList.results.find((result) => result.name === `${artifactJobId}-manifest.json`)?.artifact;
     assert(verifiedArtifact?.ready === true, "complete direction split should become server verified");
     assert(verifiedArtifact?.verified === true, "complete direction split should expose verified=true");
     assert(verifiedArtifact?.qualityGate?.classification === "usable-final", "complete direction split should pass the quality gate");
     assert(verifiedArtifact?.animationQuality === undefined, "legacy manifests without Quality v2 should remain readable");
-    const verifiedManifest = await getJson(port, `/api/codex/results/${artifactJobId}-manifest.json`);
+    const verifiedManifest = await getJson(port, `/api/zai/results/${artifactJobId}-manifest.json`);
     const verifiedManifestText = Buffer.from(verifiedManifest.dataUrl.split(",")[1], "base64").toString("utf8");
     assert(verifiedManifestText.includes('"serverVerified": true'), "server should rewrite the final direction split manifest");
     assert(verifiedManifestText.includes('"classification": "usable-final"'), "server manifest should include the quality gate classification");
@@ -173,7 +173,7 @@ async function runManualHandoffSmoke() {
             status: "accepted",
             startedAt: "2026-07-24T00:00:00.000Z",
             finishedAt: "2026-07-24T00:00:01.000Z",
-            artifactPath: `.staging/codex-job-other/front/attempt-3/result.png`
+            artifactPath: `.staging/zai-job-other/front/attempt-3/result.png`
           },
           {
             attempt: 4,
@@ -199,15 +199,15 @@ async function runManualHandoffSmoke() {
         ]
       }
     }, null, 2), "utf8");
-    await getJson(port, "/api/codex/results");
-    const resanitizedManifest = await getJson(port, `/api/codex/results/${artifactJobId}-manifest.json`);
+    await getJson(port, "/api/zai/results");
+    const resanitizedManifest = await getJson(port, `/api/zai/results/${artifactJobId}-manifest.json`);
     const resanitizedManifestText = Buffer.from(resanitizedManifest.dataUrl.split(",")[1], "base64").toString("utf8");
     assert(!resanitizedManifestText.includes("file:///"), "serverVerified manifests should not bypass absolute URI sanitization");
-    assert(!resanitizedManifestText.includes("codex-job-other"), "serverVerified manifests should not retain another job's staging path");
+    assert(!resanitizedManifestText.includes("zai-job-other"), "serverVerified manifests should not retain another job's staging path");
     assert(!resanitizedManifestText.includes("attempt-999"), "attempt artifact paths should match their recorded attempt number");
     assert(!resanitizedManifestText.includes("Users"), "failureKind should not expose a local path");
     const animationQualityReport = {
-      metricVersion: "image-cockpit.animation-quality.v2",
+      metricVersion: "zai-cockpit.animation-quality.v2",
       policyVersion: "shadow-v1",
       recordedAt: "2026-07-15T00:00:00.000Z",
       action: "idle",
@@ -227,56 +227,56 @@ async function runManualHandoffSmoke() {
       shadowDecision: { mode: "shadow", wouldBlock: false, reasons: [] },
       hardGateUnchanged: true
     };
-    await postJson(port, `/api/codex/artifacts/${encodeURIComponent(artifactJobId)}/animation-quality`, {
+    await postJson(port, `/api/zai/artifacts/${encodeURIComponent(artifactJobId)}/animation-quality`, {
       report: animationQualityReport
     });
-    const qualityV2ArtifactList = await getJson(port, "/api/codex/results");
+    const qualityV2ArtifactList = await getJson(port, "/api/zai/results");
     const qualityV2Artifact = qualityV2ArtifactList.results.find((result) => result.name === `${artifactJobId}-manifest.json`)?.artifact;
     assert(qualityV2Artifact?.ready === true, "Quality v2 shadow report should not block a usable artifact");
     assert(qualityV2Artifact?.qualityGate?.classification === "usable-final", "Quality v2 shadow report should preserve usable-final classification");
     assert(qualityV2Artifact?.animationQuality?.metricVersion === animationQualityReport.metricVersion, "artifact status should expose the Quality v2 report");
-    const qualityV2Manifest = await getJson(port, `/api/codex/results/${artifactJobId}-manifest.json`);
+    const qualityV2Manifest = await getJson(port, `/api/zai/results/${artifactJobId}-manifest.json`);
     const qualityV2ManifestText = Buffer.from(qualityV2Manifest.dataUrl.split(",")[1], "base64").toString("utf8");
     assert(qualityV2ManifestText.includes('"animationQuality"'), "Quality v2 report should persist in the manifest");
     assert(qualityV2ManifestText.includes('"classification": "usable-final"'), "Quality v2 persistence should not rewrite the hard gate");
-    await postJson(port, `/api/codex/artifacts/${encodeURIComponent(artifactJobId)}/quality-gate`, {
+    await postJson(port, `/api/zai/artifacts/${encodeURIComponent(artifactJobId)}/quality-gate`, {
       classification: "quality-failed",
       reason: "Direction split QA failed: front cell 1: Chroma key removal failed",
       code: "chroma-key-removal-failed"
     });
-    const qualityFailedArtifactList = await getJson(port, "/api/codex/results");
+    const qualityFailedArtifactList = await getJson(port, "/api/zai/results");
     const qualityFailedArtifact = qualityFailedArtifactList.results.find((result) => result.name === `${artifactJobId}-manifest.json`)?.artifact;
     assert(qualityFailedArtifact?.ready === false, "client quality gate failure should block the artifact");
     assert(qualityFailedArtifact?.qualityGate?.classification === "quality-failed", "client quality gate failure should persist to the manifest");
     assert(qualityFailedArtifact?.qualityGate?.historyAllowed === false, "client quality gate failure should block history import");
-    const qualityFailedManifest = await getJson(port, `/api/codex/results/${artifactJobId}-manifest.json`);
+    const qualityFailedManifest = await getJson(port, `/api/zai/results/${artifactJobId}-manifest.json`);
     const qualityFailedManifestText = Buffer.from(qualityFailedManifest.dataUrl.split(",")[1], "base64").toString("utf8");
     assert(qualityFailedManifestText.includes('"classification": "quality-failed"'), "quality-failed manifest should be persisted");
     await new Promise((resolve) => setTimeout(resolve, 120));
     await writeFile(join(handoffDir, "outbox", `${artifactJobId}-side.png`), tinyPngBytes);
-    const repairedArtifactList = await getJson(port, "/api/codex/results");
+    const repairedArtifactList = await getJson(port, "/api/zai/results");
     const repairedArtifact = repairedArtifactList.results.find((result) => result.name === `${artifactJobId}-manifest.json`)?.artifact;
     assert(repairedArtifact?.ready === true, "newer direction candidates should recover a stale client quality gate failure");
     assert(repairedArtifact?.qualityGate?.classification === "usable-final", "repaired direction split should become usable-final again");
 
-    const softGateJobId = "codex-job-smoke-soft-bbox-gate-Z";
+    const softGateJobId = "zai-job-smoke-soft-bbox-gate-Z";
     await writeFile(join(handoffDir, "outbox", `${softGateJobId}-manifest.json`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId: softGateJobId,
       files: Object.fromEntries(["front", "front-three-quarter", "side", "back-three-quarter", "back"].map((slug) => [slug, `${softGateJobId}-${slug}.png`]))
     }, null, 2), "utf8");
     for (const slug of ["front", "front-three-quarter", "side", "back-three-quarter", "back"]) {
       await writeFile(join(handoffDir, "outbox", `${softGateJobId}-${slug}.png`), tinyPngBytes);
     }
-    const softGateVerifiedList = await getJson(port, "/api/codex/results");
+    const softGateVerifiedList = await getJson(port, "/api/zai/results");
     const softGateVerified = softGateVerifiedList.results.find((result) => result.name === `${softGateJobId}-manifest.json`)?.artifact;
     assert(softGateVerified?.ready === true, "soft gate fixture should start as server verified");
-    await postJson(port, `/api/codex/artifacts/${encodeURIComponent(softGateJobId)}/quality-gate`, {
+    await postJson(port, `/api/zai/artifacts/${encodeURIComponent(softGateJobId)}/quality-gate`, {
       classification: "quality-failed",
       reason: "Direction split QA failed: back three-quarter: bbox width variation 47%; back: bbox width variation 48%",
       code: "client-quality-gate-failed"
     });
-    const softGateRecoveredList = await getJson(port, "/api/codex/results");
+    const softGateRecoveredList = await getJson(port, "/api/zai/results");
     const softGateRecovered = softGateRecoveredList.results.find((result) => result.name === `${softGateJobId}-manifest.json`)?.artifact;
     assert(softGateRecovered?.ready === true, "soft bbox-only client quality gate should be rechecked under current QA policy");
     assert(softGateRecovered?.qualityGate?.classification === "usable-final", "soft bbox-only quality gate should not remain blocked");
@@ -312,7 +312,7 @@ async function runManualHandoffSmoke() {
     assertPngDimensions(localSpriteSheet.results[0].dataUrl, 256, 96, "local generated sprite sheet dimensions");
     await stat(localSpriteSheet.results[0].path);
 
-    const job = await postJson(port, "/api/codex/jobs", {
+    const job = await postJson(port, "/api/zai/jobs", {
       workflowMode: "image-edit",
       prompt: "Smoke test edit",
       negativePrompt: "text",
@@ -353,7 +353,7 @@ async function runManualHandoffSmoke() {
     assert(jobJson.selectedImage.assetPath, "job should include selected image asset path");
     await stat(jobJson.selectedImage.assetPath);
 
-    const generateJob = await postJson(port, "/api/codex/jobs", {
+    const generateJob = await postJson(port, "/api/zai/jobs", {
       workflowMode: "image-generate",
       prompt: "Smoke test generation",
       negativePrompt: "text",
@@ -456,7 +456,7 @@ async function runManualHandoffSmoke() {
       }
     };
     const semanticDedupeResponses = await Promise.all(Array.from({ length: 8 }, (_, index) =>
-      postJson(port, "/api/codex/tournaments", {
+      postJson(port, "/api/zai/tournaments", {
         ...semanticDedupeRegistration,
         tournamentId: `smoke-semantic-dedupe-${index + 1}`,
         idempotencyKey: `smoke:semantic-dedupe:${index + 1}:v1`,
@@ -479,7 +479,7 @@ async function runManualHandoffSmoke() {
     );
     const semanticCanonicalTournamentId = semanticDedupeResponses[0].tournament.tournamentId;
     const semanticNearMatchId = "smoke-semantic-near-match";
-    const semanticNearMatch = await postJson(port, "/api/codex/tournaments", {
+    const semanticNearMatch = await postJson(port, "/api/zai/tournaments", {
       ...semanticDedupeRegistration,
       tournamentId: semanticNearMatchId,
       idempotencyKey: "smoke:semantic-near-match:v1",
@@ -496,23 +496,23 @@ async function runManualHandoffSmoke() {
     });
     assert(semanticNearMatch.created === true, "a near-match with a different frame contract should create a separate tournament");
     assert(semanticNearMatch.tournament.tournamentId === semanticNearMatchId, "near-match registration should keep its requested tournament id");
-    await postJson(port, `/api/codex/tournaments/${semanticNearMatchId}/cancel`, {});
+    await postJson(port, `/api/zai/tournaments/${semanticNearMatchId}/cancel`, {});
 
     const cancelledSemanticCanonical = await postJson(
       port,
-      `/api/codex/tournaments/${semanticCanonicalTournamentId}/cancel`,
+      `/api/zai/tournaments/${semanticCanonicalTournamentId}/cancel`,
       {}
     );
     assert(cancelledSemanticCanonical.tournament.state === "cancelled", "semantic dedupe canonical tournament should become terminal after cancel");
     const semanticReplacementId = "smoke-semantic-dedupe-after-cancel";
-    const semanticReplacement = await postJson(port, "/api/codex/tournaments", {
+    const semanticReplacement = await postJson(port, "/api/zai/tournaments", {
       ...semanticDedupeRegistration,
       tournamentId: semanticReplacementId,
       idempotencyKey: "smoke:semantic-dedupe:after-cancel:v1"
     });
     assert(semanticReplacement.created === true, "a terminal semantic match should not block a later tournament registration");
     assert(semanticReplacement.tournament.tournamentId === semanticReplacementId, "post-cancel semantic registration should create the requested new tournament");
-    await postJson(port, `/api/codex/tournaments/${semanticReplacementId}/cancel`, {});
+    await postJson(port, `/api/zai/tournaments/${semanticReplacementId}/cancel`, {});
 
     const canonicalSingleDirections = ["front", "front three-quarter", "side", "back three-quarter", "back"];
     const singleDirection = "back three-quarter";
@@ -544,14 +544,14 @@ async function runManualHandoffSmoke() {
         }
       }
     };
-    const singleDirectionRegistered = await postJson(port, "/api/codex/tournaments", singleDirectionRegistration);
+    const singleDirectionRegistered = await postJson(port, "/api/zai/tournaments", singleDirectionRegistration);
     assert(singleDirectionRegistered.tournament.requestedDirections.join(",") === singleDirection, "single-direction tournament should persist exactly the selected non-side direction");
     assert(singleDirectionRegistered.tournament.pilotMode === false, "single-direction tournament should use the standard non-Pilot path");
 
     for (const direction of canonicalSingleDirections) {
       if (direction === singleDirection) continue;
       const slug = direction.replaceAll(" ", "-");
-      const registeredChoice = await postJson(port, "/api/codex/tournaments", {
+      const registeredChoice = await postJson(port, "/api/zai/tournaments", {
         ...singleDirectionRegistration,
         tournamentId: `smoke-single-direction-${slug}`,
         idempotencyKey: `smoke:single-direction:${slug}:v1`,
@@ -564,7 +564,7 @@ async function runManualHandoffSmoke() {
       );
     }
 
-    const singleDirectionBundle = await postJson(port, "/api/codex/tournaments/" + singleDirectionTournamentId + "/initial-candidates", {});
+    const singleDirectionBundle = await postJson(port, "/api/zai/tournaments/" + singleDirectionTournamentId + "/initial-candidates", {});
     const singleDirectionCandidate = { job: singleDirectionBundle.jobs[0], tournament: singleDirectionBundle.tournament };
     const singleDirectionJobJson = JSON.parse(await readFile(singleDirectionCandidate.job.path, "utf8"));
     assert(singleDirectionJobJson.spriteContext.directions.join(",") === singleDirection, "single-direction candidate should request only the selected non-side direction");
@@ -573,7 +573,7 @@ async function runManualHandoffSmoke() {
     assert(singleDirectionJobJson.notes.some((note) => note.includes("complete requested direction set")), "runner notes should describe the requested set instead of forcing five directions");
     await writeFile(join(singleDirectionCandidate.job.outboxPath, singleDirectionCandidate.job.id + `-${singleDirectionSlug}.png`), tinyPngBytes);
     await writeFile(join(singleDirectionCandidate.job.outboxPath, singleDirectionCandidate.job.id + "-manifest.json"), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId: singleDirectionCandidate.job.id,
       action: "walk",
       directions: [singleDirection],
@@ -590,15 +590,15 @@ async function runManualHandoffSmoke() {
       },
       animationQuality: animationQualityReport
     }, null, 2), "utf8");
-    await getJson(port, "/api/codex/jobs/" + singleDirectionCandidate.job.id + "/results");
-    await postJson(port, "/api/codex/tournaments/" + singleDirectionTournamentId + "/evaluation", {
+    await getJson(port, "/api/zai/jobs/" + singleDirectionCandidate.job.id + "/results");
+    await postJson(port, "/api/zai/tournaments/" + singleDirectionTournamentId + "/evaluation", {
       jobId: singleDirectionCandidate.job.id,
       ready: true,
       score: 3300,
       warningCount: 0,
       qualityReportRef: singleDirectionCandidate.job.id + "-manifest.json#animationQuality"
     });
-    const acceptedSingleDirection = await postJson(port, "/api/codex/tournaments/" + singleDirectionTournamentId + "/winner", { jobId: singleDirectionCandidate.job.id });
+    const acceptedSingleDirection = await postJson(port, "/api/zai/tournaments/" + singleDirectionTournamentId + "/winner", { jobId: singleDirectionCandidate.job.id });
     assert(acceptedSingleDirection.tournament.state === "accepted", "single-direction winner should reach the accepted state");
     const publishedSingleDirectionManifest = JSON.parse(await readFile(join(handoffDir, "outbox", singleDirectionCandidate.job.id + "-manifest.json"), "utf8"));
     assert(publishedSingleDirectionManifest.directions.join(",") === singleDirection, "published single-direction manifest should contain only the selected non-side direction");
@@ -607,7 +607,7 @@ async function runManualHandoffSmoke() {
     assert(publishedSingleDirectionManifest.grid.columns === 4 && publishedSingleDirectionManifest.grid.rows === 5, "published single-direction manifest should preserve the 4x5 raw direction grid");
     assert(publishedSingleDirectionManifest.motionRecipe.frameCount === 20, "published single-direction manifest should preserve the 20f Motion Recipe metadata");
 
-    const rejectedSingleDirectionPilot = await fetch("http://127.0.0.1:" + port + "/api/codex/tournaments", {
+    const rejectedSingleDirectionPilot = await fetch("http://127.0.0.1:" + port + "/api/zai/tournaments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -624,7 +624,7 @@ async function runManualHandoffSmoke() {
       "server should reject Motion Pilot for any single-direction tournament"
     );
 
-    const rejectedNonCanonicalDirection = await fetch("http://127.0.0.1:" + port + "/api/codex/tournaments", {
+    const rejectedNonCanonicalDirection = await fetch("http://127.0.0.1:" + port + "/api/zai/tournaments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -641,14 +641,14 @@ async function runManualHandoffSmoke() {
       "server should reject single-direction values outside the five canonical choices"
     );
 
-    const registeredTournament = await postJson(port, "/api/codex/tournaments", tournamentRegistration);
+    const registeredTournament = await postJson(port, "/api/zai/tournaments", tournamentRegistration);
     assert(registeredTournament.created === true, "first tournament registration should create the persistent manifest");
     assert(registeredTournament.tournament.generationProfile === "balanced", "tournament manifest should persist the generation profile");
     assert(registeredTournament.tournament.candidates.length === 3, "Balanced should persist a 2+1 candidate plan");
     assert(registeredTournament.tournament.clientContext.batchMatrixRunId === "batch-matrix-smoke", "Batch Matrix run identity should persist across reloads");
     assert(registeredTournament.tournament.clientContext.batchMatrixCellKey === "hist-smoke-source:walk-cycle", "Batch Matrix cells should keep an exact persistent lookup key");
     const undercutBestTournamentId = "smoke-best-candidate-count-undercut";
-    const undercutBestResponse = await fetch(`http://127.0.0.1:${port}/api/codex/tournaments`, {
+    const undercutBestResponse = await fetch(`http://127.0.0.1:${port}/api/zai/tournaments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -667,43 +667,43 @@ async function runManualHandoffSmoke() {
       "profile count undercuts should expose the fixed-profile error code"
     );
     assert(
-      (await fetch(`http://127.0.0.1:${port}/api/codex/tournaments/${undercutBestTournamentId}`)).status === 404,
+      (await fetch(`http://127.0.0.1:${port}/api/zai/tournaments/${undercutBestTournamentId}`)).status === 404,
       "rejected profile count undercut should not leave a tournament manifest"
     );
-    const duplicateRegistration = await postJson(port, "/api/codex/tournaments", tournamentRegistration);
+    const duplicateRegistration = await postJson(port, "/api/zai/tournaments", tournamentRegistration);
     assert(duplicateRegistration.created === false, "same tournament idempotency key should reuse the manifest");
-    const persistentInitialBundle = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/initial-candidates`, {});
+    const persistentInitialBundle = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/initial-candidates`, {});
     const candidateA = { job: persistentInitialBundle.jobs[0], tournament: persistentInitialBundle.tournament };
     const candidateB = { job: persistentInitialBundle.jobs[1], tournament: persistentInitialBundle.tournament };
-    const duplicateCandidateA = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/candidates`, { candidateIndex: 0 });
+    const duplicateCandidateA = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/candidates`, { candidateIndex: 0 });
     assert(candidateA.job.id === duplicateCandidateA.job.id, "duplicate tournament candidate POST should not start another job");
     assert(duplicateCandidateA.reused === true, "duplicate tournament candidate POST should report reused=true");
-    await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/evaluation`, {
+    await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/evaluation`, {
       jobId: candidateA.job.id,
       ready: true,
       score: 3200,
       warningCount: 0,
       reason: "smoke initial candidate ready"
     });
-    await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/evaluation`, {
+    await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/evaluation`, {
       jobId: candidateB.job.id,
       ready: false,
       warningCount: 0,
       reason: "smoke initial candidate failed"
     });
-    const candidateC = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/candidates`, {
+    const candidateC = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/candidates`, {
       candidateIndex: 2,
       reason: "one initial candidate failed"
     });
     assert(candidateC.tournament.thirdCandidateReason === "one initial candidate failed", "adaptive candidate reason should persist in the manifest");
-    const failedCandidateEvaluation = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/evaluation`, {
+    const failedCandidateEvaluation = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/evaluation`, {
       jobId: candidateC.job.id,
       ready: false,
       warningCount: Number.MAX_SAFE_INTEGER,
       reason: "smoke terminal failure"
     });
     assert(failedCandidateEvaluation.tournament.candidates[2].warningCount === 0, "failed evaluations should not persist the client warning sentinel");
-    const savedHumanReview = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/review`, {
+    const savedHumanReview = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/review`, {
       review: {
         manualWinnerJobId: candidateA.job.id,
         decisions: [
@@ -722,7 +722,7 @@ async function runManualHandoffSmoke() {
     assert(candidateAJson.selectedImage.assetPath === candidateCJson.selectedImage.assetPath, "tournament candidates should share one content-addressed source asset");
 
     const motionPilotId = "smoke-motion-pilot-tournament";
-    const motionPilotRegistration = await postJson(port, "/api/codex/tournaments", {
+    const motionPilotRegistration = await postJson(port, "/api/zai/tournaments", {
       ...tournamentRegistration,
       tournamentId: motionPilotId,
       idempotencyKey: "smoke:motion-pilot:v1",
@@ -735,7 +735,7 @@ async function runManualHandoffSmoke() {
     });
     assert(motionPilotRegistration.tournament.pilotMode === true, "Motion Pilot should persist as an explicit experimental mode");
     assert(motionPilotRegistration.tournament.pilotDirection === "side", "Motion Pilot should persist the representative direction");
-    const motionPilotInitialBundle = await postJson(port, `/api/codex/tournaments/${motionPilotId}/initial-candidates`, {});
+    const motionPilotInitialBundle = await postJson(port, `/api/zai/tournaments/${motionPilotId}/initial-candidates`, {});
     const pilotCandidates = motionPilotInitialBundle.jobs.map((job) => ({ job, tournament: motionPilotInitialBundle.tournament }));
     for (let index = 0; index < pilotCandidates.length; index += 1) {
       const candidate = pilotCandidates[index];
@@ -747,7 +747,7 @@ async function runManualHandoffSmoke() {
       const candidate = pilotCandidates[index];
       await writeFile(join(candidate.job.outboxPath, `${candidate.job.id}-side.png`), tinyPngBytes);
       await writeFile(join(candidate.job.outboxPath, `${candidate.job.id}-manifest.json`), JSON.stringify({
-        schema: "image-cockpit.direction-split-animation.v1",
+        schema: "zai-cockpit.direction-split-animation.v1",
         jobId: candidate.job.id,
         action: "walk",
         directions: ["side"],
@@ -755,7 +755,7 @@ async function runManualHandoffSmoke() {
         chromaKey: { name: "green" },
         animationQuality: animationQualityReport
       }, null, 2), "utf8");
-      const evaluated = await postJson(port, `/api/codex/tournaments/${motionPilotId}/evaluation`, {
+      const evaluated = await postJson(port, `/api/zai/tournaments/${motionPilotId}/evaluation`, {
         jobId: candidate.job.id,
         ready: true,
         score: 3300 - index * 100,
@@ -768,13 +768,13 @@ async function runManualHandoffSmoke() {
         assert(evaluated.tournament.totalCandidateJobs === 3, "pilot review should report all three initial candidate jobs");
       }
     }
-    await postJson(port, `/api/codex/tournaments/${motionPilotId}/review`, {
+    await postJson(port, `/api/zai/tournaments/${motionPilotId}/review`, {
       review: {
         manualWinnerJobId: pilotCandidates[0].job.id,
         decisions: [{ jobId: pilotCandidates[0].job.id, decision: "winner", reasonTags: ["motion-readability"], note: "smoke pilot winner" }]
       }
     });
-    const pilotExpansion = await postJson(port, `/api/codex/tournaments/${motionPilotId}/pilot/expand`, { jobId: pilotCandidates[0].job.id });
+    const pilotExpansion = await postJson(port, `/api/zai/tournaments/${motionPilotId}/pilot/expand`, { jobId: pilotCandidates[0].job.id });
     assert(pilotExpansion.tournament.state === "pilot-expanding", "adopting a pilot should start remaining-direction expansion without publishing a partial winner");
     assert(pilotExpansion.tournament.expansionDirectionIds.join(",") === "front,back", "pilot expansion should exclude the accepted representative direction");
     const expansionJobJson = JSON.parse(await readFile(pilotExpansion.job.path, "utf8"));
@@ -783,7 +783,7 @@ async function runManualHandoffSmoke() {
       await writeFile(join(pilotExpansion.job.outboxPath, `${pilotExpansion.job.id}-${slug}.png`), tinyPngBytes);
     }
     await writeFile(join(pilotExpansion.job.outboxPath, `${pilotExpansion.job.id}-manifest.json`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId: pilotExpansion.job.id,
       action: "walk",
       directions: ["front", "back"],
@@ -794,25 +794,25 @@ async function runManualHandoffSmoke() {
       chromaKey: { name: "green" },
       animationQuality: animationQualityReport
     }, null, 2), "utf8");
-    await postJson(port, `/api/codex/tournaments/${motionPilotId}/evaluation`, {
+    await postJson(port, `/api/zai/tournaments/${motionPilotId}/evaluation`, {
       jobId: pilotExpansion.job.id,
       ready: true,
       score: 3200,
       warningCount: 0,
       qualityReportRef: `${pilotExpansion.job.id}-manifest.json#animationQuality`
     });
-    const acceptedPilotExpansion = await postJson(port, `/api/codex/tournaments/${motionPilotId}/repairs/accept`, { jobId: pilotExpansion.job.id });
+    const acceptedPilotExpansion = await postJson(port, `/api/zai/tournaments/${motionPilotId}/repairs/accept`, { jobId: pilotExpansion.job.id });
     assert(acceptedPilotExpansion.tournament.state === "accepted", "verified Motion Pilot expansion should publish one complete accepted winner");
     assert(acceptedPilotExpansion.tournament.pilotState === "completed", "Motion Pilot should persist its completed phase");
     assert(acceptedPilotExpansion.tournament.directionOutputCount === 5, "three pilot outputs plus two expansion directions should record five outputs for a 3-direction run");
     assert(acceptedPilotExpansion.tournament.totalCandidateJobs === 4, "Motion Pilot should record three pilot jobs plus one expansion job");
     const revalidatedPilotQuality = { ...animationQualityReport, identityScore: 97.5, recordedAt: new Date().toISOString() };
-    await postJson(port, `/api/codex/artifacts/${pilotCandidates[0].job.id}/animation-quality`, { report: revalidatedPilotQuality });
+    await postJson(port, `/api/zai/artifacts/${pilotCandidates[0].job.id}/animation-quality`, { report: revalidatedPilotQuality });
     const publishedPilotManifest = JSON.parse(await readFile(join(handoffDir, "outbox", `${pilotCandidates[0].job.id}-manifest.json`), "utf8"));
     assert(publishedPilotManifest.animationQuality?.identityScore === 97.5, "accepted Pilot final revalidation should update the published root manifest, not only tournament work files");
 
     const motionPilotFallbackId = "smoke-motion-pilot-fallback";
-    await postJson(port, "/api/codex/tournaments", {
+    await postJson(port, "/api/zai/tournaments", {
       ...tournamentRegistration,
       tournamentId: motionPilotFallbackId,
       idempotencyKey: "smoke:motion-pilot:fallback:v1",
@@ -822,12 +822,12 @@ async function runManualHandoffSmoke() {
       pilotMode: true,
       pilotDirection: "side"
     });
-    const motionPilotFallbackBundle = await postJson(port, `/api/codex/tournaments/${motionPilotFallbackId}/initial-candidates`, {});
+    const motionPilotFallbackBundle = await postJson(port, `/api/zai/tournaments/${motionPilotFallbackId}/initial-candidates`, {});
     for (let index = 0; index < motionPilotFallbackBundle.jobs.length; index += 1) {
       const candidate = { job: motionPilotFallbackBundle.jobs[index], tournament: motionPilotFallbackBundle.tournament };
-      await postJson(port, `/api/codex/tournaments/${motionPilotFallbackId}/evaluation`, { jobId: candidate.job.id, ready: true, score: 3000 - index, warningCount: 0 });
+      await postJson(port, `/api/zai/tournaments/${motionPilotFallbackId}/evaluation`, { jobId: candidate.job.id, ready: true, score: 3000 - index, warningCount: 0 });
     }
-    const pilotFallback = await postJson(port, `/api/codex/tournaments/${motionPilotFallbackId}/pilot/fallback`, { reason: "scores too close to call" });
+    const pilotFallback = await postJson(port, `/api/zai/tournaments/${motionPilotFallbackId}/pilot/fallback`, { reason: "scores too close to call" });
     assert(pilotFallback.tournament.pilotState === "fallback", "Motion Pilot should persist the fallback reason and phase");
     assert(pilotFallback.fallbackTournament.generationProfile === "balanced", "Motion Pilot fallback should register the existing Balanced regime");
     assert(pilotFallback.fallbackTournament.pilotMode === false, "fallback tournament should use the standard full-direction path");
@@ -837,12 +837,12 @@ async function runManualHandoffSmoke() {
       port,
       handoffDir,
       env: {
-        IMAGE_COCKPIT_CODEX_AUTORUN: "0",
-        IMAGE_COCKPIT_ARTIFACT_STABLE_MS: "0"
+        ZAI_COCKPIT_RUNNER_AUTORUN: "0",
+        ZAI_COCKPIT_ARTIFACT_STABLE_MS: "0"
       }
     });
     await waitForServer(server, port);
-    const restoredTournament = await getJson(port, `/api/codex/tournaments/${persistentTournamentId}`);
+    const restoredTournament = await getJson(port, `/api/zai/tournaments/${persistentTournamentId}`);
     assert(restoredTournament.tournament.candidates[0].jobId === candidateA.job.id, "API restart should restore candidate A from disk manifest");
     assert(restoredTournament.tournament.candidates[2].jobId === candidateC.job.id, "API restart should restore adaptive candidate C without duplication");
     assert(restoredTournament.tournament.humanReview.decisions[0].note === "best silhouette", "API restart should restore human review notes from the tournament manifest");
@@ -850,7 +850,7 @@ async function runManualHandoffSmoke() {
       await writeFile(join(candidateA.job.outboxPath, `${candidateA.job.id}-${slug}.png`), tinyPngBytes);
     }
     await writeFile(join(candidateA.job.outboxPath, `${candidateA.job.id}-manifest.json`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId: candidateA.job.id,
       action: "walk",
       directions: ["front", "side", "back"],
@@ -861,8 +861,8 @@ async function runManualHandoffSmoke() {
       },
       chromaKey: { name: "green" }
     }, null, 2), "utf8");
-    await getJson(port, `/api/codex/jobs/${candidateA.job.id}/results`);
-    const evaluatedCandidate = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/evaluation`, {
+    await getJson(port, `/api/zai/jobs/${candidateA.job.id}/results`);
+    const evaluatedCandidate = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/evaluation`, {
       jobId: candidateA.job.id,
       ready: true,
       score: 3210,
@@ -871,7 +871,7 @@ async function runManualHandoffSmoke() {
       reason: "smoke verified"
     });
     assert(evaluatedCandidate.tournament.candidates[0].state === "quality-evaluated", "verified tournament evaluation should persist");
-    const transientRegression = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/evaluation`, {
+    const transientRegression = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/evaluation`, {
       jobId: candidateA.job.id,
       ready: false,
       score: null,
@@ -881,17 +881,17 @@ async function runManualHandoffSmoke() {
     assert(transientRegression.tournament.candidates[0].state === "quality-evaluated", "transient reread should not downgrade an immutable evaluated candidate");
     assert(transientRegression.tournament.candidates[0].score === 3210, "transient reread should preserve the evaluated candidate score");
     assert(transientRegression.tournament.candidates[0].warningCount === 2, "transient reread should preserve the evaluated warning count");
-    const acceptedWinner = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/winner`, { jobId: candidateA.job.id });
+    const acceptedWinner = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/winner`, { jobId: candidateA.job.id });
     assert(acceptedWinner.tournament.state === "accepted", "verified candidate should become the persistent tournament winner");
-    const repeatedAcceptedWinner = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/winner`, { jobId: candidateA.job.id });
+    const repeatedAcceptedWinner = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/winner`, { jobId: candidateA.job.id });
     assert(repeatedAcceptedWinner.reused === true, "same accepted winner should be idempotent");
-    const rejectedDifferentWinner = await fetch(`http://127.0.0.1:${port}/api/codex/tournaments/${persistentTournamentId}/winner`, {
+    const rejectedDifferentWinner = await fetch(`http://127.0.0.1:${port}/api/zai/tournaments/${persistentTournamentId}/winner`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jobId: candidateC.job.id })
     });
     assert(rejectedDifferentWinner.status === 409, "different winner should require an explicit saved manual override");
-    const lateWinnerEvaluation = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/evaluation`, {
+    const lateWinnerEvaluation = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/evaluation`, {
       jobId: candidateA.job.id,
       ready: true,
       score: 3200,
@@ -901,22 +901,22 @@ async function runManualHandoffSmoke() {
     assert(lateWinnerEvaluation.tournament.state === "accepted", "late winner evaluation should preserve the accepted tournament state");
     assert(lateWinnerEvaluation.tournament.candidates[0].state === "accepted", "late winner evaluation should not regress the accepted candidate state");
     assert(Object.values(lateWinnerEvaluation.tournament.directionStates).every((direction) => direction.state === "accepted"), "late winner evaluation should preserve accepted direction states");
-    const failedRepair = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/repairs`, { directions: ["side"] });
-    await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/evaluation`, {
+    const failedRepair = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/repairs`, { directions: ["side"] });
+    await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/evaluation`, {
       jobId: failedRepair.job.id,
       ready: false,
       score: null,
       warningCount: 0,
       reason: "simulated transient client race"
     });
-    const recoveredAfterRepairFailure = await getJson(port, `/api/codex/tournaments/${persistentTournamentId}`);
+    const recoveredAfterRepairFailure = await getJson(port, `/api/zai/tournaments/${persistentTournamentId}`);
     assert(recoveredAfterRepairFailure.tournament.state === "accepted", "failed Direction Repair should restore the accepted winner state");
     assert(Object.values(recoveredAfterRepairFailure.tournament.directionStates).every((direction) => direction.state === "accepted"), "failed Direction Repair should restore every winner direction state");
-    const repair = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/repairs`, { directions: ["side"] });
+    const repair = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/repairs`, { directions: ["side"] });
     assert(repair.job.id !== failedRepair.job.id, "failed Direction Repair should allow one bounded retry with a new job id");
     await writeFile(join(repair.job.outboxPath, `${repair.job.id}-side.png`), tinyPngBytes);
     await writeFile(join(repair.job.outboxPath, `${repair.job.id}-manifest.json`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId: repair.job.id,
       action: "walk",
       directions: ["side"],
@@ -931,16 +931,16 @@ async function runManualHandoffSmoke() {
         retryable: false
       }
     }, null, 2), "utf8");
-    await getJson(port, `/api/codex/jobs/${repair.job.id}/results`);
-    await postJson(port, `/api/codex/artifacts/${repair.job.id}/animation-quality`, { report: animationQualityReport });
-    const acceptedRepair = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/repairs/accept`, { jobId: repair.job.id });
+    await getJson(port, `/api/zai/jobs/${repair.job.id}/results`);
+    await postJson(port, `/api/zai/artifacts/${repair.job.id}/animation-quality`, { report: animationQualityReport });
+    const acceptedRepair = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/repairs/accept`, { jobId: repair.job.id });
     assert(acceptedRepair.tournament.state === "accepted", "verified Direction Repair should return the tournament to accepted");
     assert(acceptedRepair.repairedDirections.join(",") === "side", "Direction Repair should replace only the requested direction");
     assert(acceptedRepair.beforeHashes.front === acceptedRepair.afterHashes.front, "Direction Repair should preserve the front hash");
     assert(acceptedRepair.beforeHashes.back === acceptedRepair.afterHashes.back, "Direction Repair should preserve the back hash");
     assert(acceptedRepair.tournament.directionStates.side.jobId === repair.job.id, "accepted Direction Repair should attribute the repaired direction to the repair job");
     assert(acceptedRepair.tournament.directionStates.front.jobId === candidateA.job.id, "accepted Direction Repair should attribute untargeted directions to the preserved winner");
-    const reusedInitialBundleAfterRepair = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/initial-candidates`, {});
+    const reusedInitialBundleAfterRepair = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/initial-candidates`, {});
     assert(
       reusedInitialBundleAfterRepair.reused === true && reusedInitialBundleAfterRepair.jobs.length === 2,
       "profile validation should allow persisted Direction Repair candidates beyond the fixed initial plan"
@@ -949,7 +949,7 @@ async function runManualHandoffSmoke() {
       await writeFile(join(candidateC.job.outboxPath, `${candidateC.job.id}-${slug}.png`), tinyPngBytes);
     }
     await writeFile(join(candidateC.job.outboxPath, `${candidateC.job.id}-manifest.json`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId: candidateC.job.id,
       action: "walk",
       directions: ["front", "side", "back"],
@@ -960,8 +960,8 @@ async function runManualHandoffSmoke() {
       },
       chromaKey: { name: "green" }
     }, null, 2), "utf8");
-    await getJson(port, `/api/codex/jobs/${candidateC.job.id}/results`);
-    await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/review`, {
+    await getJson(port, `/api/zai/jobs/${candidateC.job.id}/results`);
+    await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/review`, {
       review: {
         manualWinnerJobId: candidateC.job.id,
         decisions: [
@@ -972,15 +972,15 @@ async function runManualHandoffSmoke() {
     });
     const manualWinnerOverride = await postJson(
       port,
-      `/api/codex/tournaments/${persistentTournamentId}/winner`,
+      `/api/zai/tournaments/${persistentTournamentId}/winner`,
       { jobId: candidateC.job.id }
     );
     assert(manualWinnerOverride.tournament.winnerCandidateId === candidateC.job.id, "saved human review should still allow an explicit manual winner override");
-    const cancelledTournament = await postJson(port, `/api/codex/tournaments/${persistentTournamentId}/cancel`, {});
+    const cancelledTournament = await postJson(port, `/api/zai/tournaments/${persistentTournamentId}/cancel`, {});
     assert(cancelledTournament.tournament.state === "cancelled", "tournament cancel should persist a terminal cancelled state");
 
     const delayedRecoveryTournamentId = "smoke-delayed-artifact-recovery";
-    await postJson(port, "/api/codex/tournaments", {
+    await postJson(port, "/api/zai/tournaments", {
       ...tournamentRegistration,
       tournamentId: delayedRecoveryTournamentId,
       idempotencyKey: "smoke:delayed-artifact-recovery:v1",
@@ -989,17 +989,17 @@ async function runManualHandoffSmoke() {
       initialCandidateCount: 1,
       clientContext: { ...tournamentRegistration.clientContext, label: "Smoke delayed artifact recovery" }
     });
-    const delayedRecoveryBundle = await postJson(port, `/api/codex/tournaments/${delayedRecoveryTournamentId}/initial-candidates`, {});
+    const delayedRecoveryBundle = await postJson(port, `/api/zai/tournaments/${delayedRecoveryTournamentId}/initial-candidates`, {});
     const delayedRecoveryCandidate = { job: delayedRecoveryBundle.jobs[0], tournament: delayedRecoveryBundle.tournament };
-    await postJson(port, `/api/codex/tournaments/${delayedRecoveryTournamentId}/evaluation`, {
+    await postJson(port, `/api/zai/tournaments/${delayedRecoveryTournamentId}/evaluation`, {
       jobId: delayedRecoveryCandidate.job.id,
       ready: false,
       warningCount: 0,
       reason: "transient client fetch failure"
     });
-    const failedDelayedRecovery = await getJson(port, `/api/codex/tournaments/${delayedRecoveryTournamentId}`);
+    const failedDelayedRecovery = await getJson(port, `/api/zai/tournaments/${delayedRecoveryTournamentId}`);
     assert(failedDelayedRecovery.tournament.state === "failed", "a sole failed candidate should move the tournament to failed");
-    const recoveredDelayedEvaluation = await postJson(port, `/api/codex/tournaments/${delayedRecoveryTournamentId}/evaluation`, {
+    const recoveredDelayedEvaluation = await postJson(port, `/api/zai/tournaments/${delayedRecoveryTournamentId}/evaluation`, {
       jobId: delayedRecoveryCandidate.job.id,
       ready: true,
       score: 3300,
@@ -1025,7 +1025,7 @@ async function runManualHandoffSmoke() {
       spriteVariant: "standard",
       directions: ["front", "side", "back"]
     };
-    const qualityV2Registration = await postJson(port, "/api/codex/tournaments", {
+    const qualityV2Registration = await postJson(port, "/api/zai/tournaments", {
       tournamentId: qualityV2TournamentId,
       idempotencyKey: "smoke:quality-v2:v1",
       sourceFingerprint: "smoke-quality-v2-source",
@@ -1039,7 +1039,7 @@ async function runManualHandoffSmoke() {
     const tournamentJob = qualityV2Registration.jobs[0];
     const hiddenManifestPath = join(tournamentJob.outboxPath, `${tournamentJob.id}-manifest.json`);
     await writeFile(hiddenManifestPath, JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId: tournamentJob.id,
       quality: "gold",
       qualityGate: {
@@ -1050,7 +1050,7 @@ async function runManualHandoffSmoke() {
         retryable: false
       }
     }, null, 2), "utf8");
-    await postJson(port, `/api/codex/artifacts/${encodeURIComponent(tournamentJob.id)}/animation-quality`, {
+    await postJson(port, `/api/zai/artifacts/${encodeURIComponent(tournamentJob.id)}/animation-quality`, {
       report: animationQualityReport
     });
     const hiddenManifest = JSON.parse(await readFile(hiddenManifestPath, "utf8"));
@@ -1060,7 +1060,7 @@ async function runManualHandoffSmoke() {
     assert(unexpectedRootTournamentManifest === false, "report-only persistence should not leak a hidden tournament manifest into root outbox");
     assert(
       generateJobJson.notes.some((note) => note.includes("built-in image generation path")),
-      "generation job should instruct Codex to use the imagegen built-in image generation path"
+      "generation job should instruct Zai to use the imagegen built-in image generation path"
     );
     assert(
       generateJobJson.notes.some((note) => note.includes("Do not create a procedural placeholder")),
@@ -1106,7 +1106,7 @@ async function runManualHandoffSmoke() {
         experimental: true
       }
     };
-    const spriteGenerateTournament = await postJson(port, "/api/codex/tournaments", {
+    const spriteGenerateTournament = await postJson(port, "/api/zai/tournaments", {
       tournamentId: "smoke-standard-sprite-job-shape",
       idempotencyKey: "smoke:standard-sprite-job-shape:v1",
       sourceFingerprint: "smoke-standard-sprite-job-shape-source",
@@ -1135,9 +1135,9 @@ async function runManualHandoffSmoke() {
     assert(spriteGenerateJobJson.annotationContext.annotationCount === 0, "sprite generation job should not carry edit annotations");
     assert(
       spriteGenerateJobJson.notes.some((note) => note.includes("built-in image_gen")),
-      "sprite generation job should instruct Codex to use built-in image generation"
+      "sprite generation job should instruct Zai to use built-in image generation"
     );
-    const duplicateDirectionTournament = await postJson(port, "/api/codex/tournaments", {
+    const duplicateDirectionTournament = await postJson(port, "/api/zai/tournaments", {
       tournamentId: "smoke-standard-direction-normalization",
       idempotencyKey: "smoke:standard-direction-normalization:v1",
       sourceFingerprint: "smoke-standard-direction-normalization-source",
@@ -1160,7 +1160,7 @@ async function runManualHandoffSmoke() {
       duplicateDirectionJobJson.spriteContext.directions.join(",") === "front",
       "standard sprite jobs should canonicalize and deduplicate directions before the runner sees them"
     );
-    const directStandardAnimationResponse = await fetch(`http://127.0.0.1:${port}/api/codex/jobs`, {
+    const directStandardAnimationResponse = await fetch(`http://127.0.0.1:${port}/api/zai/jobs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1178,7 +1178,7 @@ async function runManualHandoffSmoke() {
       "standard animation jobs should require the tournament endpoint"
     );
 
-    const effectAnimationJob = await postJson(port, "/api/codex/jobs", {
+    const effectAnimationJob = await postJson(port, "/api/zai/jobs", {
       workflowMode: "effect-animation",
       prompt: "Smoke test transparent slash effect animation sheet",
       negativePrompt: "text, watermark, checkerboard background",
@@ -1244,7 +1244,7 @@ async function runManualHandoffSmoke() {
       "effect animation job should forbid baked checkerboard backgrounds"
     );
 
-    const hatchPetJob = await postJson(port, "/api/codex/jobs", {
+    const hatchPetJob = await postJson(port, "/api/zai/jobs", {
       workflowMode: "sprite-generate",
       prompt: "Smoke test hatch-pet atlas generation with a canonical base identity",
       negativePrompt: "text, logo, shadows",
@@ -1268,13 +1268,13 @@ async function runManualHandoffSmoke() {
     assert(hatchPetJobJson.spriteContext.cell.width === 192, "hatch-pet job should include 192px cell width");
     assert(hatchPetJobJson.spriteContext.cell.height === 208, "hatch-pet job should include 208px cell height");
     assert(hatchPetJobJson.spriteContext.grid.rows === 9, "hatch-pet job should include 9 state rows");
-    assert(hatchPetJobJson.spriteContext.directions.includes("review"), "hatch-pet job should include Codex pet state rows");
+    assert(hatchPetJobJson.spriteContext.directions.includes("review"), "hatch-pet job should include Zai pet state rows");
     assert(
       hatchPetJobJson.jobNotes.includes("hatch-pet"),
-      "hatch-pet job should instruct Codex to use the hatch-pet workflow"
+      "hatch-pet job should instruct Zai to use the hatch-pet workflow"
     );
 
-    const directionalHatchPetJob = await postJson(port, "/api/codex/jobs", {
+    const directionalHatchPetJob = await postJson(port, "/api/zai/jobs", {
       workflowMode: "sprite-generate",
       prompt: "Smoke test 5-direction hatch-pet atlas set generation",
       negativePrompt: "text, logo, shadows",
@@ -1301,10 +1301,10 @@ async function runManualHandoffSmoke() {
     assert(
       directionalHatchPetJobJson.jobNotes.includes("five separate hatch-pet atlases") ||
         directionalHatchPetJobJson.jobNotes.includes("exactly five final spritesheet images"),
-      "directional hatch-pet job should instruct Codex to return five atlas images"
+      "directional hatch-pet job should instruct Zai to return five atlas images"
     );
 
-    const spriteEditJob = await postJson(port, "/api/codex/jobs", {
+    const spriteEditJob = await postJson(port, "/api/zai/jobs", {
       workflowMode: "sprite-edit",
       prompt: "Smoke test sprite sheet editing",
       negativePrompt: "text",
@@ -1327,7 +1327,7 @@ async function runManualHandoffSmoke() {
     assert(!spriteEditJobJson.selectedImage.assetPath, "sprite edit job should not attach the current selected image");
     assert(spriteEditJobJson.annotationContext.annotationCount === 0, "sprite edit job should not carry edit annotations");
 
-    const status = await getJson(port, `/api/codex/jobs/${encodeURIComponent(job.id)}/status`);
+    const status = await getJson(port, `/api/zai/jobs/${encodeURIComponent(job.id)}/status`);
     assert(status.status.state === "disabled", "status endpoint should return disabled runner state");
   } finally {
     await stopServer(server);
@@ -1337,26 +1337,26 @@ async function runManualHandoffSmoke() {
 
 async function runMockRunnerGuardSmoke() {
   const port = String(9300 + Math.floor(Math.random() * 400));
-  const handoffDir = await mkdtemp(join(tmpdir(), "image-cockpit-smoke-mock-guard-"));
-  const mockRunnerPath = join(handoffDir, "mock-codex-runner.mjs");
+  const handoffDir = await mkdtemp(join(tmpdir(), "zai-cockpit-smoke-mock-guard-"));
+  const mockRunnerPath = join(handoffDir, "mock-zai-runner.mjs");
   await writeFile(mockRunnerPath, mockRunnerSource(), "utf8");
 
   let server = startServer({
     port,
     handoffDir,
     env: {
-      IMAGE_COCKPIT_CODEX_AUTORUN: "1",
-      IMAGE_COCKPIT_CODEX_COMMAND: nodeCommand,
-      IMAGE_COCKPIT_CODEX_HELP_ARGS_JSON: JSON.stringify([mockRunnerPath, "--help"]),
-      IMAGE_COCKPIT_CODEX_EXEC_ARGS_JSON: JSON.stringify([mockRunnerPath]),
-      IMAGE_COCKPIT_ARTIFACT_STABLE_MS: "0"
+      ZAI_COCKPIT_RUNNER_AUTORUN: "1",
+      ZAI_COCKPIT_RUNNER_COMMAND: nodeCommand,
+      ZAI_COCKPIT_RUNNER_HELP_ARGS_JSON: JSON.stringify([mockRunnerPath, "--help"]),
+      ZAI_COCKPIT_RUNNER_EXEC_ARGS_JSON: JSON.stringify([mockRunnerPath]),
+      ZAI_COCKPIT_ARTIFACT_STABLE_MS: "0"
     }
   });
 
   try {
     await waitForServer(server, port);
 
-    const runnerPreflight = await getJson(port, "/api/codex/runner");
+    const runnerPreflight = await getJson(port, "/api/zai/runner");
     assert(runnerPreflight.runner?.state === "unavailable", "unapproved mock runner should not report ready");
     assert(runnerPreflight.runner?.mode === "mock", "unapproved mock runner should report mock mode");
     assert(runnerPreflight.runner?.mockRunnerAllowed === false, "unapproved mock runner should expose mockRunnerAllowed=false");
@@ -1366,7 +1366,7 @@ async function runMockRunnerGuardSmoke() {
     assert(health.runner?.state === "unavailable", "health should not report unapproved mock runner as ready");
     assert(health.runner?.mode === "mock", "health should expose mock runner mode");
 
-    const job = await postJson(port, "/api/codex/jobs", {
+    const job = await postJson(port, "/api/zai/jobs", {
       workflowMode: "image-generate",
       prompt: "Smoke test unapproved mock runner guard",
       negativePrompt: "text",
@@ -1378,9 +1378,9 @@ async function runMockRunnerGuardSmoke() {
     });
     assert(job.runner?.state === "unavailable", "unapproved mock runner job should not start running");
     assert(job.runner?.diagnostic?.kind === "runner_failed", "unapproved mock runner should return a runner diagnostic");
-    const status = await getJson(port, `/api/codex/jobs/${encodeURIComponent(job.id)}/status`);
+    const status = await getJson(port, `/api/zai/jobs/${encodeURIComponent(job.id)}/status`);
     assert(status.status.state === "unavailable", "status endpoint should keep unapproved mock runner unavailable");
-    const outboxList = await getJson(port, "/api/codex/results");
+    const outboxList = await getJson(port, "/api/zai/results");
     assert(!outboxList.results.some((result) => result.name.startsWith(job.id)), "unapproved mock runner should not create fake images");
   } finally {
     await stopServer(server);
@@ -1390,25 +1390,17 @@ async function runMockRunnerGuardSmoke() {
 
 async function runMockAutorunSmoke() {
   const port = String(9300 + Math.floor(Math.random() * 400));
-  const handoffDir = await mkdtemp(join(tmpdir(), "image-cockpit-smoke-autorun-"));
-  const mockRunnerPath = join(handoffDir, "mock-codex-runner.mjs");
+  const handoffDir = await mkdtemp(join(tmpdir(), "zai-cockpit-smoke-autorun-"));
+  const mockRunnerPath = join(handoffDir, "mock-zai-runner.mjs");
   await writeFile(mockRunnerPath, mockRunnerSource(), "utf8");
 
   const autorunEnv = {
-    IMAGE_COCKPIT_CODEX_AUTORUN: "1",
-    IMAGE_COCKPIT_ALLOW_MOCK_RUNNER: "1",
-    IMAGE_COCKPIT_CODEX_COMMAND: nodeCommand,
-    IMAGE_COCKPIT_CODEX_HELP_ARGS_JSON: JSON.stringify([mockRunnerPath, "--help"]),
-    IMAGE_COCKPIT_CODEX_EXEC_ARGS_JSON: JSON.stringify([
-      mockRunnerPath,
-      "exec",
-      "-c",
-      'approval_policy="never"',
-      "--sandbox",
-      "workspace-write",
-      "-"
-    ]),
-    IMAGE_COCKPIT_ARTIFACT_STABLE_MS: "0"
+    ZAI_COCKPIT_RUNNER_AUTORUN: "1",
+    ZAI_COCKPIT_ALLOW_MOCK_RUNNER: "1",
+    ZAI_COCKPIT_RUNNER_COMMAND: nodeCommand,
+    ZAI_COCKPIT_RUNNER_HELP_ARGS_JSON: JSON.stringify([mockRunnerPath, "--help"]),
+    ZAI_COCKPIT_RUNNER_EXEC_ARGS_JSON: JSON.stringify([mockRunnerPath, "--job"]),
+    ZAI_COCKPIT_ARTIFACT_STABLE_MS: "0"
   };
   let server = startServer({
     port,
@@ -1420,7 +1412,7 @@ async function runMockAutorunSmoke() {
   try {
     await waitForServer(server, port);
 
-    const runnerPreflight = await getJson(port, "/api/codex/runner");
+    const runnerPreflight = await getJson(port, "/api/zai/runner");
     assert(runnerPreflight.runner?.state === "ready", "mock autorun preflight should report ready");
     assert(runnerPreflight.runner?.autorun === true, "mock autorun preflight should include autorun=true");
     assert(
@@ -1428,7 +1420,7 @@ async function runMockAutorunSmoke() {
       "mock autorun preflight should expose resolved command path"
     );
 
-    const resumableJob = await postJson(port, "/api/codex/jobs", {
+    const resumableJob = await postJson(port, "/api/zai/jobs", {
       workflowMode: "image-generate",
       prompt: "Smoke test API restart resume",
       negativePrompt: "text",
@@ -1470,7 +1462,7 @@ async function runMockAutorunSmoke() {
       action: "",
       frames: 0
     };
-    const capacityBlocker = await postJson(port, "/api/codex/jobs", genericCapacityHoldTemplate);
+    const capacityBlocker = await postJson(port, "/api/zai/jobs", genericCapacityHoldTemplate);
     assert(capacityBlocker.runner?.state === "running", "capacity fixture should occupy one runner slot");
     const capacityTournamentId = "smoke-runner-cap-tournament";
     const capacityRegistration = {
@@ -1488,13 +1480,13 @@ async function runMockAutorunSmoke() {
       startInitialCandidates: true,
       jobTemplate: capacityHoldTemplate
     };
-    const reportedCapacity = await getJson(port, "/api/codex/capacity");
+    const reportedCapacity = await getJson(port, "/api/zai/capacity");
     assert(
       reportedCapacity.capacity?.active === 1 && reportedCapacity.capacity?.available === 2,
       "capacity endpoint should expose one active runner and two available slots"
     );
 
-    const bypassResponse = await fetch(`http://127.0.0.1:${port}/api/codex/jobs`, {
+    const bypassResponse = await fetch(`http://127.0.0.1:${port}/api/zai/jobs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1509,7 +1501,7 @@ async function runMockAutorunSmoke() {
     assert(bypassResponse.status === 409, "public job endpoint should reject tournament-scoped jobs");
     assert(bypassPayload.code === "tournament_job_endpoint_required", "public tournament bypass should return its explicit error code");
 
-    const semanticBypassResponse = await fetch(`http://127.0.0.1:${port}/api/codex/jobs`, {
+    const semanticBypassResponse = await fetch(`http://127.0.0.1:${port}/api/zai/jobs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(capacityHoldTemplate)
@@ -1520,7 +1512,7 @@ async function runMockAutorunSmoke() {
       semanticBypassPayload.code === "animation_tournament_endpoint_required",
       "semantic standard-animation bypass should require the tournament endpoint"
     );
-    const caseVariantBypassResponse = await fetch(`http://127.0.0.1:${port}/api/codex/jobs`, {
+    const caseVariantBypassResponse = await fetch(`http://127.0.0.1:${port}/api/zai/jobs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...capacityHoldTemplate, spriteVariant: "STANDARD" })
@@ -1533,7 +1525,7 @@ async function runMockAutorunSmoke() {
     );
 
     const queuedAdaptiveTournamentId = "smoke-queued-adaptive-c-bypass";
-    await postJson(port, "/api/codex/tournaments", {
+    await postJson(port, "/api/zai/tournaments", {
       ...capacityRegistration,
       tournamentId: queuedAdaptiveTournamentId,
       idempotencyKey: "smoke:queued-adaptive-c-bypass:v1",
@@ -1542,9 +1534,9 @@ async function runMockAutorunSmoke() {
       initialCandidateCount: 2,
       startInitialCandidates: false
     });
-    const inboxBeforeAdaptiveBypass = (await getJson(port, "/api/codex/jobs")).jobs.length;
+    const inboxBeforeAdaptiveBypass = (await getJson(port, "/api/zai/jobs")).jobs.length;
     const adaptiveBypassResponse = await fetch(
-      `http://127.0.0.1:${port}/api/codex/tournaments/${queuedAdaptiveTournamentId}/candidates`,
+      `http://127.0.0.1:${port}/api/zai/tournaments/${queuedAdaptiveTournamentId}/candidates`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1557,16 +1549,16 @@ async function runMockAutorunSmoke() {
       adaptiveBypassPayload.code === "adaptive_candidate_initial_wave_required",
       "queued adaptive candidate bypass should expose the initial-wave guard"
     );
-    const queuedAdaptiveManifest = await getJson(port, `/api/codex/tournaments/${queuedAdaptiveTournamentId}`);
+    const queuedAdaptiveManifest = await getJson(port, `/api/zai/tournaments/${queuedAdaptiveTournamentId}`);
     assert(
       queuedAdaptiveManifest.tournament.candidates.every((candidate) => !candidate.jobId),
       "rejected adaptive bypass should leave every candidate unstarted"
     );
     assert(
-      (await getJson(port, "/api/codex/jobs")).jobs.length === inboxBeforeAdaptiveBypass,
+      (await getJson(port, "/api/zai/jobs")).jobs.length === inboxBeforeAdaptiveBypass,
       "rejected adaptive bypass should not create an inbox job"
     );
-    await postJson(port, `/api/codex/tournaments/${queuedAdaptiveTournamentId}/cancel`, {});
+    await postJson(port, `/api/zai/tournaments/${queuedAdaptiveTournamentId}/cancel`, {});
 
     const queuedResumeTournamentId = "smoke-queued-bundle-capacity";
     const queuedResumeRegistration = {
@@ -1575,10 +1567,10 @@ async function runMockAutorunSmoke() {
       idempotencyKey: "smoke:queued-bundle-capacity:v1",
       startInitialCandidates: false
     };
-    await postJson(port, "/api/codex/tournaments", queuedResumeRegistration);
-    const inboxBeforeResumeRejections = (await getJson(port, "/api/codex/jobs")).jobs.length;
+    await postJson(port, "/api/zai/tournaments", queuedResumeRegistration);
+    const inboxBeforeResumeRejections = (await getJson(port, "/api/zai/jobs")).jobs.length;
     const individualInitialResponse = await fetch(
-      `http://127.0.0.1:${port}/api/codex/tournaments/${queuedResumeTournamentId}/candidates`,
+      `http://127.0.0.1:${port}/api/zai/tournaments/${queuedResumeTournamentId}/candidates`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1589,7 +1581,7 @@ async function runMockAutorunSmoke() {
     assert(individualInitialResponse.status === 409, "individual initial candidate endpoint should reject candidate A");
     assert(individualInitialPayload.code === "initial_batch_admission_required", "individual initial candidate rejection should require the bundle endpoint");
     const queuedBundleResponse = await fetch(
-      `http://127.0.0.1:${port}/api/codex/tournaments/${queuedResumeTournamentId}/initial-candidates`,
+      `http://127.0.0.1:${port}/api/zai/tournaments/${queuedResumeTournamentId}/initial-candidates`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1599,19 +1591,19 @@ async function runMockAutorunSmoke() {
     const queuedBundlePayload = await queuedBundleResponse.json();
     assert(queuedBundleResponse.status === 409, "queued initial bundle should be rejected while one runner is active");
     assert(queuedBundlePayload.code === "insufficient_runner_slots", "queued initial bundle rejection should expose the admission error code");
-    const queuedResumeManifest = await getJson(port, `/api/codex/tournaments/${queuedResumeTournamentId}`);
+    const queuedResumeManifest = await getJson(port, `/api/zai/tournaments/${queuedResumeTournamentId}`);
     assert(
       queuedResumeManifest.tournament.candidates.slice(0, 3).every((candidate) => !candidate.jobId),
       "rejected queued bundle should leave every initial candidate unstarted"
     );
     assert(
-      (await getJson(port, "/api/codex/jobs")).jobs.length === inboxBeforeResumeRejections,
+      (await getJson(port, "/api/zai/jobs")).jobs.length === inboxBeforeResumeRejections,
       "individual and queued bundle rejections should not create inbox jobs"
     );
-    await postJson(port, `/api/codex/tournaments/${queuedResumeTournamentId}/cancel`, {});
+    await postJson(port, `/api/zai/tournaments/${queuedResumeTournamentId}/cancel`, {});
 
-    const inboxBeforeRejectedBundle = (await getJson(port, "/api/codex/jobs")).jobs.length;
-    const capacityResponse = await fetch(`http://127.0.0.1:${port}/api/codex/tournaments`, {
+    const inboxBeforeRejectedBundle = (await getJson(port, "/api/zai/jobs")).jobs.length;
+    const capacityResponse = await fetch(`http://127.0.0.1:${port}/api/zai/tournaments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(capacityRegistration)
@@ -1621,13 +1613,13 @@ async function runMockAutorunSmoke() {
     assert(capacityPayload.code === "insufficient_runner_slots", "Best initial bundle rejection should expose the admission error code");
     assert(capacityPayload.requiredSlots === 3, "Best initial bundle rejection should require all three slots");
     assert(capacityPayload.capacity?.active === 1 && capacityPayload.capacity?.available === 2, "Best initial bundle rejection should report 1 active and 2 available slots");
-    const rejectedTournament = await fetch(`http://127.0.0.1:${port}/api/codex/tournaments/${capacityTournamentId}`);
+    const rejectedTournament = await fetch(`http://127.0.0.1:${port}/api/zai/tournaments/${capacityTournamentId}`);
     assert(rejectedTournament.status === 404, "rejected Best admission should not leave a tournament manifest");
-    const inboxAfterRejectedBundle = (await getJson(port, "/api/codex/jobs")).jobs.length;
+    const inboxAfterRejectedBundle = (await getJson(port, "/api/zai/jobs")).jobs.length;
     assert(inboxAfterRejectedBundle === inboxBeforeRejectedBundle, "rejected Best admission should not create candidate inbox jobs");
     await waitForJobState(port, capacityBlocker.id, "completed", 22000);
 
-    const admittedCapacityTournament = await postJson(port, "/api/codex/tournaments", capacityRegistration);
+    const admittedCapacityTournament = await postJson(port, "/api/zai/tournaments", capacityRegistration);
     assert(admittedCapacityTournament.jobs.length === 3, "idle runner pool should atomically start all three Best candidates");
     assert(new Set(admittedCapacityTournament.jobs.map((job) => job.id)).size === 3, "atomic Best admission should return three distinct job ids");
     assert(admittedCapacityTournament.jobs.every((job) => job.runner?.state === "running"), "all three admitted Best candidates should be running in one response");
@@ -1635,7 +1627,7 @@ async function runMockAutorunSmoke() {
       admittedCapacityTournament.tournament.candidates.slice(0, 3).every((candidate) => Boolean(candidate.jobId)),
       "atomic Best admission should attach A/B/C before returning"
     );
-    const duplicateCapacityTournament = await postJson(port, "/api/codex/tournaments", capacityRegistration);
+    const duplicateCapacityTournament = await postJson(port, "/api/zai/tournaments", capacityRegistration);
     assert(
       duplicateCapacityTournament.jobs.map((job) => job.id).join(",") === admittedCapacityTournament.jobs.map((job) => job.id).join(","),
       "duplicate atomic admission should reuse the same A/B/C jobs"
@@ -1652,12 +1644,12 @@ async function runMockAutorunSmoke() {
     };
     const raceTournamentId = "smoke-atomic-admission-race";
     const [genericRaceResponse, tournamentRaceResponse] = await Promise.all([
-      fetch(`http://127.0.0.1:${port}/api/codex/jobs`, {
+      fetch(`http://127.0.0.1:${port}/api/zai/jobs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(genericRaceTemplate)
       }),
-      fetch(`http://127.0.0.1:${port}/api/codex/tournaments`, {
+      fetch(`http://127.0.0.1:${port}/api/zai/tournaments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1687,7 +1679,7 @@ async function runMockAutorunSmoke() {
       assert(tournamentRacePayload.jobs?.length === 3, "animation race winner should atomically start three candidates");
       raceJobIds.push(...tournamentRacePayload.jobs.map((job) => job.id));
     }
-    const raceCapacity = await getJson(port, "/api/codex/capacity");
+    const raceCapacity = await getJson(port, "/api/zai/capacity");
     assert(
       raceCapacity.capacity.active === raceJobIds.length && [1, 3].includes(raceCapacity.capacity.active),
       "concurrent admission should leave either one generic runner or exactly three animation runners"
@@ -1706,12 +1698,12 @@ async function runMockAutorunSmoke() {
       }
     };
     const [plainRegistrationRaceResponse, startRegistrationRaceResponse] = await Promise.all([
-      fetch(`http://127.0.0.1:${port}/api/codex/tournaments`, {
+      fetch(`http://127.0.0.1:${port}/api/zai/tournaments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(registrationRaceBase)
       }),
-      fetch(`http://127.0.0.1:${port}/api/codex/tournaments`, {
+      fetch(`http://127.0.0.1:${port}/api/zai/tournaments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...registrationRaceBase, startInitialCandidates: true })
@@ -1722,7 +1714,7 @@ async function runMockAutorunSmoke() {
       `plain registration and register+start should serialize without deadlock: plain=${plainRegistrationRaceResponse.status}, start=${startRegistrationRaceResponse.status}`
     );
     await Promise.all([plainRegistrationRaceResponse.json(), startRegistrationRaceResponse.json()]);
-    const registrationRaceManifest = await getJson(port, `/api/codex/tournaments/${registrationRaceTournamentId}`);
+    const registrationRaceManifest = await getJson(port, `/api/zai/tournaments/${registrationRaceTournamentId}`);
     const registrationRaceJobIds = registrationRaceManifest.tournament.candidates
       .slice(0, 3)
       .map((candidate) => candidate.jobId)
@@ -1731,7 +1723,7 @@ async function runMockAutorunSmoke() {
     await Promise.all(registrationRaceJobIds.map((jobId) => waitForJobState(port, jobId, "completed")));
 
     const firstQualifiedTournamentId = "smoke-first-qualified-cancellation";
-    const firstQualifiedRegistration = await postJson(port, "/api/codex/tournaments", {
+    const firstQualifiedRegistration = await postJson(port, "/api/zai/tournaments", {
       tournamentId: firstQualifiedTournamentId,
       idempotencyKey: "smoke:first-qualified:cancellation:v1",
       sourceFingerprint: "smoke-first-qualified-source",
@@ -1770,7 +1762,7 @@ async function runMockAutorunSmoke() {
       await writeFile(join(firstQualifiedA.outboxPath, `${firstQualifiedA.id}-${slug}.png`), tinyPngBytes);
     }
     await writeFile(join(firstQualifiedA.outboxPath, `${firstQualifiedA.id}-manifest.json`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId: firstQualifiedA.id,
       action: "walk",
       directions: ["front", "side", "back"],
@@ -1784,10 +1776,10 @@ async function runMockAutorunSmoke() {
     }, null, 2), "utf8");
     await waitForJobState(port, firstQualifiedA.id, "completed");
     for (const activeJob of [firstQualifiedB, firstQualifiedC]) {
-      const activeStatus = await getJson(port, `/api/codex/jobs/${activeJob.id}/status`);
+      const activeStatus = await getJson(port, `/api/zai/jobs/${activeJob.id}/status`);
       assert(activeStatus.status.state === "running", "First Qualified fixture should keep both remaining candidates active");
     }
-    await postJson(port, `/api/codex/tournaments/${firstQualifiedTournamentId}/evaluation`, {
+    await postJson(port, `/api/zai/tournaments/${firstQualifiedTournamentId}/evaluation`, {
       jobId: firstQualifiedA.id,
       ready: true,
       score: 3400,
@@ -1797,7 +1789,7 @@ async function runMockAutorunSmoke() {
       reason: "warning rejection fixture"
     });
     const rejectedWarnedFirstQualified = await fetch(
-      `http://127.0.0.1:${port}/api/codex/tournaments/${firstQualifiedTournamentId}/winner`,
+      `http://127.0.0.1:${port}/api/zai/tournaments/${firstQualifiedTournamentId}/winner`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1812,7 +1804,7 @@ async function runMockAutorunSmoke() {
       }
     );
     assert(rejectedWarnedFirstQualified.status === 409, "First Qualified should reject a candidate with any quality warning");
-    await postJson(port, `/api/codex/tournaments/${firstQualifiedTournamentId}/evaluation`, {
+    await postJson(port, `/api/zai/tournaments/${firstQualifiedTournamentId}/evaluation`, {
       jobId: firstQualifiedA.id,
       ready: true,
       score: 3400,
@@ -1823,7 +1815,7 @@ async function runMockAutorunSmoke() {
     });
     const acceptedFirstQualified = await postJson(
       port,
-      `/api/codex/tournaments/${firstQualifiedTournamentId}/winner`,
+      `/api/zai/tournaments/${firstQualifiedTournamentId}/winner`,
       {
         jobId: firstQualifiedA.id,
         decision: {
@@ -1843,7 +1835,7 @@ async function runMockAutorunSmoke() {
       "First Qualified acceptance should cancel both remaining candidates"
     );
     for (const cancelledJob of [firstQualifiedB, firstQualifiedC]) {
-      const cancelledStatus = await getJson(port, `/api/codex/jobs/${cancelledJob.id}/status`);
+      const cancelledStatus = await getJson(port, `/api/zai/jobs/${cancelledJob.id}/status`);
       assert(
         cancelledStatus.status.state === "failed" && cancelledStatus.status.message.includes("cancelled"),
         "First Qualified loser runners should stop inside winner acceptance"
@@ -1851,7 +1843,7 @@ async function runMockAutorunSmoke() {
     }
 
     const smartRaceTournamentId = "smoke-smart-race-cancellation";
-    const smartRaceRegistration = await postJson(port, "/api/codex/tournaments", {
+    const smartRaceRegistration = await postJson(port, "/api/zai/tournaments", {
       tournamentId: smartRaceTournamentId,
       idempotencyKey: "smoke:smart-race:cancellation:v1",
       sourceFingerprint: "smoke-smart-race-source",
@@ -1892,7 +1884,7 @@ async function runMockAutorunSmoke() {
       await writeFile(join(smartRaceC.job.outboxPath, `${smartRaceC.job.id}-${slug}.png`), tinyPngBytes);
     }
     await writeFile(join(smartRaceC.job.outboxPath, `${smartRaceC.job.id}-manifest.json`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId: smartRaceC.job.id,
       action: "walk",
       directions: ["front", "side", "back"],
@@ -1908,9 +1900,9 @@ async function runMockAutorunSmoke() {
       waitForJobState(port, smartRaceB.job.id, "completed"),
       waitForJobState(port, smartRaceC.job.id, "completed")
     ]);
-    const smartRaceAStatus = await getJson(port, `/api/codex/jobs/${smartRaceA.job.id}/status`);
+    const smartRaceAStatus = await getJson(port, `/api/zai/jobs/${smartRaceA.job.id}/status`);
     assert(smartRaceAStatus.status.state === "running", "Smart Race fixture should keep candidate A active");
-    await postJson(port, `/api/codex/tournaments/${smartRaceTournamentId}/evaluation`, {
+    await postJson(port, `/api/zai/tournaments/${smartRaceTournamentId}/evaluation`, {
       jobId: smartRaceB.job.id,
       ready: true,
       score: 3275,
@@ -1919,7 +1911,7 @@ async function runMockAutorunSmoke() {
       shadowWouldBlock: true,
       reason: "measured B fixture"
     });
-    await postJson(port, `/api/codex/tournaments/${smartRaceTournamentId}/evaluation`, {
+    await postJson(port, `/api/zai/tournaments/${smartRaceTournamentId}/evaluation`, {
       jobId: smartRaceC.job.id,
       ready: true,
       score: 3325,
@@ -1939,7 +1931,7 @@ async function runMockAutorunSmoke() {
     };
     const acceptedSmartRace = await postJson(
       port,
-      `/api/codex/tournaments/${smartRaceTournamentId}/winner`,
+      `/api/zai/tournaments/${smartRaceTournamentId}/winner`,
       smartRaceWinnerRequest
     );
     assert(acceptedSmartRace.tournament.state === "accepted", "Smart Race winner should be durably accepted");
@@ -1950,20 +1942,20 @@ async function runMockAutorunSmoke() {
       acceptedSmartRace.cancellationResults.some((result) => result.jobId === smartRaceA.job.id && result.ok),
       "winner response should include the server-side candidate A cancellation"
     );
-    const cancelledSmartRaceA = await getJson(port, `/api/codex/jobs/${smartRaceA.job.id}/status`);
+    const cancelledSmartRaceA = await getJson(port, `/api/zai/jobs/${smartRaceA.job.id}/status`);
     assert(cancelledSmartRaceA.status.state === "failed" && cancelledSmartRaceA.status.message.includes("cancelled"), "candidate A runner should stop inside winner acceptance");
-    const completedSmartRaceB = await getJson(port, `/api/codex/jobs/${smartRaceB.job.id}/status`);
+    const completedSmartRaceB = await getJson(port, `/api/zai/jobs/${smartRaceB.job.id}/status`);
     assert(completedSmartRaceB.status.state === "completed", "candidate B should be terminal before crash-window simulation");
     const firstDecisionTimestamp = acceptedSmartRace.tournament.smartRaceDecision.decidedAt;
     const repeatedSmartRaceWinner = await postJson(
       port,
-      `/api/codex/tournaments/${smartRaceTournamentId}/winner`,
+      `/api/zai/tournaments/${smartRaceTournamentId}/winner`,
       smartRaceWinnerRequest
     );
     assert(repeatedSmartRaceWinner.reused === true, "same Smart Race winner POST should reuse the published result");
     assert(repeatedSmartRaceWinner.tournament.smartRaceDecision.decidedAt === firstDecisionTimestamp, "same winner POST should preserve the first decision");
     const rejectedDifferentSmartRaceWinner = await fetch(
-      `http://127.0.0.1:${port}/api/codex/tournaments/${smartRaceTournamentId}/winner`,
+      `http://127.0.0.1:${port}/api/zai/tournaments/${smartRaceTournamentId}/winner`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1972,9 +1964,9 @@ async function runMockAutorunSmoke() {
     );
     assert(rejectedDifferentSmartRaceWinner.status === 409, "a different automatic winner should be rejected after acceptance");
 
-    const repairManifestBeforeCapacityBlock = await getJson(port, `/api/codex/tournaments/${smartRaceTournamentId}`);
+    const repairManifestBeforeCapacityBlock = await getJson(port, `/api/zai/tournaments/${smartRaceTournamentId}`);
     const repairCapacityBlockers = await Promise.all(
-      [0, 1, 2].map((index) => postJson(port, "/api/codex/jobs", {
+      [0, 1, 2].map((index) => postJson(port, "/api/zai/jobs", {
         ...genericCapacityHoldTemplate,
         prompt: `Smoke test admission race hold repair capacity ${index + 1}`
       }))
@@ -1984,7 +1976,7 @@ async function runMockAutorunSmoke() {
       "repair capacity fixture should occupy all three runner slots"
     );
     const blockedRepairResponse = await fetch(
-      `http://127.0.0.1:${port}/api/codex/tournaments/${smartRaceTournamentId}/repairs`,
+      `http://127.0.0.1:${port}/api/zai/tournaments/${smartRaceTournamentId}/repairs`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1994,7 +1986,7 @@ async function runMockAutorunSmoke() {
     const blockedRepairPayload = await blockedRepairResponse.json();
     assert(blockedRepairResponse.status === 409, "Direction Repair should reject while all runner slots are occupied");
     assert(blockedRepairPayload.code === "runner_slots_full", "blocked Direction Repair should expose the runner capacity error");
-    const repairManifestAfterCapacityBlock = await getJson(port, `/api/codex/tournaments/${smartRaceTournamentId}`);
+    const repairManifestAfterCapacityBlock = await getJson(port, `/api/zai/tournaments/${smartRaceTournamentId}`);
     assert(
       repairManifestAfterCapacityBlock.tournament.retryCount === repairManifestBeforeCapacityBlock.tournament.retryCount,
       "capacity-blocked Direction Repair should not consume a retry"
@@ -2043,14 +2035,14 @@ async function runMockAutorunSmoke() {
     ]);
     server = startServer({ port, handoffDir, env: autorunEnv });
     await waitForServer(server, port);
-    const restoredSmartRace = await getJson(port, `/api/codex/tournaments/${smartRaceTournamentId}`);
+    const restoredSmartRace = await getJson(port, `/api/zai/tournaments/${smartRaceTournamentId}`);
     assert(restoredSmartRace.tournament.selectionPolicy === "smart-race", "Smart Race policy should survive API restart");
     assert(restoredSmartRace.tournament.candidates[1].identityScore === 82.04, "runner-up identity should survive API restart");
     assert(restoredSmartRace.tournament.candidates[1].shadowWouldBlock === true, "runner-up shadow result should survive API restart");
     assert(restoredSmartRace.tournament.candidates[2].identityScore === 83.96, "winner identity should survive API restart");
     assert(restoredSmartRace.tournament.candidates[2].shadowWouldBlock === false, "winner shadow result should survive API restart");
     assert(restoredSmartRace.tournament.smartRaceDecision.decidedAt === firstDecisionTimestamp, "Smart Race decision should survive API restart");
-    const restoredSmartRaceBStatus = await getJson(port, `/api/codex/jobs/${smartRaceB.job.id}/status`);
+    const restoredSmartRaceBStatus = await getJson(port, `/api/zai/jobs/${smartRaceB.job.id}/status`);
     assert(restoredSmartRaceBStatus.status.state === "failed", "accepted terminal loser should be recovered as cancelled instead of resuming");
     if (process.platform === "win32") {
       assert(
@@ -2070,14 +2062,14 @@ async function runMockAutorunSmoke() {
     assert((restoredSmartRaceBStatus.status.resumeCount ?? 0) === (completedSmartRaceB.status.resumeCount ?? 0), "accepted terminal loser resume count should remain unchanged");
     const unconfirmedSmartRaceWinner = await postJson(
       port,
-      `/api/codex/tournaments/${smartRaceTournamentId}/winner`,
+      `/api/zai/tournaments/${smartRaceTournamentId}/winner`,
       { jobId: smartRaceC.job.id }
     );
     assert(
       unconfirmedSmartRaceWinner.cancellationResults.some((result) => result.jobId === smartRaceA.job.id && !result.ok),
       `mismatched orphan identity should remain unconfirmed: ${JSON.stringify(unconfirmedSmartRaceWinner.cancellationResults)}`
     );
-    const pendingSmartRaceAStatus = await getJson(port, `/api/codex/jobs/${smartRaceA.job.id}/status`);
+    const pendingSmartRaceAStatus = await getJson(port, `/api/zai/jobs/${smartRaceA.job.id}/status`);
     assert(pendingSmartRaceAStatus.status.cancellationPending === true, "unconfirmed orphan cancellation should remain idempotently retryable");
     assert(!(await waitForProcessExit(simulatedOrphanPid, 250)), "identity mismatch must not terminate the simulated orphan runner");
     await stopServer(server);
@@ -2096,10 +2088,10 @@ async function runMockAutorunSmoke() {
     await waitForServer(server, port);
     const reconciledSmartRaceWinner = await postJson(
       port,
-      `/api/codex/tournaments/${smartRaceTournamentId}/winner`,
+      `/api/zai/tournaments/${smartRaceTournamentId}/winner`,
       { jobId: smartRaceC.job.id }
     );
-    const restoredSmartRaceAStatus = await getJson(port, `/api/codex/jobs/${smartRaceA.job.id}/status`);
+    const restoredSmartRaceAStatus = await getJson(port, `/api/zai/jobs/${smartRaceA.job.id}/status`);
     if (process.platform === "win32") {
       assert(
         reconciledSmartRaceWinner.cancellationResults.some((result) => result.jobId === smartRaceA.job.id && result.ok),
@@ -2118,7 +2110,7 @@ async function runMockAutorunSmoke() {
     assert(restoredSmartRaceAStatus.status.state === "failed", "accepted loser should not resume after API restart");
     assert((restoredSmartRaceAStatus.status.resumeCount ?? 0) === (cancelledSmartRaceA.status.resumeCount ?? 0), "accepted loser resume count should remain unchanged");
 
-    const job = await postJson(port, "/api/codex/jobs", {
+    const job = await postJson(port, "/api/zai/jobs", {
       workflowMode: "image-generate",
       prompt: "Smoke test mock autorun generation",
       negativePrompt: "text",
@@ -2139,19 +2131,19 @@ async function runMockAutorunSmoke() {
     assert(completedStatus.status.logPath, "completed mock autorun status should include log path");
     assert(!completedStatus.status.diagnostic, "mock autorun exact job-id result should not create a diagnostic");
     await stat(completedStatus.status.logPath);
-    const completedLog = await getJson(port, `/api/codex/jobs/${encodeURIComponent(job.id)}/log?bytes=4096`);
+    const completedLog = await getJson(port, `/api/zai/jobs/${encodeURIComponent(job.id)}/log?bytes=4096`);
     assert(completedLog.jobId === job.id, "job log endpoint should return the matching job id");
     assert(completedLog.exists === true, "job log endpoint should report an existing log");
     assert(completedLog.text.includes("mock completed"), "job log endpoint should expose runner output");
     assert(typeof completedLog.readAt === "string", "job log endpoint should include readAt");
 
-    const outboxList = await getJson(port, "/api/codex/results");
+    const outboxList = await getJson(port, "/api/zai/results");
     const resultName = `${job.id}.png`;
     assert(outboxList.results.some((result) => result.name === resultName), "mock autorun result image should be listed");
-    const importedResult = await getJson(port, `/api/codex/results/${encodeURIComponent(resultName)}`);
+    const importedResult = await getJson(port, `/api/zai/results/${encodeURIComponent(resultName)}`);
     assert(importedResult.dataUrl === tinyPng, "mock autorun result should import as expected PNG data URL");
 
-    const blockedJob = await postJson(port, "/api/codex/jobs", {
+    const blockedJob = await postJson(port, "/api/zai/jobs", {
       workflowMode: "image-generate",
       prompt: "Smoke test policy blocked sidecar",
       negativePrompt: "text",
@@ -2164,10 +2156,10 @@ async function runMockAutorunSmoke() {
     const blockedStatus = await waitForJobDiagnostic(port, blockedJob.id, "policy_or_safety");
     assert(blockedStatus.status.state === "completed", "policy sidecar job should complete without a placeholder image");
     assert(blockedStatus.status.diagnostic?.kind === "policy_or_safety", "blocked sidecar should return policy_or_safety diagnostic");
-    const blockedOutbox = await getJson(port, "/api/codex/results");
+    const blockedOutbox = await getJson(port, "/api/zai/results");
     assert(!blockedOutbox.results.some((result) => result.name.startsWith(`${blockedJob.id}-`)), "blocked sidecar should not create a fake image");
 
-    const unavailableJob = await postJson(port, "/api/codex/jobs", {
+    const unavailableJob = await postJson(port, "/api/zai/jobs", {
       workflowMode: "image-generate",
       prompt: "Smoke test imagegen unavailable sidecar",
       negativePrompt: "text",
@@ -2180,10 +2172,10 @@ async function runMockAutorunSmoke() {
     const unavailableStatus = await waitForJobDiagnostic(port, unavailableJob.id, "imagegen_unavailable");
     assert(unavailableStatus.status.state === "completed", "imagegen unavailable sidecar should complete without a placeholder image");
     assert(unavailableStatus.status.diagnostic?.kind === "imagegen_unavailable", "blocked sidecar should return imagegen_unavailable diagnostic");
-    const unavailableOutbox = await getJson(port, "/api/codex/results");
+    const unavailableOutbox = await getJson(port, "/api/zai/results");
     assert(!unavailableOutbox.results.some((result) => result.name.startsWith(`${unavailableJob.id}-`)), "imagegen unavailable sidecar should not create a fake image");
 
-    const failedJob = await postJson(port, "/api/codex/jobs", {
+    const failedJob = await postJson(port, "/api/zai/jobs", {
       workflowMode: "image-generate",
       prompt: "Smoke test policy runner failed",
       negativePrompt: "text",
@@ -2197,7 +2189,7 @@ async function runMockAutorunSmoke() {
     assert(failedStatus.status.state === "failed", "policy stderr job should fail runner");
     assert(failedStatus.status.diagnostic?.kind === "policy_or_safety", "policy stderr should return policy_or_safety diagnostic");
 
-    const modelCapacityJob = await postJson(port, "/api/codex/jobs", {
+    const modelCapacityJob = await postJson(port, "/api/zai/jobs", {
       workflowMode: "image-generate",
       prompt: "Smoke test model at capacity runner failed",
       negativePrompt: "text",
@@ -2211,7 +2203,7 @@ async function runMockAutorunSmoke() {
     assert(modelCapacityStatus.status.state === "failed", "model capacity stderr should fail the runner");
     assert(modelCapacityStatus.status.diagnostic?.kind === "runner_failed", "model capacity should not be misclassified from echoed prompt instructions");
 
-    const noImageJob = await postJson(port, "/api/codex/jobs", {
+    const noImageJob = await postJson(port, "/api/zai/jobs", {
       workflowMode: "image-generate",
       prompt: "Smoke test no image returned",
       negativePrompt: "text",
@@ -2237,8 +2229,8 @@ function startServer({ port, handoffDir, env }) {
     env: {
       ...process.env,
       ...env,
-      IMAGE_COCKPIT_API_PORT: port,
-      IMAGE_COCKPIT_HANDOFF_DIR: handoffDir
+      ZAI_COCKPIT_API_PORT: port,
+      ZAI_COCKPIT_HANDOFF_DIR: handoffDir
     },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true
@@ -2296,7 +2288,7 @@ async function waitForJobState(apiPort, jobId, expectedState, timeoutMs = 8000) 
   const deadline = Date.now() + timeoutMs;
   let lastStatus;
   while (Date.now() < deadline) {
-    lastStatus = await getJson(apiPort, `/api/codex/jobs/${encodeURIComponent(jobId)}/status`);
+    lastStatus = await getJson(apiPort, `/api/zai/jobs/${encodeURIComponent(jobId)}/status`);
     if (lastStatus.status?.state === expectedState) return lastStatus;
     await new Promise((resolve) => setTimeout(resolve, 150));
   }
@@ -2327,7 +2319,7 @@ async function waitForJobDiagnostic(apiPort, jobId, expectedKind) {
   const deadline = Date.now() + 8000;
   let lastStatus;
   while (Date.now() < deadline) {
-    lastStatus = await getJson(apiPort, `/api/codex/jobs/${encodeURIComponent(jobId)}/status`);
+    lastStatus = await getJson(apiPort, `/api/zai/jobs/${encodeURIComponent(jobId)}/status`);
     if (lastStatus.status?.diagnostic?.kind === expectedKind) return lastStatus;
     await new Promise((resolve) => setTimeout(resolve, 150));
   }
@@ -2348,7 +2340,7 @@ import { join } from "node:path";
 const tinyPng = "${tinyPng}";
 
 if (process.argv.includes("--help")) {
-  console.log("mock codex runner");
+  console.log("mock zai runner");
   process.exit(0);
 }
 
@@ -2358,39 +2350,34 @@ for await (const chunk of process.stdin) {
   stdin += chunk;
 }
 
-if (!stdin.includes("Image Cockpit for Codex Workflows")) {
-  console.error("missing Image Cockpit prompt");
+if (!stdin.includes("Zai Cockpit")) {
+  console.error("missing Zai Cockpit prompt");
   process.exit(2);
 }
 
-if (!stdin.includes("built-in imagegen / image_gen") || !stdin.includes("procedural, SVG, canvas, diagram, geometric, or placeholder image")) {
+if (!stdin.includes("generate_image tool") || !stdin.includes("procedural, SVG, canvas, diagram, geometric, or placeholder")) {
   console.error("missing imagegen runner instructions");
   process.exit(5);
 }
 
 const standardDirectionContract = [
-  "five requested directions means five concurrent image_gen calls inside this one candidate",
-  "Capture the exact path returned by that call and bind it one-to-one to that direction",
+  "call generate_image once per requested direction",
+  "Bind each saved file one-to-one to its direction",
   "directionAttempts keyed by canonical direction slug",
-  "Never submit image_gen for it again",
+  "Never regenerate an accepted direction",
   "regenerating the complete requested direction set because one direction failed is prohibited",
-  "Direction Repair or Motion Pilot expansion may request any 1-5 direction subset",
-  "Track a concurrency ceiling separately from the actual wave size",
-  "each actual wave size is min(concurrency ceiling, pending direction count)",
-  "reduce ceiling 5 or 4 to 3",
-  "must not create more Codex jobs",
-  "Do not create direction child-job UI, partial direction previews, or cross-job generation caches"
+  "Keep the retry loop inside this single job and never request more directions than the job asked for"
 ];
 if (!standardDirectionContract.every((marker) => stdin.includes(marker))) {
   console.error("missing standard direction parallel runner contract");
   process.exit(6);
 }
 
-const jobId = process.env.IMAGE_COCKPIT_JOB_ID;
-const jobPath = process.env.IMAGE_COCKPIT_JOB_PATH;
-const outboxDir = process.env.IMAGE_COCKPIT_OUTBOX_DIR;
+const jobId = process.env.ZAI_COCKPIT_JOB_ID;
+const jobPath = process.env.ZAI_COCKPIT_JOB_PATH;
+const outboxDir = process.env.ZAI_COCKPIT_OUTBOX_DIR;
 if (!jobId || !jobPath || !outboxDir) {
-  console.error("missing Image Cockpit runner environment");
+  console.error("missing Zai Cockpit runner environment");
   process.exit(3);
 }
 
@@ -2439,7 +2426,7 @@ if (job.prompt.includes("imagegen unavailable sidecar")) {
   await writeFile(join(outboxDir, \`\${jobId}-blocked.json\`), JSON.stringify({
     status: "blocked",
     reasonKind: "imagegen_unavailable",
-    userMessage: "Image generation is not available in this Codex environment.",
+    userMessage: "Image generation is not available in this Zai environment.",
     suggestion: "Use manual handoff or another provider."
   }, null, 2), "utf8");
   console.log(\`mock imagegen unavailable sidecar \${jobId}\`);

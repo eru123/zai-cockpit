@@ -17,12 +17,12 @@ Please include:
 
 ## Security Boundaries
 
-- The app is local-first and should not require an API key.
-- The app should not call OpenAI APIs directly.
+- The app is local-first; the Z.ai API key lives in `.env` and is only read by the local agent runner.
+- The app talks only to Z.ai endpoints configured via `ZAI_*` variables.
 - Local handoff files may include user prompts, image references, selected source assets, annotations, and generated outputs.
-- `codex-handoff/`, `.env`, downloaded assets, API keys, access tokens, and model weights should not be committed.
+- `zai-handoff/`, `.env`, downloaded assets, API keys, access tokens, and model weights should not be committed.
 - Generated or imported assets should be treated as user-controlled content.
 
 ## Runner Notes
 
-When `IMAGE_COCKPIT_CODEX_AUTORUN=1`, the local server attempts to launch the configured Codex command. If the command is unavailable, denied, or blocked, the runner should record `unavailable` and fall back to manual handoff instead of retrying indefinitely.
+When `ZAI_COCKPIT_RUNNER_AUTORUN=1`, the local server attempts to launch the configured Zai command. If the command is unavailable, denied, or blocked, the runner should record `unavailable` and fall back to manual handoff instead of retrying indefinitely.

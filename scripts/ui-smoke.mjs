@@ -8,7 +8,7 @@ import { deflateSync } from "node:zlib";
 import JSZip from "jszip";
 
 const nodeCommand = process.execPath;
-const browserCommand = process.env.IMAGE_COCKPIT_BROWSER_COMMAND || findBrowserCommand();
+const browserCommand = process.env.ZAI_COCKPIT_BROWSER_COMMAND || findBrowserCommand();
 const tinyPng =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
 const basicCharacterPromptExampleChecks = [
@@ -65,18 +65,18 @@ const expectedNewPromptCategoryCounts = {
 };
 const expectedSimplePromptPresetCount = 9;
 const expectedDetailedPromptExampleCount = 137;
-const expectedCodexLogHistoryLimit = 3;
+const expectedZaiLogHistoryLimit = 3;
 
 if (!browserCommand) {
-  console.error("UI smoke requires Chrome or Edge. Set IMAGE_COCKPIT_BROWSER_COMMAND to a browser executable.");
+  console.error("UI smoke requires Chrome or Edge. Set ZAI_COCKPIT_BROWSER_COMMAND to a browser executable.");
   process.exit(1);
 }
 
-const tempRoot = await mkdtemp(join(tmpdir(), "image-cockpit-ui-smoke-"));
+const tempRoot = await mkdtemp(join(tmpdir(), "zai-cockpit-ui-smoke-"));
 const handoffDir = join(tempRoot, "handoff");
 const chromeProfileDir = join(tempRoot, "chrome-profile");
-const mockRunnerPath = join(tempRoot, "mock-codex-runner.mjs");
-const mockAnimationPackPath = join(tempRoot, "mock-run-cycle.image-cockpit-animation.zip");
+const mockRunnerPath = join(tempRoot, "mock-zai-runner.mjs");
+const mockAnimationPackPath = join(tempRoot, "mock-run-cycle.zai-cockpit-animation.zip");
 const mockFullBodySourcePath = join(tempRoot, "mock-full-body-source.png");
 const mockImportFailureMarkerPath = join(tempRoot, "mock-direction-split-import-failure.flag");
 const mockQualityGateFailureMarkerPath = join(tempRoot, "mock-direction-split-quality-gate-failure.flag");
@@ -86,11 +86,11 @@ const apiPort = await getOpenPort();
 const vitePort = await getOpenPort();
 const debugPort = await getOpenPort();
 const appUrl = `http://127.0.0.1:${vitePort}/`;
-const screenshotDir = process.env.IMAGE_COCKPIT_UI_SMOKE_SCREENSHOT_DIR;
-const onlyEffectSmoke = process.env.IMAGE_COCKPIT_UI_SMOKE_ONLY_EFFECT === "1";
-const onlyVfxCompositeSmoke = process.env.IMAGE_COCKPIT_UI_SMOKE_ONLY_VFX_COMPOSITE === "1";
-const onlySingleDirectionSmoke = process.env.IMAGE_COCKPIT_UI_SMOKE_ONLY_SINGLE_DIRECTION === "1";
-const onlyAnimationAdmissionSmoke = process.env.IMAGE_COCKPIT_UI_SMOKE_ONLY_ANIMATION_ADMISSION === "1";
+const screenshotDir = process.env.ZAI_COCKPIT_UI_SMOKE_SCREENSHOT_DIR;
+const onlyEffectSmoke = process.env.ZAI_COCKPIT_UI_SMOKE_ONLY_EFFECT === "1";
+const onlyVfxCompositeSmoke = process.env.ZAI_COCKPIT_UI_SMOKE_ONLY_VFX_COMPOSITE === "1";
+const onlySingleDirectionSmoke = process.env.ZAI_COCKPIT_UI_SMOKE_ONLY_SINGLE_DIRECTION === "1";
+const onlyAnimationAdmissionSmoke = process.env.ZAI_COCKPIT_UI_SMOKE_ONLY_ANIMATION_ADMISSION === "1";
 
 let apiServer;
 let viteServer;
@@ -102,20 +102,20 @@ try {
   await writeFile(mockAnimationPackPath, Buffer.from(await createMockAnimationPack()));
   await writeFile(mockFullBodySourcePath, makeFullBodySourcePng());
   apiServer = startProcess(nodeCommand, ["node_modules/tsx/dist/cli.mjs", "server/index.ts"], {
-    IMAGE_COCKPIT_API_PORT: String(apiPort),
-    IMAGE_COCKPIT_HANDOFF_DIR: handoffDir,
-    IMAGE_COCKPIT_CODEX_AUTORUN: "1",
-    IMAGE_COCKPIT_ALLOW_MOCK_RUNNER: "1",
-    IMAGE_COCKPIT_CODEX_COMMAND: nodeCommand,
-    IMAGE_COCKPIT_CODEX_HELP_ARGS_JSON: JSON.stringify([mockRunnerPath, "--help"]),
-    IMAGE_COCKPIT_CODEX_EXEC_ARGS_JSON: JSON.stringify([mockRunnerPath]),
-    IMAGE_COCKPIT_MOCK_RUNNER_DELAY_MS: "2600",
-    IMAGE_COCKPIT_ARTIFACT_STABLE_MS: "0"
+    ZAI_COCKPIT_API_PORT: String(apiPort),
+    ZAI_COCKPIT_HANDOFF_DIR: handoffDir,
+    ZAI_COCKPIT_RUNNER_AUTORUN: "1",
+    ZAI_COCKPIT_ALLOW_MOCK_RUNNER: "1",
+    ZAI_COCKPIT_RUNNER_COMMAND: nodeCommand,
+    ZAI_COCKPIT_RUNNER_HELP_ARGS_JSON: JSON.stringify([mockRunnerPath, "--help"]),
+    ZAI_COCKPIT_RUNNER_EXEC_ARGS_JSON: JSON.stringify([mockRunnerPath]),
+    ZAI_COCKPIT_MOCK_RUNNER_DELAY_MS: "2600",
+    ZAI_COCKPIT_ARTIFACT_STABLE_MS: "0"
   });
   await waitForHttp(`http://127.0.0.1:${apiPort}/api/providers`, "local API");
 
   viteServer = startProcess(nodeCommand, ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", String(vitePort), "--strictPort"], {
-    IMAGE_COCKPIT_API_TARGET: `http://127.0.0.1:${apiPort}`
+    ZAI_COCKPIT_API_TARGET: `http://127.0.0.1:${apiPort}`
   });
   await waitForHttp(appUrl, "Vite app");
   console.log(`UI smoke app URL: ${appUrl}`);
@@ -167,10 +167,10 @@ try {
           }
         });
       }
-      localStorage.setItem("image-cockpit.language", "en");
-      localStorage.removeItem("image-cockpit.pendingCodexJob");
-      if (sessionStorage.getItem("image-cockpit.ui-smoke.skip-default-seed") !== "1") {
-        localStorage.setItem("image-cockpit.v3.history", JSON.stringify([{
+      localStorage.setItem("zai-cockpit.language", "en");
+      localStorage.removeItem("zai-cockpit.pendingZaiJob");
+      if (sessionStorage.getItem("zai-cockpit.ui-smoke.skip-default-seed") !== "1") {
+        localStorage.setItem("zai-cockpit.v3.history", JSON.stringify([{
           id: "ui-smoke-source",
           name: "ui-smoke-source.png",
           dataUrl: ${JSON.stringify(tinyPng)},
@@ -182,9 +182,9 @@ try {
           adopted: false,
           source: "import"
         }]));
-        localStorage.removeItem("image-cockpit.v3.frames");
-        localStorage.removeItem("image-cockpit.v3.actions");
-        localStorage.removeItem("image-cockpit.v3.animation-library");
+        localStorage.removeItem("zai-cockpit.v3.frames");
+        localStorage.removeItem("zai-cockpit.v3.actions");
+        localStorage.removeItem("zai-cockpit.v3.animation-library");
       }
     `
   });
@@ -220,7 +220,7 @@ try {
   await assertPromptExamples();
   await assertAnimationPresetExamples();
   await assertAnimationLibraryHidden();
-  await assertCodexFailureNotice();
+  await assertZaiFailureNotice();
   await assertImagegenUnavailableSidecar();
   await assertTempCandidateContactImportFilter();
   await assertPartialDirectionSplitRecovery();
@@ -228,11 +228,11 @@ try {
   await assertCompletedDirectionSplitImportFailure();
   await assertQualityGateDirectionSplitFailure();
   await assertDetachedDirectionSplitRecoverResults();
-  await assertCodexQueue();
+  await assertZaiQueue();
   await assertImageEditing();
   await assertWorkflow({
     label: "Pixel Art Generation",
-    route: "Route: Codex Handoff",
+    route: "Route: Zai Handoff",
     buttons: ["Generate Pixel Art", "Download"],
     hiddenButtons: ["Import Latest", "Import File", "PNG", "Animated GIF", "Animated WebP", "Animated APNG"],
     hiddenText: ["Sprite Actions", "Export Sprite", "Generation Method"],
@@ -246,7 +246,7 @@ try {
   });
   await assertWorkflow({
     label: "Animation Generation",
-    route: "Route: Codex Handoff",
+    route: "Route: Zai Handoff",
     buttons: ["Choose Animation", "Open advanced settings", "Generate Animation", "Download"],
     hiddenButtons: ["Import Latest", "Import File", "PNG", "Animated GIF", "Animated WebP", "Animated APNG", "Official Animations", "User Animations", "Import Animation", "Export Sample", "Use", "5-Direction Sheet", "hatch-pet", "5-Direction hatch-pet"],
     hiddenText: ["Animation Library", "Official Animations", "User Animations", "No user animations yet", "Sprite Actions", "Export Sprite", "Generation Method", "Hop Bounce"],
@@ -392,7 +392,7 @@ async function assertSettingsRecoveryEnvironmentReport() {
   await waitForEval(() => `document.body.innerText.includes("Copy Markdown") && document.body.innerText.includes("Copy JSON")`, "environment report tab");
   await clickButtonByText("Copy Markdown");
   const markdownCopy = await evaluate(`window.__uiSmokeCopiedText || ""`);
-  assert(markdownCopy.includes("Image Cockpit Environment Report"), "Copy Markdown should copy the environment report");
+  assert(markdownCopy.includes("Zai Cockpit Environment Report"), "Copy Markdown should copy the environment report");
   assert(markdownCopy.includes("imagegen smoke: not_run"), "Environment report should include imagegen smoke status");
   assert(!/data:image/i.test(markdownCopy), "Markdown report should not include image data URLs");
   assert(!/api[_-]?key\s*[=:]|sk-[A-Za-z0-9]|ghp_/i.test(markdownCopy), "Markdown report should not include secret values");
@@ -417,15 +417,15 @@ async function assertSafeModeRecovery() {
     const text = document.body.innerText;
     return {
       skipped: text.includes("Large history, frames, and animation library state were not loaded."),
-      clearAll: text.includes("Clear all local Image Cockpit state"),
-      runner: text.includes("Codex runner"),
+      clearAll: text.includes("Clear all local Zai Cockpit state"),
+      runner: text.includes("Zai runner"),
       settingsOpen: Boolean(document.querySelector(".settings-modal")) && text.includes("Environment Report"),
       historyItems: document.querySelectorAll(".history-item").length
     };
   })()`);
   assert(safeMode.skipped, "Safe mode should state that large local state was skipped");
   assert(safeMode.clearAll, "Safe mode should expose the reset action");
-  assert(safeMode.runner, "Safe mode should keep lightweight Codex runner status visible");
+  assert(safeMode.runner, "Safe mode should keep lightweight Zai runner status visible");
   assert(safeMode.settingsOpen, "Safe mode should automatically open the settings recovery modal");
   assert(safeMode.historyItems === 0, "Safe mode should not render restored history items");
   await assertNoBrowserErrors("safe mode recovery");
@@ -454,21 +454,21 @@ async function assertStoragePreflightRecovery() {
 
 async function assertResetLocalStatePage() {
   await cdp.send("Page.navigate", { url: `http://127.0.0.1:${vitePort}/reset-local-state.html` });
-  await waitForEval(() => `document.body.innerText.includes("Image Cockpit Local State Reset")`, "static local state reset page");
+  await waitForEval(() => `document.body.innerText.includes("Zai Cockpit Local State Reset")`, "static local state reset page");
   await evaluate(`(() => {
     window.confirm = () => true;
-    localStorage.setItem("image-cockpit.v3.history", JSON.stringify([{ id: "reset-smoke" }]));
-    localStorage.setItem("image-cockpit.pendingCodexJob", JSON.stringify({ id: "reset-pending" }));
+    localStorage.setItem("zai-cockpit.v3.history", JSON.stringify([{ id: "reset-smoke" }]));
+    localStorage.setItem("zai-cockpit.pendingZaiJob", JSON.stringify({ id: "reset-pending" }));
   })()`);
   await clickButtonByText("Clear all local state");
   await waitForEval(() => `document.querySelector("#status")?.textContent.includes("cleared")`, "static reset clear all status");
   const resetState = await evaluate(`(() => ({
-    history: localStorage.getItem("image-cockpit.v3.history"),
-    pending: localStorage.getItem("image-cockpit.pendingCodexJob"),
+    history: localStorage.getItem("zai-cockpit.v3.history"),
+    pending: localStorage.getItem("zai-cockpit.pendingZaiJob"),
     safeLink: Boolean(document.querySelector('a[href="/?safe=1"]'))
   }))()`);
   assert(resetState.history === null, "Reset page should clear history localStorage");
-  assert(resetState.pending === null, "Reset page should clear pending Codex job localStorage");
+  assert(resetState.pending === null, "Reset page should clear pending Zai job localStorage");
   assert(resetState.safeLink, "Reset page should provide a safe mode link");
   await assertNoBrowserErrors("static local state reset page");
   await cdp.send("Page.navigate", { url: `http://127.0.0.1:${vitePort}/` });
@@ -1012,13 +1012,13 @@ async function assertSingleDirectionAnimationWorkflow() {
   await clickSelector(".animation-utility-heading .icon-button");
   await waitForEval(() => `!document.querySelector(".animation-utility-modal")`, "single-direction advanced settings closed");
 
-  const beforeJobsResponse = await fetch(`http://127.0.0.1:${apiPort}/api/codex/jobs`);
+  const beforeJobsResponse = await fetch(`http://127.0.0.1:${apiPort}/api/zai/jobs`);
   const beforeJobs = new Set((await beforeJobsResponse.json()).jobs || []);
   await waitForButtonEnabled("Generate Animation");
   await clickButtonByText("Generate Animation");
   await waitForEval(() => `document.body.innerText.includes("Animation generated")`, "back-three-quarter single-direction 20f animation generated", 90000);
   await waitForEval(() => `document.querySelectorAll(".direction-preview-row").length === 1`, "back-three-quarter single-direction 20f direction preview", 30000);
-  await waitForEval(() => `document.querySelectorAll(".codex-job-row").length === 0`, "back-three-quarter single-direction 20f job completion", 30000);
+  await waitForEval(() => `document.querySelectorAll(".zai-job-row").length === 0`, "back-three-quarter single-direction 20f job completion", 30000);
   const result = await evaluate(`(() => ({
     previewImages: document.querySelectorAll(".animation-preview img").length,
     directionRows: document.querySelectorAll(".direction-preview-row").length,
@@ -1033,7 +1033,7 @@ async function assertSingleDirectionAnimationWorkflow() {
   const singleDirectionHistoryName = await evaluate(`document.querySelector(".history-item.selected")?.getAttribute("title") || ""`);
   assert(singleDirectionHistoryName.includes("direction-split-animation-sheet"), `Single-direction result should have a selectable history entry, got ${singleDirectionHistoryName}`);
 
-  const afterJobsResponse = await fetch(`http://127.0.0.1:${apiPort}/api/codex/jobs`);
+  const afterJobsResponse = await fetch(`http://127.0.0.1:${apiPort}/api/zai/jobs`);
   const createdJobNames = ((await afterJobsResponse.json()).jobs || []).filter((name) => !beforeJobs.has(name));
   const createdJobs = await Promise.all(createdJobNames.map(async (name) => JSON.parse(await readFile(join(handoffDir, "inbox", name), "utf8"))));
   assert(createdJobs.length === 1, `Fast single-direction generation should create one job, got ${createdJobs.length}`);
@@ -1065,7 +1065,7 @@ async function assertSingleDirectionAnimationWorkflow() {
   assert(singleDirectionPackManifest.files?.directionPreviews?.map((preview) => preview.direction).join(",") === "back three-quarter", "Single-direction Animation Pack preview metadata should contain only back three-quarter");
   assert(singleDirectionPackMetadata.directions?.join(",") === "back three-quarter" && singleDirectionPackMetadata.framesPerDirection === 20, `Single-direction Animation Pack metadata should preserve direction and frame count, got ${JSON.stringify(singleDirectionPackMetadata)}`);
 
-  const beforeFiveDirectionJobsResponse = await fetch(`http://127.0.0.1:${apiPort}/api/codex/jobs`);
+  const beforeFiveDirectionJobsResponse = await fetch(`http://127.0.0.1:${apiPort}/api/zai/jobs`);
   const beforeFiveDirectionJobs = new Set((await beforeFiveDirectionJobsResponse.json()).jobs || []);
   const beforeFiveDirectionHistoryCount = await evaluate(`document.querySelectorAll(".history-item").length`);
   await clickButtonByText("5 directions");
@@ -1078,7 +1078,7 @@ async function assertSingleDirectionAnimationWorkflow() {
     180000
   );
   await waitForEval(() => `document.querySelectorAll(".direction-preview-row").length === 5`, "five-direction 20f previews", 60000);
-  await waitForEval(() => `document.querySelectorAll(".codex-job-row").length === 0`, "five-direction 20f job completion", 60000);
+  await waitForEval(() => `document.querySelectorAll(".zai-job-row").length === 0`, "five-direction 20f job completion", 60000);
   const fiveDirectionResult = await evaluate(`(() => ({
     previewImages: document.querySelectorAll(".animation-preview img").length,
     directionRows: document.querySelectorAll(".direction-preview-row").length,
@@ -1089,7 +1089,7 @@ async function assertSingleDirectionAnimationWorkflow() {
   assert(fiveDirectionResult.previewImages === 6 && fiveDirectionResult.directionRows === 5, `Five-direction 20f should render five direction previews plus one sheet, got ${JSON.stringify(fiveDirectionResult)}`);
   assert(fiveDirectionResult.width === 5120 && fiveDirectionResult.height === 1280 && fiveDirectionResult.gridRows === "5", `Five-direction 20f final sheet should be 5120x1280 with five rows, got ${JSON.stringify(fiveDirectionResult)}`);
 
-  const afterFiveDirectionJobsResponse = await fetch(`http://127.0.0.1:${apiPort}/api/codex/jobs`);
+  const afterFiveDirectionJobsResponse = await fetch(`http://127.0.0.1:${apiPort}/api/zai/jobs`);
   const fiveDirectionJobNames = ((await afterFiveDirectionJobsResponse.json()).jobs || []).filter((name) => !beforeFiveDirectionJobs.has(name));
   const fiveDirectionJobs = await Promise.all(fiveDirectionJobNames.map(async (name) => JSON.parse(await readFile(join(handoffDir, "inbox", name), "utf8"))));
   assert(fiveDirectionJobs.length === 1, `Fast five-direction 20f generation should create one job, got ${fiveDirectionJobs.length}`);
@@ -1421,7 +1421,7 @@ async function assertAnimationLibraryImport() {
   snapshot = await pageSnapshot();
   assert(snapshot.text.includes("No user animations yet"), "User Animations should show an empty state before import");
 
-  await setFileInputFiles('input[accept*="image-cockpit-animation"]', [mockAnimationPackPath]);
+  await setFileInputFiles('input[accept*="zai-cockpit-animation"]', [mockAnimationPackPath]);
   await waitForEval(() => `document.body.innerText.includes("Animation pack imported")`, "Animation pack imported");
   snapshot = await pageSnapshot();
   assert(snapshot.text.includes("Smoke Run Pack"), "Imported animation pack should appear in User Animations");
@@ -1687,30 +1687,30 @@ async function assertAnimationTimelinePackV2() {
   await maybeCapture("animation-timeline-pack-v2");
 }
 
-async function assertCodexQueue() {
+async function assertZaiQueue() {
   await selectWorkflowTab("Pixel Art Generation");
-  await waitForEval(() => `document.body.innerText.includes("Pixel Art Generation")`, "Pixel Art Generation for Codex queue");
+  await waitForEval(() => `document.body.innerText.includes("Pixel Art Generation")`, "Pixel Art Generation for Zai queue");
   await setPromptValue("animation admission blocker ui smoke");
 
   await clickButtonByText("Generate Pixel Art");
-  await waitForEval(() => `document.body.innerText.includes("Codex Jobs") && document.body.innerText.includes("Active 1/3")`, "first Codex job running");
-  await assertCodexProgressIndicators();
-  await assertCodexLogFullscreen();
+  await waitForEval(() => `document.body.innerText.includes("Zai Jobs") && document.body.innerText.includes("Active 1/3")`, "first Zai job running");
+  await assertZaiProgressIndicators();
+  await assertZaiLogFullscreen();
   await assertAnimationAdmissionWhileJobRunning();
   await setPromptValue("queue smoke pixel hero");
   await waitForButtonEnabled("Generate Pixel Art");
 
   await clickButtonByText("Generate Pixel Art");
-  await waitForEval(() => `document.body.innerText.includes("Active 2/3")`, "two Codex jobs running");
+  await waitForEval(() => `document.body.innerText.includes("Active 2/3")`, "two Zai jobs running");
   await waitForButtonEnabled("Generate Pixel Art");
 
   await clickButtonByText("Generate Pixel Art");
-  await waitForEval(() => `document.body.innerText.includes("Active 3/3")`, "three Codex jobs running");
+  await waitForEval(() => `document.body.innerText.includes("Active 3/3")`, "three Zai jobs running");
   await evaluate(`(() => {
-    window.__uiSmokeQueueStatusObserved = document.body.innerText.includes("Codex job queued");
+    window.__uiSmokeQueueStatusObserved = document.body.innerText.includes("Zai job queued");
     window.__uiSmokeQueueStatusObserver?.disconnect();
     window.__uiSmokeQueueStatusObserver = new MutationObserver(() => {
-      if (!document.body.innerText.includes("Codex job queued")) return;
+      if (!document.body.innerText.includes("Zai job queued")) return;
       window.__uiSmokeQueueStatusObserved = true;
       window.__uiSmokeQueueStatusObserver?.disconnect();
     });
@@ -1718,59 +1718,59 @@ async function assertCodexQueue() {
     return true;
   })()`);
   await waitForEval(() => `(() => {
-    const button = Array.from(document.querySelectorAll("button")).find((item) => item.innerText.replace(/\\s+/g, " ").trim() === "Queue Codex Job" && !item.disabled);
+    const button = Array.from(document.querySelectorAll("button")).find((item) => item.innerText.replace(/\\s+/g, " ").trim() === "Queue Zai Job" && !item.disabled);
     if (!button) return false;
     window.__uiSmokeQueueActionAtCapacity = true;
     button.click();
     return true;
-  })()`, "Queue Codex Job button enabled and clicked at three active jobs");
+  })()`, "Queue Zai Job button enabled and clicked at three active jobs");
   const queueActionAtCapacity = await evaluate(`window.__uiSmokeQueueActionAtCapacity === true`);
-  assert(queueActionAtCapacity, "Codex queue should switch the primary action to Queue Codex Job at three active jobs");
+  assert(queueActionAtCapacity, "Zai queue should switch the primary action to Queue Zai Job at three active jobs");
 
   await waitForEval(() => `(() => {
     const text = document.body.innerText;
-    const queuedRows = document.querySelectorAll(".codex-job-state.queued").length;
+    const queuedRows = document.querySelectorAll(".zai-job-state.queued").length;
     const queued = text.includes("Queued") && text.includes("Waiting for an open slot") && queuedRows >= 1;
     if (queued) {
       window.__uiSmokeQueueEvidence = {
         text,
-        rows: document.querySelectorAll(".codex-job-row").length,
+        rows: document.querySelectorAll(".zai-job-row").length,
         queuedRows
       };
     }
     return queued;
-  })()`, "fourth Codex job queued");
+  })()`, "fourth Zai job queued");
   const queueEvidence = await evaluate(`window.__uiSmokeQueueEvidence || { text: "", rows: 0, queuedRows: 0 }`);
   const queuedStatusObserved = await evaluate(`(() => {
     window.__uiSmokeQueueStatusObserver?.disconnect();
     return window.__uiSmokeQueueStatusObserved === true;
   })()`);
-  assert(queuedStatusObserved, "Codex queue should report that the fourth job was queued");
-  assert(queueEvidence.queuedRows >= 1, "Codex queue should render the fourth job in a queued state");
+  assert(queuedStatusObserved, "Zai queue should report that the fourth job was queued");
+  assert(queueEvidence.queuedRows >= 1, "Zai queue should render the fourth job in a queued state");
   assert(
     queueEvidence.rows >= 3 && queueEvidence.rows <= 4,
-    `Codex queue should show the queued fourth job alongside the still-active jobs, got ${queueEvidence.rows} rows`
+    `Zai queue should show the queued fourth job alongside the still-active jobs, got ${queueEvidence.rows} rows`
   );
   const snapshot = await pageSnapshot();
-  assert(snapshot.codexJobShelfInHistory, "Codex job shelf should appear above the Results cards in the right column");
-  assert(!snapshot.codexJobShelfInSource, "Codex job shelf should not remain in the left source column");
-  assert(snapshot.codexJobShelfBeforeHistoryList, "Codex job shelf should sit before the result card list");
-  await maybeCapture("codex-job-shelf-results");
+  assert(snapshot.zaiJobShelfInHistory, "Zai job shelf should appear above the Results cards in the right column");
+  assert(!snapshot.zaiJobShelfInSource, "Zai job shelf should not remain in the left source column");
+  assert(snapshot.zaiJobShelfBeforeHistoryList, "Zai job shelf should sit before the result card list");
+  await maybeCapture("zai-job-shelf-results");
 
-  await waitForEval(() => `document.querySelectorAll(".codex-job-row").length === 0`, "Codex queue drains after results return", 18000);
+  await waitForEval(() => `document.querySelectorAll(".zai-job-row").length === 0`, "Zai queue drains after results return", 18000);
   const drainedSnapshot = await pageSnapshot();
-  assert(drainedSnapshot.codexLogPanelVisible, "Codex log panel should keep latest logs after jobs complete");
+  assert(drainedSnapshot.zaiLogPanelVisible, "Zai log panel should keep latest logs after jobs complete");
   await waitForEval(
-    () => `document.querySelectorAll(".codex-log-card").length === ${expectedCodexLogHistoryLimit}`,
-    "Codex log panel retains the latest 3 completed log cards",
+    () => `document.querySelectorAll(".zai-log-card").length === ${expectedZaiLogHistoryLimit}`,
+    "Zai log panel retains the latest 3 completed log cards",
     6000
   );
-  const drainedLogCardCount = await evaluate(`document.querySelectorAll(".codex-log-card").length`);
+  const drainedLogCardCount = await evaluate(`document.querySelectorAll(".zai-log-card").length`);
   assert(
-    drainedLogCardCount === expectedCodexLogHistoryLimit,
-    `Codex log panel should retain exactly ${expectedCodexLogHistoryLimit} completed log cards after four jobs, got ${drainedLogCardCount}`
+    drainedLogCardCount === expectedZaiLogHistoryLimit,
+    `Zai log panel should retain exactly ${expectedZaiLogHistoryLimit} completed log cards after four jobs, got ${drainedLogCardCount}`
   );
-  await assertNoBrowserErrors("Codex queue");
+  await assertNoBrowserErrors("Zai queue");
   await selectWorkflowTab("Pixel Art Generation");
 }
 
@@ -1779,12 +1779,12 @@ async function assertAnimationAdmissionOnly() {
   await setPromptValue("animation admission blocker ui smoke");
   await clickButtonByText("Generate Pixel Art");
   await waitForEval(
-    () => `document.body.innerText.includes("Codex Jobs") && document.body.innerText.includes("Active 1/3")`,
+    () => `document.body.innerText.includes("Zai Jobs") && document.body.innerText.includes("Active 1/3")`,
     "animation admission blocker running"
   );
   await assertAnimationAdmissionWhileJobRunning();
   await waitForEval(
-    () => `document.querySelectorAll(".codex-job-row").length === 0`,
+    () => `document.querySelectorAll(".zai-job-row").length === 0`,
     "animation admission blocker completion",
     22000
   );
@@ -1802,8 +1802,8 @@ async function assertAnimationAdmissionOnly() {
 
 async function assertAnimationAdmissionWhileJobRunning() {
   const countsBefore = await evaluate(`Promise.all([
-    fetch("/api/codex/tournaments").then((response) => response.json()),
-    fetch("/api/codex/jobs").then((response) => response.json())
+    fetch("/api/zai/tournaments").then((response) => response.json()),
+    fetch("/api/zai/jobs").then((response) => response.json())
   ]).then(([tournaments, jobs]) => ({
     tournaments: tournaments.tournaments?.length || 0,
     jobs: jobs.jobs?.length || 0
@@ -1833,20 +1833,20 @@ async function assertAnimationAdmissionWhileJobRunning() {
       statusExists: Boolean(status),
       statusRole: status?.getAttribute("role") || "",
       statusLive: status?.getAttribute("aria-live") || "",
-      queueActionVisible: document.body.innerText.includes("Queue Codex Job")
+      queueActionVisible: document.body.innerText.includes("Queue Zai Job")
     };
   })()`);
-  assert(admission.disabled, "Animation Generation should be disabled while one Codex job is running");
+  assert(admission.disabled, "Animation Generation should be disabled while one Zai job is running");
   assert(admission.label === "Generate Animation", `Blocked animation should retain its Generate label, got ${JSON.stringify(admission)}`);
   assert(admission.describedBy && admission.statusExists, `Blocked animation should expose a real aria-describedby target, got ${JSON.stringify(admission)}`);
   assert(admission.statusRole === "status" && admission.statusLive === "polite", `Blocked animation reason should be announced accessibly, got ${JSON.stringify(admission)}`);
-  assert(!admission.queueActionVisible, "Blocked animation should not offer Queue Codex Job");
+  assert(!admission.queueActionVisible, "Blocked animation should not offer Queue Zai Job");
 
   await evaluate(`document.querySelector(".animation-generate-step .primary-button").click()`);
   await delay(250);
   const countsAfterDisabledClick = await evaluate(`Promise.all([
-    fetch("/api/codex/tournaments").then((response) => response.json()),
-    fetch("/api/codex/jobs").then((response) => response.json())
+    fetch("/api/zai/tournaments").then((response) => response.json()),
+    fetch("/api/zai/jobs").then((response) => response.json())
   ]).then(([tournaments, jobs]) => ({
     tournaments: tournaments.tournaments?.length || 0,
     jobs: jobs.jobs?.length || 0
@@ -1878,23 +1878,23 @@ async function assertAnimationAdmissionWhileJobRunning() {
   await selectWorkflowTab("Pixel Art Generation");
 }
 
-async function assertCodexProgressIndicators() {
+async function assertZaiProgressIndicators() {
   await waitForEval(
-    () => `Boolean(document.querySelector(".history-panel .codex-job-row .codex-progress-meter.state-running .codex-progress-fill"))`,
-    "Codex job shelf running progress"
+    () => `Boolean(document.querySelector(".history-panel .zai-job-row .zai-progress-meter.state-running .zai-progress-fill"))`,
+    "Zai job shelf running progress"
   );
   await waitForEval(
-    () => `Boolean(document.querySelector(".codex-log-card .codex-progress-meter.state-running .codex-progress-fill"))`,
-    "Codex log card running progress",
+    () => `Boolean(document.querySelector(".zai-log-card .zai-progress-meter.state-running .zai-progress-fill"))`,
+    "Zai log card running progress",
     6000
   );
   const metrics = await evaluate(`(() => {
-    const shelfMeter = document.querySelector(".history-panel .codex-job-row .codex-progress-meter.state-running");
-    const shelfTrack = shelfMeter?.querySelector(".codex-progress-track");
-    const shelfFill = shelfMeter?.querySelector(".codex-progress-fill");
-    const logMeter = document.querySelector(".codex-log-card .codex-progress-meter.state-running");
-    const logTrack = logMeter?.querySelector(".codex-progress-track");
-    const logFill = logMeter?.querySelector(".codex-progress-fill");
+    const shelfMeter = document.querySelector(".history-panel .zai-job-row .zai-progress-meter.state-running");
+    const shelfTrack = shelfMeter?.querySelector(".zai-progress-track");
+    const shelfFill = shelfMeter?.querySelector(".zai-progress-fill");
+    const logMeter = document.querySelector(".zai-log-card .zai-progress-meter.state-running");
+    const logTrack = logMeter?.querySelector(".zai-progress-track");
+    const logFill = logMeter?.querySelector(".zai-progress-fill");
     const shelfText = shelfMeter?.innerText || "";
     const shelfTrackRect = shelfTrack?.getBoundingClientRect();
     const shelfFillRect = shelfFill?.getBoundingClientRect();
@@ -1911,31 +1911,31 @@ async function assertCodexProgressIndicators() {
       reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
       keyframesDefined: Array.from(document.styleSheets).some((sheet) => {
         try {
-          return Array.from(sheet.cssRules || []).some((rule) => rule.cssText.includes("codex-progress-shimmer"));
+          return Array.from(sheet.cssRules || []).some((rule) => rule.cssText.includes("zai-progress-shimmer"));
         } catch {
           return false;
         }
       })
     };
   })()`);
-  assert(metrics.shelfHasElapsed, "Codex job shelf progress should show elapsed time");
-  assert(metrics.shelfShowsNoPercent, "Codex job shelf progress should not expose a fake percent label");
-  assert(metrics.shelfTrackWidth > 40, `Codex job shelf progress track should be visible, got ${metrics.shelfTrackWidth}`);
-  assert(metrics.shelfFillWidth > 0 && metrics.shelfFillWidth < metrics.shelfTrackWidth, `Codex job shelf progress fill should be partial, got ${metrics.shelfFillWidth}/${metrics.shelfTrackWidth}`);
-  assert(metrics.logTrackWidth > 40, `Codex log card progress track should be visible, got ${metrics.logTrackWidth}`);
-  assert(metrics.logFillWidth > 0 && metrics.logFillWidth < metrics.logTrackWidth, `Codex log card progress fill should be partial, got ${metrics.logFillWidth}/${metrics.logTrackWidth}`);
+  assert(metrics.shelfHasElapsed, "Zai job shelf progress should show elapsed time");
+  assert(metrics.shelfShowsNoPercent, "Zai job shelf progress should not expose a fake percent label");
+  assert(metrics.shelfTrackWidth > 40, `Zai job shelf progress track should be visible, got ${metrics.shelfTrackWidth}`);
+  assert(metrics.shelfFillWidth > 0 && metrics.shelfFillWidth < metrics.shelfTrackWidth, `Zai job shelf progress fill should be partial, got ${metrics.shelfFillWidth}/${metrics.shelfTrackWidth}`);
+  assert(metrics.logTrackWidth > 40, `Zai log card progress track should be visible, got ${metrics.logTrackWidth}`);
+  assert(metrics.logFillWidth > 0 && metrics.logFillWidth < metrics.logTrackWidth, `Zai log card progress fill should be partial, got ${metrics.logFillWidth}/${metrics.logTrackWidth}`);
   assert(
-    metrics.reducedMotion || metrics.shimmer === "codex-progress-shimmer" || metrics.keyframesDefined,
-    `Codex progress fill should animate with shimmer unless reduced motion is active, got ${metrics.shimmer}`
+    metrics.reducedMotion || metrics.shimmer === "zai-progress-shimmer" || metrics.keyframesDefined,
+    `Zai progress fill should animate with shimmer unless reduced motion is active, got ${metrics.shimmer}`
   );
 
   await clickButtonByAriaLabel("Full screen logs");
-  await waitForEval(() => `document.querySelector(".codex-log-panel")?.classList.contains("fullscreen")`, "Codex log fullscreen progress mode");
+  await waitForEval(() => `document.querySelector(".zai-log-panel")?.classList.contains("fullscreen")`, "Zai log fullscreen progress mode");
   const fullscreenMetrics = await evaluate(`(() => {
-    const header = document.querySelector(".codex-log-panel.fullscreen .codex-log-header");
-    const meter = header?.querySelector(".codex-progress-meter.compact.state-running");
-    const track = meter?.querySelector(".codex-progress-track");
-    const fill = meter?.querySelector(".codex-progress-fill");
+    const header = document.querySelector(".zai-log-panel.fullscreen .zai-log-header");
+    const meter = header?.querySelector(".zai-progress-meter.compact.state-running");
+    const track = meter?.querySelector(".zai-progress-track");
+    const fill = meter?.querySelector(".zai-progress-fill");
     const headerRect = header?.getBoundingClientRect();
     const trackRect = track?.getBoundingClientRect();
     const fillRect = fill?.getBoundingClientRect();
@@ -1946,140 +1946,140 @@ async function assertCodexProgressIndicators() {
       compactBottom: Boolean(meter && trackRect && headerRect && Math.abs(trackRect.bottom - headerRect.bottom) <= 1)
     };
   })()`);
-  assert(fullscreenMetrics.trackWidth > 40, `Fullscreen Codex log header progress should be visible, got ${fullscreenMetrics.trackWidth}`);
-  assert(fullscreenMetrics.fillWidth > 0 && fullscreenMetrics.fillWidth < fullscreenMetrics.trackWidth, `Fullscreen Codex log header progress should be partial, got ${fullscreenMetrics.fillWidth}/${fullscreenMetrics.trackWidth}`);
-  assert(fullscreenMetrics.compactBottom, "Fullscreen Codex log header progress should sit at the bottom of the header");
+  assert(fullscreenMetrics.trackWidth > 40, `Fullscreen Zai log header progress should be visible, got ${fullscreenMetrics.trackWidth}`);
+  assert(fullscreenMetrics.fillWidth > 0 && fullscreenMetrics.fillWidth < fullscreenMetrics.trackWidth, `Fullscreen Zai log header progress should be partial, got ${fullscreenMetrics.fillWidth}/${fullscreenMetrics.trackWidth}`);
+  assert(fullscreenMetrics.compactBottom, "Fullscreen Zai log header progress should sit at the bottom of the header");
   await evaluate(`window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
-  await waitForEval(() => `!document.querySelector(".codex-log-panel")?.classList.contains("fullscreen")`, "Codex log progress fullscreen closes with Escape");
+  await waitForEval(() => `!document.querySelector(".zai-log-panel")?.classList.contains("fullscreen")`, "Zai log progress fullscreen closes with Escape");
 }
 
-async function assertCodexLogFullscreen() {
-  await waitForEval(() => `Boolean(document.querySelector(".codex-log-panel .codex-log-fullscreen-button"))`, "Codex log fullscreen button");
+async function assertZaiLogFullscreen() {
+  await waitForEval(() => `Boolean(document.querySelector(".zai-log-panel .zai-log-fullscreen-button"))`, "Zai log fullscreen button");
   await waitForEval(
-    () => `Array.from(document.querySelectorAll(".codex-log-card pre")).some((pre) => pre.innerText.includes("mock runner accepted"))`,
-    "mock Codex log output",
+    () => `Array.from(document.querySelectorAll(".zai-log-card pre")).some((pre) => pre.innerText.includes("mock runner accepted"))`,
+    "mock Zai log output",
     8000
   );
   await waitForEval(
-    () => `Array.from(document.querySelectorAll(".codex-log-card pre")).some((pre) => pre.innerText.includes("mock runner tail marker"))`,
-    "mock Codex log tail marker",
+    () => `Array.from(document.querySelectorAll(".zai-log-card pre")).some((pre) => pre.innerText.includes("mock runner tail marker"))`,
+    "mock Zai log tail marker",
     8000
   );
   await delay(100);
   const normalMetrics = await evaluate(`(() => {
-    const panel = document.querySelector(".codex-log-panel");
-    const pre = Array.from(document.querySelectorAll(".codex-log-card pre"))
-      .find((candidate) => candidate.innerText.includes("mock runner tail marker")) || document.querySelector(".codex-log-card pre");
+    const panel = document.querySelector(".zai-log-panel");
+    const pre = Array.from(document.querySelectorAll(".zai-log-card pre"))
+      .find((candidate) => candidate.innerText.includes("mock runner tail marker")) || document.querySelector(".zai-log-card pre");
     return {
       panelHeight: Math.round(panel?.getBoundingClientRect().height || 0),
       preHeight: Math.round(pre?.getBoundingClientRect().height || 0),
-      cardCount: document.querySelectorAll(".codex-log-panel .codex-log-card").length,
+      cardCount: document.querySelectorAll(".zai-log-panel .zai-log-card").length,
       preOverflowing: Boolean(pre && pre.scrollHeight > pre.clientHeight),
       distanceFromBottom: pre ? Math.round(pre.scrollHeight - pre.scrollTop - pre.clientHeight) : 999,
       hasTailMarker: Boolean(pre?.innerText.includes("mock runner tail marker"))
     };
   })()`);
-  assert(normalMetrics.panelHeight > 0, "Codex log panel should be visible before fullscreen");
-  assert(normalMetrics.preHeight > 0, "Codex log pre should be visible before fullscreen");
-  assert(normalMetrics.cardCount <= expectedCodexLogHistoryLimit, `Compact Codex log panel should show at most ${expectedCodexLogHistoryLimit} cards, got ${normalMetrics.cardCount}`);
-  assert(normalMetrics.preOverflowing, "Compact Codex log pre should overflow so latest-line auto-scroll is meaningful");
-  assert(normalMetrics.hasTailMarker, "Compact Codex log should include the mock tail marker");
-  assert(normalMetrics.distanceFromBottom <= 4, `Compact Codex log should auto-scroll to the latest line, distance ${normalMetrics.distanceFromBottom}`);
+  assert(normalMetrics.panelHeight > 0, "Zai log panel should be visible before fullscreen");
+  assert(normalMetrics.preHeight > 0, "Zai log pre should be visible before fullscreen");
+  assert(normalMetrics.cardCount <= expectedZaiLogHistoryLimit, `Compact Zai log panel should show at most ${expectedZaiLogHistoryLimit} cards, got ${normalMetrics.cardCount}`);
+  assert(normalMetrics.preOverflowing, "Compact Zai log pre should overflow so latest-line auto-scroll is meaningful");
+  assert(normalMetrics.hasTailMarker, "Compact Zai log should include the mock tail marker");
+  assert(normalMetrics.distanceFromBottom <= 4, `Compact Zai log should auto-scroll to the latest line, distance ${normalMetrics.distanceFromBottom}`);
 
   await clickButtonByAriaLabel("Full screen logs");
-  await waitForEval(() => `document.querySelector(".codex-log-panel")?.classList.contains("fullscreen")`, "Codex log fullscreen mode");
+  await waitForEval(() => `document.querySelector(".zai-log-panel")?.classList.contains("fullscreen")`, "Zai log fullscreen mode");
   await delay(100);
   const fullscreenMetrics = await evaluate(`(() => {
-    const panel = document.querySelector(".codex-log-panel.fullscreen");
-    const pre = Array.from(document.querySelectorAll(".codex-log-panel.fullscreen .codex-log-card pre"))
-      .find((candidate) => candidate.innerText.includes("mock runner tail marker")) || document.querySelector(".codex-log-panel.fullscreen .codex-log-card pre");
+    const panel = document.querySelector(".zai-log-panel.fullscreen");
+    const pre = Array.from(document.querySelectorAll(".zai-log-panel.fullscreen .zai-log-card pre"))
+      .find((candidate) => candidate.innerText.includes("mock runner tail marker")) || document.querySelector(".zai-log-panel.fullscreen .zai-log-card pre");
     return {
       panelHeight: Math.round(panel?.getBoundingClientRect().height || 0),
       preHeight: Math.round(pre?.getBoundingClientRect().height || 0),
       exitButton: Boolean(document.querySelector('button[aria-label="Exit full screen"]')),
-      cardCount: document.querySelectorAll(".codex-log-panel.fullscreen .codex-log-card").length,
+      cardCount: document.querySelectorAll(".zai-log-panel.fullscreen .zai-log-card").length,
       distanceFromBottom: pre ? Math.round(pre.scrollHeight - pre.scrollTop - pre.clientHeight) : 999,
       hasTailMarker: Boolean(pre?.innerText.includes("mock runner tail marker"))
     };
   })()`);
-  assert(fullscreenMetrics.exitButton, "Fullscreen Codex log should expose an exit button");
-  assert(fullscreenMetrics.cardCount <= expectedCodexLogHistoryLimit, `Fullscreen Codex log panel should show at most ${expectedCodexLogHistoryLimit} cards, got ${fullscreenMetrics.cardCount}`);
-  assert(fullscreenMetrics.panelHeight > normalMetrics.panelHeight + 120, "Fullscreen Codex log panel should be taller than the compact panel");
-  assert(fullscreenMetrics.preHeight > normalMetrics.preHeight + 120, "Fullscreen Codex log text area should be taller than normal");
-  assert(fullscreenMetrics.hasTailMarker, "Fullscreen Codex log should include the mock tail marker");
-  assert(fullscreenMetrics.distanceFromBottom <= 4, `Fullscreen Codex log should open at the latest line, distance ${fullscreenMetrics.distanceFromBottom}`);
-  await maybeCapture("codex-log-fullscreen");
+  assert(fullscreenMetrics.exitButton, "Fullscreen Zai log should expose an exit button");
+  assert(fullscreenMetrics.cardCount <= expectedZaiLogHistoryLimit, `Fullscreen Zai log panel should show at most ${expectedZaiLogHistoryLimit} cards, got ${fullscreenMetrics.cardCount}`);
+  assert(fullscreenMetrics.panelHeight > normalMetrics.panelHeight + 120, "Fullscreen Zai log panel should be taller than the compact panel");
+  assert(fullscreenMetrics.preHeight > normalMetrics.preHeight + 120, "Fullscreen Zai log text area should be taller than normal");
+  assert(fullscreenMetrics.hasTailMarker, "Fullscreen Zai log should include the mock tail marker");
+  assert(fullscreenMetrics.distanceFromBottom <= 4, `Fullscreen Zai log should open at the latest line, distance ${fullscreenMetrics.distanceFromBottom}`);
+  await maybeCapture("zai-log-fullscreen");
 
   await evaluate(`window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
-  await waitForEval(() => `!document.querySelector(".codex-log-panel")?.classList.contains("fullscreen")`, "Codex log fullscreen closes with Escape");
+  await waitForEval(() => `!document.querySelector(".zai-log-panel")?.classList.contains("fullscreen")`, "Zai log fullscreen closes with Escape");
 
   await cdp.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await delay(250);
   await clickButtonByAriaLabel("Full screen logs");
-  await waitForEval(() => `document.querySelector(".codex-log-panel")?.classList.contains("fullscreen")`, "mobile Codex log fullscreen mode");
+  await waitForEval(() => `document.querySelector(".zai-log-panel")?.classList.contains("fullscreen")`, "mobile Zai log fullscreen mode");
   await delay(100);
   const mobileFit = await evaluate(`(() => {
-    const panel = document.querySelector(".codex-log-panel.fullscreen");
-    const header = document.querySelector(".codex-log-panel.fullscreen .codex-log-header");
-    const pre = Array.from(document.querySelectorAll(".codex-log-panel.fullscreen .codex-log-card pre"))
-      .find((candidate) => candidate.innerText.includes("mock runner tail marker")) || document.querySelector(".codex-log-panel.fullscreen .codex-log-card pre");
+    const panel = document.querySelector(".zai-log-panel.fullscreen");
+    const header = document.querySelector(".zai-log-panel.fullscreen .zai-log-header");
+    const pre = Array.from(document.querySelectorAll(".zai-log-panel.fullscreen .zai-log-card pre"))
+      .find((candidate) => candidate.innerText.includes("mock runner tail marker")) || document.querySelector(".zai-log-panel.fullscreen .zai-log-card pre");
     const panelRect = panel?.getBoundingClientRect();
     return {
       panelFits: Boolean(panelRect && panelRect.left >= -1 && panelRect.right <= window.innerWidth + 1),
       headerFits: Boolean(header && header.scrollWidth <= header.clientWidth + 1),
       preFits: Boolean(pre && pre.scrollWidth <= pre.clientWidth + 1),
-      cardCount: document.querySelectorAll(".codex-log-panel.fullscreen .codex-log-card").length,
+      cardCount: document.querySelectorAll(".zai-log-panel.fullscreen .zai-log-card").length,
       distanceFromBottom: pre ? Math.round(pre.scrollHeight - pre.scrollTop - pre.clientHeight) : 999,
       hasTailMarker: Boolean(pre?.innerText.includes("mock runner tail marker"))
     };
   })()`);
-  assert(mobileFit.panelFits, "Mobile fullscreen Codex log panel should fit within the viewport");
-  assert(mobileFit.headerFits, "Mobile fullscreen Codex log header should not overflow horizontally");
-  assert(mobileFit.preFits, "Mobile fullscreen Codex log text should not overflow horizontally");
-  assert(mobileFit.cardCount <= expectedCodexLogHistoryLimit, `Mobile fullscreen Codex log panel should show at most ${expectedCodexLogHistoryLimit} cards, got ${mobileFit.cardCount}`);
-  assert(mobileFit.hasTailMarker, "Mobile fullscreen Codex log should include the mock tail marker");
-  assert(mobileFit.distanceFromBottom <= 4, `Mobile fullscreen Codex log should stay on the latest line, distance ${mobileFit.distanceFromBottom}`);
+  assert(mobileFit.panelFits, "Mobile fullscreen Zai log panel should fit within the viewport");
+  assert(mobileFit.headerFits, "Mobile fullscreen Zai log header should not overflow horizontally");
+  assert(mobileFit.preFits, "Mobile fullscreen Zai log text should not overflow horizontally");
+  assert(mobileFit.cardCount <= expectedZaiLogHistoryLimit, `Mobile fullscreen Zai log panel should show at most ${expectedZaiLogHistoryLimit} cards, got ${mobileFit.cardCount}`);
+  assert(mobileFit.hasTailMarker, "Mobile fullscreen Zai log should include the mock tail marker");
+  assert(mobileFit.distanceFromBottom <= 4, `Mobile fullscreen Zai log should stay on the latest line, distance ${mobileFit.distanceFromBottom}`);
   await evaluate(`window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
-  await waitForEval(() => `!document.querySelector(".codex-log-panel")?.classList.contains("fullscreen")`, "mobile Codex log fullscreen closes with Escape");
+  await waitForEval(() => `!document.querySelector(".zai-log-panel")?.classList.contains("fullscreen")`, "mobile Zai log fullscreen closes with Escape");
   await cdp.send("Emulation.clearDeviceMetricsOverride");
   await cdp.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
   await delay(250);
 }
 
-async function assertCodexFailureNotice() {
+async function assertZaiFailureNotice() {
   await selectWorkflowTab("Pixel Art Generation");
-  await waitForEval(() => `document.body.innerText.includes("Pixel Art Generation")`, "Pixel Art Generation for Codex failure");
+  await waitForEval(() => `document.body.innerText.includes("Pixel Art Generation")`, "Pixel Art Generation for Zai failure");
   const historyCountBefore = await evaluate(`document.querySelectorAll(".history-item").length`);
   await setPromptValue("policy blocked ui smoke");
 
   await clickButtonByText("Generate Pixel Art");
-  await waitForEval(() => `document.querySelector(".codex-failure-card")?.innerText.includes("Generation failed")`, "Codex failure notice", 20000);
+  await waitForEval(() => `document.querySelector(".zai-failure-card")?.innerText.includes("Generation failed")`, "Zai failure notice", 20000);
   let snapshot = await pageSnapshot();
-  assert(snapshot.codexFailureCards === 1, `Codex failure should leave one failure card, got ${snapshot.codexFailureCards}`);
-  assert(snapshot.text.includes("safety or usage-policy checks"), "Codex failure should show policy/safety diagnostic copy");
-  assert(snapshot.historyItems === historyCountBefore, "Codex failure should not create a fake history image");
-  assert(snapshot.codexJobRows === 0, "Codex failure should release the active job slot");
+  assert(snapshot.zaiFailureCards === 1, `Zai failure should leave one failure card, got ${snapshot.zaiFailureCards}`);
+  assert(snapshot.text.includes("safety or usage-policy checks"), "Zai failure should show policy/safety diagnostic copy");
+  assert(snapshot.historyItems === historyCountBefore, "Zai failure should not create a fake history image");
+  assert(snapshot.zaiJobRows === 0, "Zai failure should release the active job slot");
   await evaluate(`(() => {
     const select = document.querySelector(".language-control select");
     select.value = "ja";
     select.dispatchEvent(new Event("change", { bubbles: true }));
   })()`);
-  await waitForEval(() => `document.body.innerText.includes("生成できませんでした")`, "Japanese Codex failure notice");
+  await waitForEval(() => `document.body.innerText.includes("生成できませんでした")`, "Japanese Zai failure notice");
   await evaluate(`(() => {
     const select = document.querySelector(".language-control select");
     select.value = "en";
     select.dispatchEvent(new Event("change", { bubbles: true }));
   })()`);
-  await waitForEval(() => `document.body.innerText.includes("Generation failed")`, "English Codex failure notice restored");
+  await waitForEval(() => `document.body.innerText.includes("Generation failed")`, "English Zai failure notice restored");
 
   await setPromptValue("normal generation after failure");
   await clickButtonByText("Generate Pixel Art");
-  await waitForEval(() => `document.querySelectorAll(".history-item").length > ${historyCountBefore}`, "Codex queue continues after failure", 18000);
+  await waitForEval(() => `document.querySelectorAll(".history-item").length > ${historyCountBefore}`, "Zai queue continues after failure", 18000);
   snapshot = await pageSnapshot();
-  assert(snapshot.historyItems > historyCountBefore, "Codex should import a real image after a previous failure");
-  assert(snapshot.codexFailureCards === 1, "Codex failure notice should remain visible after later success");
-  await assertNoBrowserErrors("Codex failure notice");
-  await maybeCapture("codex-failure-notice");
+  assert(snapshot.historyItems > historyCountBefore, "Zai should import a real image after a previous failure");
+  assert(snapshot.zaiFailureCards === 1, "Zai failure notice should remain visible after later success");
+  await assertNoBrowserErrors("Zai failure notice");
+  await maybeCapture("zai-failure-notice");
   await selectWorkflowTab("Pixel Art Generation");
 }
 
@@ -2091,18 +2091,18 @@ async function assertImagegenUnavailableSidecar() {
 
   await clickButtonByText("Generate Pixel Art");
   await waitForEval(
-    () => `Array.from(document.querySelectorAll(".codex-failure-card")).some((card) => card.innerText.includes("Image generation unavailable"))`,
-    "imagegen unavailable Codex failure notice",
+    () => `Array.from(document.querySelectorAll(".zai-failure-card")).some((card) => card.innerText.includes("Image generation unavailable"))`,
+    "imagegen unavailable Zai failure notice",
     20000
   );
   const after = await pageSnapshot();
   assert(
-    after.codexFailureCards === before.codexFailureCards + 1,
-    `Imagegen unavailable sidecar should add one failure card, got ${after.codexFailureCards}`
+    after.zaiFailureCards === before.zaiFailureCards + 1,
+    `Imagegen unavailable sidecar should add one failure card, got ${after.zaiFailureCards}`
   );
-  assert(after.text.includes("Image generation is not available in this Codex environment."), "Imagegen unavailable should show explicit diagnostic copy");
+  assert(after.text.includes("Image generation is not available in this Zai environment."), "Imagegen unavailable should show explicit diagnostic copy");
   assert(after.historyItems === before.historyItems, "Imagegen unavailable sidecar should not create a fake history image");
-  assert(after.codexJobRows === 0, "Imagegen unavailable sidecar should release the active job slot");
+  assert(after.zaiJobRows === 0, "Imagegen unavailable sidecar should release the active job slot");
   await assertNoBrowserErrors("imagegen unavailable sidecar");
 }
 
@@ -2118,7 +2118,7 @@ async function assertTempCandidateContactImportFilter() {
     "temp candidate contact import filter imports final image",
     18000
   );
-  await waitForEval(() => `document.querySelectorAll(".codex-job-row").length === 0`, "temp candidate contact filter job drains", 6000);
+  await waitForEval(() => `document.querySelectorAll(".zai-job-row").length === 0`, "temp candidate contact filter job drains", 6000);
   const historyTexts = await evaluate(`Array.from(document.querySelectorAll(".history-item")).map((node) => node.innerText.replace(/\\s+/g, " ").trim())`);
   assert(
     !historyTexts.some((text) => text.includes("candidate-contact.tmp")),
@@ -2142,20 +2142,20 @@ async function assertPartialDirectionSplitRecovery() {
   await delay(3200);
   let snapshot = await pageSnapshot();
   assert(
-    snapshot.codexFailureCards === before.codexFailureCards,
-    `Partial direction files without a manifest should not add a failure card, got ${snapshot.codexFailureCards}`
+    snapshot.zaiFailureCards === before.zaiFailureCards,
+    `Partial direction files without a manifest should not add a failure card, got ${snapshot.zaiFailureCards}`
   );
-  assert(snapshot.text.includes("Waiting for Codex"), "Partial direction files should keep the job pending while waiting for the final manifest");
+  assert(snapshot.text.includes("Waiting for Zai"), "Partial direction files should keep the job pending while waiting for the final manifest");
   await waitForEval(
     () => `document.querySelectorAll(".history-item").length > ${before.historyItems}`,
     "partial direction split imports after final manifest",
     25000
   );
-  await waitForEval(() => `document.querySelectorAll(".codex-job-row").length === 0`, "partial direction split releases active job slot", 6000);
+  await waitForEval(() => `document.querySelectorAll(".zai-job-row").length === 0`, "partial direction split releases active job slot", 6000);
   snapshot = await pageSnapshot();
-  assert(snapshot.codexJobRows === 0, "Partial direction split recovery should release the active job slot after import");
+  assert(snapshot.zaiJobRows === 0, "Partial direction split recovery should release the active job slot after import");
   assert(
-    snapshot.codexFailureCards === before.codexFailureCards,
+    snapshot.zaiFailureCards === before.zaiFailureCards,
     "Partial direction split recovery should not leave a failure card"
   );
   assert(snapshot.text.includes("direction-split manifest ok"), "Recovered direction split import should confirm manifest use");
@@ -2176,20 +2176,20 @@ async function assertManifestFirstDirectionSplitRecovery() {
   await delay(3200);
   let snapshot = await pageSnapshot();
   assert(
-    snapshot.codexFailureCards === before.codexFailureCards,
-    `Manifest-first direction files should not add a failure card while side is missing, got ${snapshot.codexFailureCards}`
+    snapshot.zaiFailureCards === before.zaiFailureCards,
+    `Manifest-first direction files should not add a failure card while side is missing, got ${snapshot.zaiFailureCards}`
   );
-  assert(snapshot.text.includes("Waiting for Codex"), "Manifest-first direction files should stay pending until server verified");
+  assert(snapshot.text.includes("Waiting for Zai"), "Manifest-first direction files should stay pending until server verified");
   await waitForEval(
     () => `document.querySelectorAll(".history-item").length > ${before.historyItems}`,
     "manifest-first direction split imports after side arrives",
     25000
   );
-  await waitForEval(() => `document.querySelectorAll(".codex-job-row").length === 0`, "manifest-first direction split releases active job slot", 6000);
+  await waitForEval(() => `document.querySelectorAll(".zai-job-row").length === 0`, "manifest-first direction split releases active job slot", 6000);
   snapshot = await pageSnapshot();
-  assert(snapshot.codexJobRows === 0, "Manifest-first direction split recovery should release the active job slot after import");
+  assert(snapshot.zaiJobRows === 0, "Manifest-first direction split recovery should release the active job slot after import");
   assert(
-    snapshot.codexFailureCards === before.codexFailureCards,
+    snapshot.zaiFailureCards === before.zaiFailureCards,
     "Manifest-first direction split recovery should not leave a failure card"
   );
   assert(snapshot.text.includes("direction-split manifest ok"), "Manifest-first recovered import should confirm manifest use");
@@ -2213,10 +2213,10 @@ async function assertCompletedDirectionSplitImportFailure() {
     25000
   );
   const snapshot = await pageSnapshot();
-  assert(snapshot.codexJobRows === 0, "Completed direction split import failure should release the active job slot");
+  assert(snapshot.zaiJobRows === 0, "Completed direction split import failure should release the active job slot");
   assert(
-    snapshot.codexFailureCards === before.codexFailureCards + 1,
-    `Completed direction split import failure should add one failure card, got ${snapshot.codexFailureCards}`
+    snapshot.zaiFailureCards === before.zaiFailureCards + 1,
+    `Completed direction split import failure should add one failure card, got ${snapshot.zaiFailureCards}`
   );
   assert(snapshot.historyItems === before.historyItems, "Completed direction split import failure should not add a broken history item");
   assert(snapshot.text.includes("Raw direction files"), "Completed direction split import failure should tell the user raw files remain available");
@@ -2241,10 +2241,10 @@ async function assertQualityGateDirectionSplitFailure() {
     25000
   );
   const snapshot = await pageSnapshot();
-  assert(snapshot.codexJobRows === 0, "Quality gate failure should release the active job slot");
+  assert(snapshot.zaiJobRows === 0, "Quality gate failure should release the active job slot");
   assert(
-    snapshot.codexFailureCards === before.codexFailureCards + 1,
-    `Quality gate failure should add one failure card, got ${snapshot.codexFailureCards}`
+    snapshot.zaiFailureCards === before.zaiFailureCards + 1,
+    `Quality gate failure should add one failure card, got ${snapshot.zaiFailureCards}`
   );
   assert(snapshot.historyItems === before.historyItems, "Quality gate failure should not add a quarantined history item");
   assert(snapshot.text.toLowerCase().includes("no history or final download item was added"), "Quality gate failure should explain that no final item was added");
@@ -2255,7 +2255,7 @@ async function assertQualityGateDirectionSplitFailure() {
 }
 
 async function assertDetachedDirectionSplitRecoverResults() {
-  const jobId = "codex-job-ui-smoke-detached-direction-split";
+  const jobId = "zai-job-ui-smoke-detached-direction-split";
   await writeDetachedDirectionSplitFixture(jobId);
   await selectWorkflowTab("Pixel Art Generation");
   const before = await pageSnapshot();
@@ -2300,7 +2300,7 @@ async function writeDetachedDirectionSplitFixture(jobId) {
     );
   }
   await writeFile(join(handoffDir, "outbox", `${jobId}-manifest.json`), JSON.stringify({
-    schema: "image-cockpit.direction-split-animation.v1",
+    schema: "zai-cockpit.direction-split-animation.v1",
     jobId,
     serverVerified: true,
     quality: "gold",
@@ -2318,7 +2318,7 @@ async function assertImageEditing() {
   await selectWorkflowTab("Image Editing");
   await waitForEval(() => `document.body.innerText.includes("Image Editing")`, "Image Editing workflow");
   let snapshot = await pageSnapshot();
-  assert(snapshot.summary.includes("Route: Codex Handoff"), "Image Editing should use Codex Handoff");
+  assert(snapshot.summary.includes("Route: Zai Handoff"), "Image Editing should use Zai Handoff");
   assert(snapshot.buttons.includes("Edit Image"), "Image Editing should expose the Edit Image action");
   assert(snapshot.buttons.includes("Upload Image"), "Image Editing should expose image upload");
   assert(snapshot.buttons.includes("Pixel Art Generation"), "Image Editing should expose Pixel Art Generation tab");
@@ -2419,7 +2419,7 @@ async function assertImageEditingFullBodyFitWithLogs(label) {
         height: rect.height
       };
     };
-    const log = document.querySelector(".codex-log-panel");
+    const log = document.querySelector(".zai-log-panel");
     const workspace = document.querySelector(".workspace");
     const canvasPanel = document.querySelector(".canvas-panel");
     const stage = document.querySelector(".canvas-stage");
@@ -2463,14 +2463,14 @@ async function assertImageEditingFullBodyFitWithLogs(label) {
       distanceToLog: Math.round((logRect?.top || 0) - (workspaceRect?.bottom || 0))
     };
   })()`);
-  assert(metrics.logVisible, `${label}: Codex log panel should be visible while checking full-body fit`);
+  assert(metrics.logVisible, `${label}: Zai log panel should be visible while checking full-body fit`);
   assert(metrics.activeVisible, `${label}: active preview should be visible`);
   assert(metrics.activeHeight >= 160, `${label}: active preview should remain inspectable, got height ${metrics.activeHeight}`);
   assert(metrics.stageHeight >= 220, `${label}: canvas stage should reserve enough height for full-body inspection, got ${metrics.stageHeight}`);
   assert(metrics.activeFitsStage, `${label}: active preview should fit inside the canvas stage: ${JSON.stringify(metrics)}`);
   assert(metrics.stageFitsPanel, `${label}: canvas stage should fit inside the canvas panel: ${JSON.stringify(metrics)}`);
-  assert(metrics.workspaceBeforeLog, `${label}: workspace should not overlap the Codex log panel, distance ${metrics.distanceToLog}: ${JSON.stringify(metrics)}`);
-  assert(metrics.downloadBeforeLog, `${label}: download panel should stay above the Codex log panel: ${JSON.stringify(metrics)}`);
+  assert(metrics.workspaceBeforeLog, `${label}: workspace should not overlap the Zai log panel, distance ${metrics.distanceToLog}: ${JSON.stringify(metrics)}`);
+  assert(metrics.downloadBeforeLog, `${label}: download panel should stay above the Zai log panel: ${JSON.stringify(metrics)}`);
 }
 
 async function assertAnimationResultNotEditable() {
@@ -2493,7 +2493,7 @@ async function assertEffectAnimationWorkflow() {
   await assertEffectControlsSimplified();
   await assertWorkflow({
     label: "Effect Animation",
-    route: "Route: Codex Handoff",
+    route: "Route: Zai Handoff",
     buttons: ["Choose Effect", "Open advanced settings", "Generate Effect", "Download"],
     hiddenButtons: ["Import Latest", "Import File", "Animated WebP", "Animated APNG", "Export Animation Pack"],
     hiddenText: ["Sprite Actions", "Export Sprite", "Generation Method", "Prompt (optional)", "Compositing tools (after generation)"],
@@ -2800,13 +2800,13 @@ async function assertHistoryIncrementalRendering() {
     source: "import"
   }));
   await evaluate(`(() => {
-    sessionStorage.setItem("image-cockpit.ui-smoke.skip-default-seed", "1");
-    localStorage.setItem("image-cockpit.v3.history", ${JSON.stringify(JSON.stringify(bulkHistory))});
-    localStorage.removeItem("image-cockpit.v3.frames");
-    localStorage.removeItem("image-cockpit.v3.actions");
+    sessionStorage.setItem("zai-cockpit.ui-smoke.skip-default-seed", "1");
+    localStorage.setItem("zai-cockpit.v3.history", ${JSON.stringify(JSON.stringify(bulkHistory))});
+    localStorage.removeItem("zai-cockpit.v3.frames");
+    localStorage.removeItem("zai-cockpit.v3.actions");
   })()`);
-  await writeIndexedSmokeState("image-cockpit.v3.history", bulkHistory);
-  await writeIndexedSmokeState("image-cockpit.v3.frames", []);
+  await writeIndexedSmokeState("zai-cockpit.v3.history", bulkHistory);
+  await writeIndexedSmokeState("zai-cockpit.v3.frames", []);
   await cdp.send("Page.navigate", { url: `http://127.0.0.1:${vitePort}/` });
   await waitForEval(
     () => `document.querySelector(".history-list")?.dataset.visibleCount === "100" && document.querySelector(".history-list")?.dataset.totalCount === "130"`,
@@ -2876,7 +2876,7 @@ async function scrollHistoryListToBottom() {
 async function writeIndexedSmokeState(key, value) {
   await evaluate(`(async () => {
     const db = await new Promise((resolve, reject) => {
-      const request = indexedDB.open("image-cockpit-local-state", 1);
+      const request = indexedDB.open("zai-cockpit-local-state", 1);
       request.onupgradeneeded = () => {
         const database = request.result;
         if (!database.objectStoreNames.contains("state")) database.createObjectStore("state");
@@ -3025,7 +3025,7 @@ async function assertWorkflow({
     }
     if (expectSourceRoundTrip) {
       await waitForEval(
-        () => `document.querySelectorAll(".codex-job-row").length === 0`,
+        () => `document.querySelectorAll(".zai-job-row").length === 0`,
         `${label} releases every tournament job before source round trip`,
         15000
       );
@@ -3091,7 +3091,7 @@ async function assertWorkflow({
 async function assertNormalizedAnimationFrames(label) {
   const metrics = await evaluate(`(async () => {
     const readState = (key) => new Promise((resolve, reject) => {
-      const request = indexedDB.open("image-cockpit-local-state", 1);
+      const request = indexedDB.open("zai-cockpit-local-state", 1);
       request.onerror = () => reject(request.error || new Error("Could not open IndexedDB"));
       request.onsuccess = () => {
         const db = request.result;
@@ -3113,7 +3113,7 @@ async function assertNormalizedAnimationFrames(label) {
       image.onerror = () => reject(new Error("Could not load frame image"));
       image.src = src;
     });
-    const frames = await readState("image-cockpit.v3.frames");
+    const frames = await readState("zai-cockpit.v3.frames");
     const groups = new Map();
     frames
       .filter((frame) => frame.width === 256 && frame.height === 256 && frame.sourceId)
@@ -3209,7 +3209,7 @@ async function assertSourceStatusRoundTrip(label, selector, { restoreSelectedRes
   if (label === "Animation Generation") {
     assert(
       after.animationSourceCard.includes(sourceName),
-      `${label} should keep the clicked source in the Animation Generation source card: source=${JSON.stringify(sourceName)}, card=${JSON.stringify(after.animationSourceCard)}, jobs=${after.codexJobRows}`
+      `${label} should keep the clicked source in the Animation Generation source card: source=${JSON.stringify(sourceName)}, card=${JSON.stringify(after.animationSourceCard)}, jobs=${after.zaiJobRows}`
     );
     assert(!after.disabledButtons.includes("Generate Animation"), `${label} should allow generating another animation from the clicked source`);
   }
@@ -3632,17 +3632,17 @@ async function pageSnapshot() {
     historyItems: document.querySelectorAll(".history-list > .history-item").length,
     historyVisibleCount: document.querySelector(".history-list")?.dataset.visibleCount || "",
     historyTotalCount: document.querySelector(".history-list")?.dataset.totalCount || "",
-    codexFailureCards: document.querySelectorAll(".codex-failure-card").length,
-    codexLogPanelVisible: Boolean(document.querySelector(".codex-log-panel")),
-    codexLogFullscreen: Boolean(document.querySelector(".codex-log-panel.fullscreen")),
-    codexLogFullscreenButtons: document.querySelectorAll(".codex-log-fullscreen-button").length,
-    codexLogCards: document.querySelectorAll(".codex-log-card").length,
+    zaiFailureCards: document.querySelectorAll(".zai-failure-card").length,
+    zaiLogPanelVisible: Boolean(document.querySelector(".zai-log-panel")),
+    zaiLogFullscreen: Boolean(document.querySelector(".zai-log-panel.fullscreen")),
+    zaiLogFullscreenButtons: document.querySelectorAll(".zai-log-fullscreen-button").length,
+    zaiLogCards: document.querySelectorAll(".zai-log-card").length,
     spriteBenchVisible: Boolean(document.querySelector(".sprite-bench")),
-    codexJobRows: document.querySelectorAll(".codex-job-row").length,
-    codexJobShelfInHistory: Boolean(document.querySelector(".history-panel > .codex-job-shelf")),
-    codexJobShelfInSource: Boolean(document.querySelector(".source-panel > .codex-job-shelf")),
-    codexJobShelfBeforeHistoryList: (() => {
-      const shelf = document.querySelector(".history-panel > .codex-job-shelf");
+    zaiJobRows: document.querySelectorAll(".zai-job-row").length,
+    zaiJobShelfInHistory: Boolean(document.querySelector(".history-panel > .zai-job-shelf")),
+    zaiJobShelfInSource: Boolean(document.querySelector(".source-panel > .zai-job-shelf")),
+    zaiJobShelfBeforeHistoryList: (() => {
+      const shelf = document.querySelector(".history-panel > .zai-job-shelf");
       const list = document.querySelector(".history-panel > .history-list");
       if (!shelf || !list) return false;
       return Boolean(shelf.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING);
@@ -3762,7 +3762,7 @@ async function waitForPageTarget(port) {
 async function createMockAnimationPack() {
   const zip = new JSZip();
   const manifest = {
-    schema: "image-cockpit.animation.v1",
+    schema: "zai-cockpit.animation.v1",
     title: "Smoke Run Pack",
     kind: "user",
     action: "run",
@@ -3772,7 +3772,7 @@ async function createMockAnimationPack() {
     framesPerDirection: 8,
     playback: "ping-pong-reverse",
     createdAt: "2026-06-25T00:00:00.000Z",
-    createdWith: "Image Cockpit for Codex Workflows",
+    createdWith: "Zai Cockpit",
     license: "ui-smoke",
     sourceNote: "Mock pack generated by scripts/ui-smoke.mjs.",
     promptSummary: "",
@@ -3920,7 +3920,7 @@ import { join } from "node:path";
 import { deflateSync } from "node:zlib";
 
 if (process.argv.includes("--help")) {
-  console.log("mock codex runner");
+  console.log("mock zai runner");
   process.exit(0);
 }
 
@@ -3930,16 +3930,16 @@ for await (const chunk of process.stdin) {
   stdin += chunk;
 }
 
-if (!stdin.includes("built-in image_gen")) {
+if (!stdin.includes("generate_image tool")) {
   console.error("missing imagegen runner instructions");
   process.exit(2);
 }
 
-const jobId = process.env.IMAGE_COCKPIT_JOB_ID;
-const jobPath = process.env.IMAGE_COCKPIT_JOB_PATH;
-const outboxDir = process.env.IMAGE_COCKPIT_OUTBOX_DIR;
+const jobId = process.env.ZAI_COCKPIT_JOB_ID;
+const jobPath = process.env.ZAI_COCKPIT_JOB_PATH;
+const outboxDir = process.env.ZAI_COCKPIT_OUTBOX_DIR;
 if (!jobId || !jobPath || !outboxDir) {
-  console.error("missing Image Cockpit runner environment");
+  console.error("missing Zai Cockpit runner environment");
   process.exit(3);
 }
 
@@ -3949,7 +3949,7 @@ for (let index = 1; index <= 28; index += 1) {
   console.log(\`mock runner progress \${jobId} \${String(index).padStart(2, "0")}/28\`);
 }
 console.log(\`mock runner tail marker \${jobId}\`);
-const configuredDelayMs = Number(process.env.IMAGE_COCKPIT_MOCK_RUNNER_DELAY_MS || 0);
+const configuredDelayMs = Number(process.env.ZAI_COCKPIT_MOCK_RUNNER_DELAY_MS || 0);
 const delayMs = job.prompt.includes("animation admission blocker ui smoke")
   ? Math.max(configuredDelayMs, 15000)
   : configuredDelayMs;
@@ -3972,7 +3972,7 @@ if (job.prompt.includes("imagegen unavailable ui smoke")) {
   await writeFile(join(outboxDir, \`\${jobId}-blocked.json\`), JSON.stringify({
     status: "blocked",
     reasonKind: "imagegen_unavailable",
-    userMessage: "Image generation is not available in this Codex environment.",
+    userMessage: "Image generation is not available in this Zai environment.",
     suggestion: "Use manual handoff or another provider."
   }, null, 2), "utf8");
   console.log(\`mock imagegen unavailable sidecar \${jobId}\`);
@@ -4015,7 +4015,7 @@ if (job.workflowMode === "effect-animation") {
   const png = makeEffectSheetPng(columns * cellWidth, rows * cellHeight, columns, rows, cellWidth, cellHeight, frameCount);
   await writeFile(join(outboxDir, \`\${jobId}-effect-sheet.png\`), png);
   await writeFile(join(outboxDir, \`\${jobId}-effect.json\`), JSON.stringify({
-    schema: "image-cockpit.effect-animation.v1",
+    schema: "zai-cockpit.effect-animation.v1",
     jobId,
     effectContext,
     transparent: true
@@ -4055,7 +4055,7 @@ if (job.spriteContext?.variant === "standard") {
       await writeFile(join(outboxDir, \`\${jobId}-\${slug}.png\`), png);
     }
     await writeFile(join(outboxDir, \`\${jobId}-manifest.json\`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId,
       action: job.spriteContext?.action || "idle",
       directions: directionNames,
@@ -4087,7 +4087,7 @@ if (job.spriteContext?.variant === "standard") {
     }
     await writeFile(join(outboxDir, \`\${jobId}-qa.json\`), JSON.stringify({ status: "pass", ignoredByUi: true }, null, 2), "utf8");
     await writeFile(join(outboxDir, \`\${jobId}-manifest.json\`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId,
       action: job.spriteContext?.action || "idle",
       directions: directionNames,
@@ -4105,7 +4105,7 @@ if (job.spriteContext?.variant === "standard") {
       await writeFile(join(outboxDir, \`\${jobId}-\${slug}.png\`), png);
     }
     await writeFile(join(outboxDir, \`\${jobId}-manifest.json\`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId,
       action: job.spriteContext?.action || "idle",
       directions: directionNames,
@@ -4132,7 +4132,7 @@ if (job.spriteContext?.variant === "standard") {
       await writeFile(join(outboxDir, \`\${jobId}-\${slug}.png\`), png);
     }
     await writeFile(join(outboxDir, \`\${jobId}-manifest.json\`), JSON.stringify({
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       jobId,
       action: job.spriteContext?.action || "idle",
       directions: directionNames,
@@ -4149,7 +4149,7 @@ if (job.spriteContext?.variant === "standard") {
     await writeFile(join(outboxDir, \`\${jobId}-\${slug}.png\`), png);
   }
   await writeFile(join(outboxDir, \`\${jobId}-manifest.json\`), JSON.stringify({
-    schema: "image-cockpit.direction-split-animation.v1",
+    schema: "zai-cockpit.direction-split-animation.v1",
     jobId,
     action: job.spriteContext?.action || "idle",
     directions: directionNames,

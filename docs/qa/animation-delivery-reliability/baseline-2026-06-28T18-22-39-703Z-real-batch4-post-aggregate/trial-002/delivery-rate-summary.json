@@ -1,5 +1,5 @@
 {
-  "schema": "image-cockpit.animation-delivery-rate-summary.v1",
+  "schema": "zai-cockpit.animation-delivery-rate-summary.v1",
   "createdAt": "2026-06-28T18:48:28.817Z",
   "runnerMode": "real",
   "totalTrials": 1,

@@ -97,7 +97,7 @@ export function buildAnimationQualityReport(input: BuildAnimationQualityReportIn
   });
 
   return {
-    metricVersion: "image-cockpit.animation-quality.v2",
+    metricVersion: "zai-cockpit.animation-quality.v2",
     policyVersion: "shadow-v1",
     recordedAt: input.recordedAt ?? new Date().toISOString(),
     action,

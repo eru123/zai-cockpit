@@ -1,6 +1,6 @@
 # Code Of Conduct
 
-Image Cockpit for Codex Workflows is intended to be a practical, respectful project space for local image production tooling.
+Zai Cockpit is intended to be a practical, respectful project space for local image production tooling.
 
 ## Expected Behavior
 

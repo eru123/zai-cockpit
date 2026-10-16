@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import { delimiter, extname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 loadDotEnv(resolve(".env"));
 
@@ -14,31 +15,28 @@ const requiredFiles = [
   "src/App.tsx",
   "scripts/smoke.mjs",
   "scripts/release-audit.mjs",
-  "docs/release/v0.1.0-runbook.md",
-  "docs/release/v0.1.0-checklist.md"
+  "scripts/zai-agent-runner.mjs"
 ];
-const handoffRoot = resolve(process.env.IMAGE_COCKPIT_HANDOFF_DIR ?? "codex-handoff");
+const handoffRoot = resolve(process.env.ZAI_COCKPIT_HANDOFF_DIR ?? "zai-handoff");
 const handoffDirs = ["inbox", "outbox", "assets", "status", "logs"];
-const codexAutoRun = process.env.IMAGE_COCKPIT_CODEX_AUTORUN !== "0";
-const codexCommand = process.env.IMAGE_COCKPIT_CODEX_COMMAND ?? "codex";
-const codexCommandCandidates = resolveCommandCandidates(codexCommand);
-const codexLaunchCommand = selectCodexLaunchCommand(codexCommand, codexCommandCandidates);
-const codexSandbox = process.env.IMAGE_COCKPIT_CODEX_SANDBOX ?? "workspace-write";
-const codexApproval = process.env.IMAGE_COCKPIT_CODEX_APPROVAL ?? "never";
-const codexHelpArgs = parseJsonStringArray("IMAGE_COCKPIT_CODEX_HELP_ARGS_JSON", ["--help"]);
-const runnerTimeoutMs = 4000;
+const runnerDir = dirname(fileURLToPath(import.meta.url));
+const agentRunnerScript = resolve(runnerDir, "zai-agent-runner.mjs");
+const zaiAutoRun = process.env.ZAI_COCKPIT_RUNNER_AUTORUN !== "0";
+const zaiCommand = process.env.ZAI_COCKPIT_RUNNER_COMMAND ?? process.execPath;
+const zaiHelpArgs = parseJsonStringArray("ZAI_COCKPIT_RUNNER_HELP_ARGS_JSON", [agentRunnerScript, "--preflight"]);
+const runnerTimeoutMs = 15000;
 
 const hardFailures = [];
 const warnings = [];
 const notes = [];
 
-console.log("Image Cockpit local doctor");
+console.log("Zai Cockpit local doctor");
 console.log("");
 
 checkRequiredFiles();
 checkNodeVersion();
 await checkHandoffDirs();
-await checkCodexCommand();
+await checkZaiRunner();
 
 printSummary();
 
@@ -85,39 +83,62 @@ async function checkHandoffDirs() {
   }
 }
 
-async function checkCodexCommand() {
-  section("Codex runner");
-  note(`autorun=${codexAutoRun}`);
-  note(`command=${codexCommand}`);
-  note(`launchCommand=${codexLaunchCommand}`);
-  if (codexCommandCandidates.length > 0) {
-    note(`resolved command path=${codexCommandCandidates[0]}`);
-  } else {
-    note("resolved command path=<not found on PATH>");
-  }
-  note(`sandbox=${codexSandbox}`);
-  note(`approval=${codexApproval}`);
+async function checkZaiRunner() {
+  section("Z.ai runner");
+  note(`autorun=${zaiAutoRun}`);
+  note(`command=${zaiCommand}`);
 
-  if (!codexAutoRun) {
-    ok("Codex autorun is disabled; manual handoff mode is active.");
+  if (!existsSync(agentRunnerScript)) {
+    fail(`Built-in Z.ai agent runner script is missing: ${agentRunnerScript}`);
+    return;
+  }
+  ok(`agent runner script: ${agentRunnerScript}`);
+
+  checkZaiApiConfig();
+
+  if (!zaiAutoRun) {
+    ok("Zai autorun is disabled; manual handoff mode is active.");
     return;
   }
 
-  const result = await tryRun(codexLaunchCommand, codexHelpArgs, runnerTimeoutMs);
+  const result = await tryRun(zaiCommand, zaiHelpArgs, runnerTimeoutMs);
   if (result.ok) {
-    ok(`${codexLaunchCommand} ${codexHelpArgs.join(" ")} completed`);
+    ok(`${zaiCommand} ${zaiHelpArgs.join(" ")} completed`);
     return;
   }
 
-  warn(`${codexLaunchCommand} is not executable from this environment: ${result.message}`);
+  warn(`Runner preflight failed: ${result.message}`);
   if (result.code) warn(`runner error code: ${result.code}`);
-  if ((result.code === "EPERM" || result.code === "EACCES") && isWindowsAppsLaunchLikely()) {
-    note("The resolved Codex command is the WindowsApps Codex Desktop executable, which this environment cannot launch as a subprocess.");
-    note("Use manual handoff, or set IMAGE_COCKPIT_CODEX_COMMAND to a terminal-runnable Codex CLI or wrapper when one is available.");
+  note("Jobs can still be written to zai-handoff/inbox and completed through manual handoff.");
+  note("Set ZAI_COCKPIT_RUNNER_AUTORUN=0 to make manual handoff explicit.");
+}
+
+function checkZaiApiConfig() {
+  const apiKey = process.env.ZAI_API_KEY || process.env.ZAI_COCKPIT_API_KEY || "";
+  const endpointMode = normalizeEndpointMode(process.env.ZAI_ENDPOINT_MODE);
+  const codingBase = process.env.ZAI_CODING_BASE_URL || "https://api.z.ai/api/coding/paas/v4";
+  const apiBase = process.env.ZAI_API_BASE_URL || "https://api.z.ai/api/paas/v4";
+  const chatModel = process.env.ZAI_CHAT_MODEL || "glm-4.7";
+  const imageModel = process.env.ZAI_IMAGE_MODEL || "cogview-4";
+
+  note(`endpointMode=${endpointMode} (chat: ${endpointMode === "api" ? apiBase : `${codingBase} first`})`);
+  note(`chatModel=${chatModel} imageModel=${imageModel}`);
+
+  if (apiKey) {
+    ok("ZAI_API_KEY is configured.");
+    if (endpointMode === "auto") {
+      note("Chat completions use the GLM Coding Plan endpoint first and fall back to the pay-as-you-go endpoint.");
+    }
+  } else {
+    warn("ZAI_API_KEY is not configured; the Z.ai agent runner cannot start.");
+    note("Create an API key at https://z.ai/model-api (or from your GLM Coding Plan page) and set ZAI_API_KEY in .env.");
   }
-  note("Jobs can still be written to codex-handoff/inbox and completed through manual handoff.");
-  note("Set IMAGE_COCKPIT_CODEX_AUTORUN=0 to make manual handoff explicit.");
-  note("Set IMAGE_COCKPIT_CODEX_COMMAND to a runnable Codex executable path when autorun is available.");
+  note("Image generation always uses the pay-as-you-go endpoint because Z.ai serves image models only there.");
+}
+
+function normalizeEndpointMode(value) {
+  const mode = (value || "auto").toLowerCase();
+  return mode === "coding" || mode === "api" ? mode : "auto";
 }
 
 function tryRun(command, args, timeoutMs) {
@@ -235,87 +256,8 @@ function parseJsonStringArray(envKey, fallback) {
       return parsed;
     }
   } catch {
-    // Invalid optional wrapper args fall back to Codex CLI defaults.
+    // Invalid optional wrapper args fall back to the built-in runner defaults.
   }
   return fallback;
 }
 
-function resolveCommandCandidates(command) {
-  const hasPathSeparator = command.includes("/") || command.includes("\\");
-  const commandNames = commandHasExtension(command) ? [command] : commandExtensions().map((extension) => `${command}${extension}`);
-  const dirs = hasPathSeparator ? [""] : (process.env.PATH ?? "").split(delimiter).filter(Boolean);
-  const candidates = [];
-
-  dirs.forEach((dir) => {
-    commandNames.forEach((name) => {
-      const candidate = hasPathSeparator ? resolve(name) : join(dir, name);
-      if (existsSync(candidate)) candidates.push(candidate);
-    });
-  });
-
-  return Array.from(new Set([...candidates, ...knownCodexCliCandidates(command)]));
-}
-
-function selectCodexLaunchCommand(command, candidates) {
-  if (command.includes("/") || command.includes("\\") || !isCodexCommandName(command)) return command;
-  return candidates.find(isLocalOpenAiCodexCliCommand) ?? candidates.find((candidate) => !isWindowsAppsCodexCommand(candidate)) ?? command;
-}
-
-function knownCodexCliCandidates(command) {
-  if (!isCodexCommandName(command)) return [];
-  const roots = [process.env.LOCALAPPDATA, process.env.USERPROFILE ? join(process.env.USERPROFILE, "AppData", "Local") : ""]
-    .filter(Boolean)
-    .map((root) => join(root, "OpenAI", "Codex", "bin"));
-  const candidates = [];
-
-  roots.forEach((root) => {
-    if (!existsSync(root)) return;
-    try {
-      readdirSync(root, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .forEach((entry) => {
-          ["codex.exe", "codex"].forEach((file) => {
-            const candidate = join(root, entry.name, file);
-            if (existsSync(candidate)) candidates.push(candidate);
-          });
-        });
-    } catch {
-      // Ignore discovery failures; explicit IMAGE_COCKPIT_CODEX_COMMAND remains available.
-    }
-  });
-
-  return candidates;
-}
-
-function commandExtensions() {
-  if (process.platform !== "win32") return [""];
-  const pathExt = process.env.PATHEXT?.split(";").filter(Boolean) ?? [".COM", ".EXE", ".BAT", ".CMD"];
-  return ["", ...pathExt.map((extension) => extension.toLowerCase())];
-}
-
-function commandHasExtension(command) {
-  return Boolean(extname(command));
-}
-
-function isCodexCommandName(command) {
-  return /^codex(?:\.exe)?$/i.test(command);
-}
-
-function isLocalOpenAiCodexCliCommand(candidate) {
-  return /[\\/]AppData[\\/]Local[\\/]OpenAI[\\/]Codex[\\/]bin[\\/][^\\/]+[\\/]codex(?:\.exe)?$/i.test(candidate);
-}
-
-function isWindowsAppsCodexCommand(candidate) {
-  return /[\\/]WindowsApps[\\/]OpenAI\.Codex_/i.test(candidate) && /[\\/]codex(?:\.exe)?$/i.test(candidate);
-}
-
-function hasWindowsAppsCodexCandidate() {
-  return codexCommandCandidates.some(isWindowsAppsCodexCommand);
-}
-
-function isWindowsAppsLaunchLikely() {
-  const explicitLaunchCommandIsWindowsApps = isWindowsAppsCodexCommand(codexLaunchCommand);
-  const bareCommandWouldResolveThroughWindowsApps =
-    isCodexCommandName(codexLaunchCommand) && hasWindowsAppsCodexCandidate() && !codexCommandCandidates.some(isLocalOpenAiCodexCliCommand);
-  return explicitLaunchCommandIsWindowsApps || bareCommandWouldResolveThroughWindowsApps;
-}

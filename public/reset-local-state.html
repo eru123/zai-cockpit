@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Image Cockpit Local State Reset</title>
+    <title>Zai Cockpit Local State Reset</title>
     <style>
       :root {
         color-scheme: light;
@@ -106,8 +106,8 @@
   </head>
   <body>
     <main>
-      <h1>Image Cockpit Local State Reset</h1>
-      <p>This page clears only Image Cockpit browser local state for this origin. It never deletes repository files, codex-handoff/outbox, docs/qa, or generated PNG files.</p>
+      <h1>Zai Cockpit Local State Reset</h1>
+      <p>This page clears only Zai Cockpit browser local state for this origin. It never deletes repository files, zai-handoff/outbox, docs/qa, or generated PNG files.</p>
       <p class="notice">Use this page when the main app cannot start because history, frames, or animation library state grew too large.</p>
       <div class="actions">
         <button class="primary" type="button" data-scope="history">Clear history</button>
@@ -122,21 +122,21 @@
       <output id="status" role="status">Ready.</output>
     </main>
     <script>
-      const DB_NAME = "image-cockpit-local-state";
+      const DB_NAME = "zai-cockpit-local-state";
       const STORE_NAME = "state";
       const KEYS = {
-        history: ["image-cockpit.v3.history", "image-cockpit.v3.history.summary"],
-        frames: ["image-cockpit.v3.frames", "image-cockpit.v3.frames.summary"],
-        "animation-library": ["image-cockpit.v3.animation-library"],
-        actions: ["image-cockpit.v3.actions"],
-        pending: ["image-cockpit.pendingCodexJob"]
+        history: ["zai-cockpit.v3.history", "zai-cockpit.v3.history.summary"],
+        frames: ["zai-cockpit.v3.frames", "zai-cockpit.v3.frames.summary"],
+        "animation-library": ["zai-cockpit.v3.animation-library"],
+        actions: ["zai-cockpit.v3.actions"],
+        pending: ["zai-cockpit.pendingZaiJob"]
       };
 
       const INDEXED_KEYS = {
-        history: ["image-cockpit.v3.history"],
-        frames: ["image-cockpit.v3.frames"],
-        "animation-library": ["image-cockpit.v3.animation-library"],
-        actions: ["image-cockpit.v3.actions"]
+        history: ["zai-cockpit.v3.history"],
+        frames: ["zai-cockpit.v3.frames"],
+        "animation-library": ["zai-cockpit.v3.animation-library"],
+        actions: ["zai-cockpit.v3.actions"]
       };
 
       const status = document.querySelector("#status");
@@ -146,7 +146,7 @@
       });
 
       async function clearScope(scope) {
-        const label = scope === "all" ? "all Image Cockpit local state" : scope;
+        const label = scope === "all" ? "all Zai Cockpit local state" : scope;
         if (!window.confirm(`Clear ${label}? This only affects browser local state for this origin.`)) return;
         status.textContent = `Clearing ${label}...`;
 

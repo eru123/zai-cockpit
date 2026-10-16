@@ -5,11 +5,11 @@ import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 
 const nodeCommand = process.execPath;
-const supervisorPort = readPort("IMAGE_COCKPIT_SUPERVISOR_PORT", 8793);
-const apiPort = readPort("IMAGE_COCKPIT_API_PORT", 8794);
-const vitePort = readPort("IMAGE_COCKPIT_VITE_PORT", 5181);
+const supervisorPort = readPort("ZAI_COCKPIT_SUPERVISOR_PORT", 8793);
+const apiPort = readPort("ZAI_COCKPIT_API_PORT", 8794);
+const vitePort = readPort("ZAI_COCKPIT_VITE_PORT", 5181);
 const apiTarget = `http://127.0.0.1:${apiPort}`;
-const handoffRoot = resolve(process.env.IMAGE_COCKPIT_HANDOFF_DIR ?? "codex-handoff");
+const handoffRoot = resolve(process.env.ZAI_COCKPIT_HANDOFF_DIR ?? "zai-handoff");
 const statusDir = join(handoffRoot, "status");
 const apiScript = resolve("server", "index.ts");
 const tsxCli = resolve("node_modules", "tsx", "dist", "cli.mjs");
@@ -86,7 +86,7 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(supervisorPort, "127.0.0.1", () => {
-  console.log("Image Cockpit dev supervisor");
+  console.log("Zai Cockpit dev supervisor");
   console.log(`Supervisor: http://127.0.0.1:${supervisorPort}`);
   console.log(`API:        ${apiTarget}`);
   console.log(`Vite:       http://127.0.0.1:${vitePort}`);
@@ -122,12 +122,12 @@ async function repairCockpit() {
 }
 
 async function restartApi() {
-  if (await hasRunningCodexJobs()) {
+  if (await hasRunningZaiJobs()) {
     return {
       ok: false,
       skipped: true,
       action: "restart-api",
-      reason: "Running Codex job status was found; API restart was skipped."
+      reason: "Running Zai job status was found; API restart was skipped."
     };
   }
 
@@ -150,8 +150,8 @@ function startApi() {
     cwd: process.cwd(),
     env: {
       ...process.env,
-      IMAGE_COCKPIT_API_PORT: String(apiPort),
-      IMAGE_COCKPIT_HANDOFF_DIR: handoffRoot
+      ZAI_COCKPIT_API_PORT: String(apiPort),
+      ZAI_COCKPIT_HANDOFF_DIR: handoffRoot
     },
     stdio: "inherit",
     windowsHide: true
@@ -168,8 +168,8 @@ function startVite() {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        IMAGE_COCKPIT_API_TARGET: apiTarget,
-        VITE_IMAGE_COCKPIT_SUPERVISOR_PORT: String(supervisorPort)
+        ZAI_COCKPIT_API_TARGET: apiTarget,
+        VITE_ZAI_COCKPIT_SUPERVISOR_PORT: String(supervisorPort)
       },
       stdio: "inherit",
       windowsHide: true
@@ -229,7 +229,7 @@ function buildHealth() {
   if (!existsSync(viteCli)) mismatches.push("Vite CLI is missing.");
 
   return {
-    app: "image-cockpit",
+    app: "zai-cockpit",
     role: "supervisor",
     devOnly: true,
     checkedAt: new Date().toISOString(),
@@ -274,7 +274,7 @@ function isProcessRunning(slot) {
   return Boolean(slot.child && slot.pid && slot.state === "running" && slot.child.exitCode === null);
 }
 
-async function hasRunningCodexJobs() {
+async function hasRunningZaiJobs() {
   try {
     const entries = await readdir(statusDir, { withFileTypes: true });
     for (const entry of entries) {

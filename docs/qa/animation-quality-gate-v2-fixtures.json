@@ -1,6 +1,6 @@
 {
-  "schema": "image-cockpit.animation-quality-fixtures.v1",
-  "metricVersion": "image-cockpit.animation-quality.v2",
+  "schema": "zai-cockpit.animation-quality-fixtures.v1",
+  "metricVersion": "zai-cockpit.animation-quality.v2",
   "policyVersion": "shadow-v1",
   "alignment": {
     "normalizationFootlineRatio": 0.9,

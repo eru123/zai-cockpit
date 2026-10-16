@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const nodeCommand = process.execPath;
-const keepArtifacts = process.env.IMAGE_COCKPIT_IMAGEGEN_SMOKE_KEEP === "1";
-const timeoutMs = Number(process.env.IMAGE_COCKPIT_IMAGEGEN_SMOKE_TIMEOUT_MS ?? 900000);
+const keepArtifacts = process.env.ZAI_COCKPIT_IMAGEGEN_SMOKE_KEEP === "1";
+const timeoutMs = Number(process.env.ZAI_COCKPIT_IMAGEGEN_SMOKE_TIMEOUT_MS ?? 900000);
 const handoffDir = await createHandoffDir();
 const port = await getOpenPort();
 const server = startServer({ port, handoffDir });
@@ -15,10 +15,10 @@ const server = startServer({ port, handoffDir });
 try {
   await waitForServer(server, port);
 
-  const runnerPreflight = await getJson(port, "/api/codex/runner");
-  assert(runnerPreflight.runner?.state === "ready", `Codex runner preflight was not ready: ${JSON.stringify(runnerPreflight.runner)}`);
+  const runnerPreflight = await getJson(port, "/api/zai/runner");
+  assert(runnerPreflight.runner?.state === "ready", `Zai runner preflight was not ready: ${JSON.stringify(runnerPreflight.runner)}`);
 
-  const job = await postJson(port, "/api/codex/jobs", {
+  const job = await postJson(port, "/api/zai/jobs", {
     workflowMode: "image-generate",
     prompt:
       "Create one original pixel-art game asset concept image: a tiny clockwork mushroom courier carrying a glowing blue delivery satchel through a rainy neon forest, crisp readable silhouette, 16-bit pixel-art inspired rendering, transparent-game-asset feel, teal rain highlights, warm amber satchel glow, no readable text, no logo, no watermark, no numbers.",
@@ -41,18 +41,18 @@ try {
   const imageReturnedBeforeRunnerExit =
     finalStatus.exitCode === null &&
     typeof finalStatus.message === "string" &&
-    finalStatus.message.includes("Codex returned an image while runner status was still running");
+    finalStatus.message.includes("Zai returned an image while runner status was still running");
   assert(
     finalStatus.exitCode === 0 || imageReturnedBeforeRunnerExit,
     `Real imagegen job exit code should be 0 or image-returned-before-exit: ${JSON.stringify(finalStatus)}`
   );
 
-  const list = await getJson(port, "/api/codex/results");
+  const list = await getJson(port, "/api/zai/results");
   const result = list.results.find((item) => item.name.startsWith(job.id) && item.mimeType === "image/png");
   assert(result, `Expected a returned PNG with prefix ${job.id}; found ${list.results.map((item) => item.name).join(", ") || "<none>"}`);
   assert(result.size > 20000, `Returned PNG should be larger than a placeholder; size=${result.size}`);
 
-  const imported = await getJson(port, `/api/codex/results/${encodeURIComponent(result.name)}`);
+  const imported = await getJson(port, `/api/zai/results/${encodeURIComponent(result.name)}`);
   const pngBytes = Buffer.from(imported.dataUrl.split(",")[1], "base64");
   const dimensions = readPngDimensions(pngBytes);
   assert(dimensions.width >= 256 && dimensions.height >= 256, `Returned PNG should be at least 256x256; got ${dimensions.width}x${dimensions.height}`);
@@ -75,12 +75,12 @@ try {
 }
 
 async function createHandoffDir() {
-  if (process.env.IMAGE_COCKPIT_IMAGEGEN_SMOKE_DIR) {
-    const dir = resolve(process.env.IMAGE_COCKPIT_IMAGEGEN_SMOKE_DIR);
+  if (process.env.ZAI_COCKPIT_IMAGEGEN_SMOKE_DIR) {
+    const dir = resolve(process.env.ZAI_COCKPIT_IMAGEGEN_SMOKE_DIR);
     await mkdir(dir, { recursive: true });
     return dir;
   }
-  return mkdtemp(join(tmpdir(), "image-cockpit-real-imagegen-smoke-"));
+  return mkdtemp(join(tmpdir(), "zai-cockpit-real-imagegen-smoke-"));
 }
 
 function startServer({ port, handoffDir }) {
@@ -88,9 +88,9 @@ function startServer({ port, handoffDir }) {
     cwd: process.cwd(),
     env: {
       ...process.env,
-      IMAGE_COCKPIT_API_PORT: String(port),
-      IMAGE_COCKPIT_HANDOFF_DIR: handoffDir,
-      IMAGE_COCKPIT_CODEX_AUTORUN: "1"
+      ZAI_COCKPIT_API_PORT: String(port),
+      ZAI_COCKPIT_HANDOFF_DIR: handoffDir,
+      ZAI_COCKPIT_RUNNER_AUTORUN: "1"
     },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true
@@ -122,7 +122,7 @@ async function waitForTerminalStatus(apiPort, jobId) {
   const deadline = Date.now() + timeoutMs;
   let lastStatus;
   while (Date.now() < deadline) {
-    const response = await getJson(apiPort, `/api/codex/jobs/${encodeURIComponent(jobId)}/status`);
+    const response = await getJson(apiPort, `/api/zai/jobs/${encodeURIComponent(jobId)}/status`);
     lastStatus = response.status;
     if (["completed", "failed", "unavailable", "disabled", "unknown"].includes(lastStatus?.state)) return lastStatus;
     await delay(5000);

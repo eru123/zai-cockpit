@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution to Image Cockpit for Codex Workflows.
+Thanks for considering a contribution to Zai Cockpit.
 
 Forks, experiments, local patches, and write-ups are welcome.
 
@@ -8,10 +8,10 @@ Upstream pull requests are currently disabled or limited while the project direc
 
 ## Product Boundary
 
-- The app runs locally on a machine where Codex is installed.
-- The app itself must not call OpenAI APIs directly.
+- The app runs locally and talks to Z.ai through the built-in agent runner (`scripts/zai-agent-runner.mjs`).
+- Chat completions must prefer the GLM Coding Plan endpoint over the pay-as-you-go endpoint.
 - No API keys, access tokens, model weights, or license-unclear assets should be committed.
-- Codex integration should go through local handoff files under `codex-handoff/` or through the local `codex exec` runner.
+- Z.ai integration goes through local handoff files under `zai-handoff/` and the agent runner.
 
 ## Priority
 
@@ -46,7 +46,7 @@ npm run release:audit
 - Update README, roadmap, review notes, or release checklist when behavior changes.
 - Include screenshots for visible UI changes under `docs/qa/`.
 - Keep generated outputs, secrets, and local handoff artifacts out of commits.
-- Confirm the app still has no direct OpenAI API dependency.
+- Confirm the runner still uses the coding-plan endpoint first and never commits API keys.
 
 ## Commit Style
 

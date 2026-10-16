@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const nodeCommand = process.execPath;
-const keepArtifacts = process.env.IMAGE_COCKPIT_REAL_CODEX_SMOKE_KEEP === "1";
-const timeoutMs = Number(process.env.IMAGE_COCKPIT_REAL_CODEX_SMOKE_TIMEOUT_MS ?? 180000);
+const keepArtifacts = process.env.ZAI_COCKPIT_REAL_ZAI_SMOKE_KEEP === "1";
+const timeoutMs = Number(process.env.ZAI_COCKPIT_REAL_ZAI_SMOKE_TIMEOUT_MS ?? 180000);
 const handoffDir = await createHandoffDir();
 const port = await getOpenPort();
 const server = startServer({ port, handoffDir });
@@ -15,10 +15,10 @@ const server = startServer({ port, handoffDir });
 try {
   await waitForServer(server, port);
 
-  const runnerPreflight = await getJson(port, "/api/codex/runner");
-  assert(runnerPreflight.runner?.state === "ready", `Codex runner preflight was not ready: ${JSON.stringify(runnerPreflight.runner)}`);
+  const runnerPreflight = await getJson(port, "/api/zai/runner");
+  assert(runnerPreflight.runner?.state === "ready", `Zai runner preflight was not ready: ${JSON.stringify(runnerPreflight.runner)}`);
 
-  const job = await postJson(port, "/api/codex/jobs", {
+  const job = await postJson(port, "/api/zai/jobs", {
     workflowMode: "image-generate",
     prompt:
       "Runner smoke verification only. Do not generate or fetch an image. Read this handoff job, then write a small Markdown sidecar file into the configured outbox. Name it with the provided job id and suffix -runner-smoke.md. The file should contain the job id and the phrase runner smoke ok.",
@@ -34,10 +34,10 @@ try {
     frames: 0
   });
 
-  assert(job.runner?.state === "running", `Real Codex runner should start as running: ${JSON.stringify(job.runner)}`);
+  assert(job.runner?.state === "running", `Real Zai runner should start as running: ${JSON.stringify(job.runner)}`);
   const finalStatus = await waitForTerminalStatus(port, job.id);
-  assert(finalStatus.state === "completed", `Real Codex runner did not complete: ${JSON.stringify(finalStatus)}`);
-  assert(finalStatus.exitCode === 0, `Real Codex runner exit code should be 0: ${JSON.stringify(finalStatus)}`);
+  assert(finalStatus.state === "completed", `Real Zai runner did not complete: ${JSON.stringify(finalStatus)}`);
+  assert(finalStatus.exitCode === 0, `Real Zai runner exit code should be 0: ${JSON.stringify(finalStatus)}`);
 
   const outboxDir = join(handoffDir, "outbox");
   const outboxFiles = existsSync(outboxDir) ? await readdir(outboxDir) : [];
@@ -48,10 +48,10 @@ try {
   const sidecarText = await readFile(sidecarPath, "utf8");
   assert(sidecarText.includes(job.id), "Runner smoke sidecar should contain the job id");
   assert(sidecarText.includes("runner smoke ok"), "Runner smoke sidecar should contain the success phrase");
-  assert(finalStatus.logPath, "Real Codex runner status should include a log path");
+  assert(finalStatus.logPath, "Real Zai runner status should include a log path");
   await stat(finalStatus.logPath);
 
-  console.log("Real Codex runner smoke passed.");
+  console.log("Real Zai runner smoke passed.");
   console.log(`jobId=${job.id}`);
   console.log(`handoffDir=${handoffDir}`);
   console.log(`logPath=${finalStatus.logPath}`);
@@ -62,12 +62,12 @@ try {
 }
 
 async function createHandoffDir() {
-  if (process.env.IMAGE_COCKPIT_REAL_CODEX_SMOKE_DIR) {
-    const dir = resolve(process.env.IMAGE_COCKPIT_REAL_CODEX_SMOKE_DIR);
+  if (process.env.ZAI_COCKPIT_REAL_ZAI_SMOKE_DIR) {
+    const dir = resolve(process.env.ZAI_COCKPIT_REAL_ZAI_SMOKE_DIR);
     await mkdir(dir, { recursive: true });
     return dir;
   }
-  return mkdtemp(join(tmpdir(), "image-cockpit-real-codex-smoke-"));
+  return mkdtemp(join(tmpdir(), "zai-cockpit-real-zai-smoke-"));
 }
 
 function startServer({ port, handoffDir }) {
@@ -75,9 +75,9 @@ function startServer({ port, handoffDir }) {
     cwd: process.cwd(),
     env: {
       ...process.env,
-      IMAGE_COCKPIT_API_PORT: String(port),
-      IMAGE_COCKPIT_HANDOFF_DIR: handoffDir,
-      IMAGE_COCKPIT_CODEX_AUTORUN: "1"
+      ZAI_COCKPIT_API_PORT: String(port),
+      ZAI_COCKPIT_HANDOFF_DIR: handoffDir,
+      ZAI_COCKPIT_RUNNER_AUTORUN: "1"
     },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true
@@ -109,7 +109,7 @@ async function waitForTerminalStatus(apiPort, jobId) {
   const deadline = Date.now() + timeoutMs;
   let lastStatus;
   while (Date.now() < deadline) {
-    const response = await getJson(apiPort, `/api/codex/jobs/${encodeURIComponent(jobId)}/status`);
+    const response = await getJson(apiPort, `/api/zai/jobs/${encodeURIComponent(jobId)}/status`);
     lastStatus = response.status;
     if (["completed", "failed", "unavailable", "disabled", "unknown"].includes(lastStatus?.state)) return lastStatus;
     await delay(1500);

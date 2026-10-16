@@ -2,7 +2,7 @@
 
 Created: 2026-07-02
 
-This catalog adds cute two-head-tall monster girl source characters for Image Cockpit generation and follow-up animation testing.
+This catalog adds cute two-head-tall monster girl source characters for Zai Cockpit generation and follow-up animation testing.
 Each prompt targets one full-body, family-friendly chibi character that can later be used as the source image for front idle, side idle, side run, side walk, and side attack animation generation.
 
 ## Common Negative Prompt

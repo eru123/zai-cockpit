@@ -7,7 +7,7 @@ import { createAnimationPackV2, createAnimationPackV2Zip } from "./animationPack
 
 describe("animation pack validation", () => {
   it("accepts the v1 animation manifest", () => {
-    expect(validateAnimationPackManifest(makeManifest()).schema).toBe("image-cockpit.animation.v1");
+    expect(validateAnimationPackManifest(makeManifest()).schema).toBe("zai-cockpit.animation.v1");
   });
 
   it("keeps legacy manifests without Motion Recipe metadata importable", () => {
@@ -97,7 +97,7 @@ describe("animation pack validation", () => {
   });
 
   it("rejects unsupported schemas", () => {
-    expect(() => validateAnimationPackManifest({ ...makeManifest(), schema: "image-cockpit.animation.v0" })).toThrow(
+    expect(() => validateAnimationPackManifest({ ...makeManifest(), schema: "zai-cockpit.animation.v0" })).toThrow(
       /schema/i
     );
   });
@@ -136,7 +136,7 @@ describe("animation pack validation", () => {
 
     expect(zip.file("manifest.json")).toBeTruthy();
     expect(zip.file("sheet.png")).toBeTruthy();
-    expect(JSON.parse(await zip.file("manifest.json")!.async("string")).schema).toBe("image-cockpit.animation.v1");
+    expect(JSON.parse(await zip.file("manifest.json")!.async("string")).schema).toBe("zai-cockpit.animation.v1");
   });
 
   it("exports direction GIF, WebP, and APNG previews into the animation pack", async () => {
@@ -171,7 +171,7 @@ describe("animation pack validation", () => {
 
 function makeManifest(frameCount: 4 | 6 | 8 | 12 | 16 | 20 = 8): AnimationPackManifest {
   return {
-    schema: "image-cockpit.animation.v1",
+    schema: "zai-cockpit.animation.v1",
     title: "Run Cycle",
     kind: "user",
     action: "run",
@@ -181,7 +181,7 @@ function makeManifest(frameCount: 4 | 6 | 8 | 12 | 16 | 20 = 8): AnimationPackMa
     framesPerDirection: frameCount,
     playback: "ping-pong-reverse",
     createdAt: "2026-06-25T00:00:00.000Z",
-    createdWith: "Image Cockpit for Codex Workflows",
+    createdWith: "Zai Cockpit",
     license: "user-controlled",
     sourceNote: "",
     promptSummary: "",

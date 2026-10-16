@@ -6,17 +6,17 @@ import { tmpdir } from "node:os";
 import { delimiter, join, relative, resolve } from "node:path";
 
 const nodeCommand = process.execPath;
-const browserCommand = process.env.IMAGE_COCKPIT_BROWSER_COMMAND || findBrowserCommand();
-const timeoutMs = Number(process.env.IMAGE_COCKPIT_SOURCE_BROWSER_TIMEOUT_MS ?? 900000);
-const headless = process.env.IMAGE_COCKPIT_SOURCE_BROWSER_HEADLESS !== "0";
-const sourceId = process.env.IMAGE_COCKPIT_SOURCE_BROWSER_ID || "source";
-const sourcePrompt = process.env.IMAGE_COCKPIT_SOURCE_BROWSER_PROMPT || defaultSourcePrompt();
-const sourceNegativePrompt = process.env.IMAGE_COCKPIT_SOURCE_BROWSER_NEGATIVE || defaultSourceNegativePrompt();
-const sourceNotes = process.env.IMAGE_COCKPIT_SOURCE_BROWSER_NOTES || "Browser QA source generation. Create a single full-body animation-ready pixel-art source image. Do not create placeholder, SVG, diagram, or text-only output.";
+const browserCommand = process.env.ZAI_COCKPIT_BROWSER_COMMAND || findBrowserCommand();
+const timeoutMs = Number(process.env.ZAI_COCKPIT_SOURCE_BROWSER_TIMEOUT_MS ?? 900000);
+const headless = process.env.ZAI_COCKPIT_SOURCE_BROWSER_HEADLESS !== "0";
+const sourceId = process.env.ZAI_COCKPIT_SOURCE_BROWSER_ID || "source";
+const sourcePrompt = process.env.ZAI_COCKPIT_SOURCE_BROWSER_PROMPT || defaultSourcePrompt();
+const sourceNegativePrompt = process.env.ZAI_COCKPIT_SOURCE_BROWSER_NEGATIVE || defaultSourceNegativePrompt();
+const sourceNotes = process.env.ZAI_COCKPIT_SOURCE_BROWSER_NOTES || "Browser QA source generation. Create a single full-body animation-ready pixel-art source image. Do not create placeholder, SVG, diagram, or text-only output.";
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-const reportDir = resolve(process.env.IMAGE_COCKPIT_SOURCE_BROWSER_REPORT_DIR || join("docs", "qa", "image-source-browser-smoke", `${sourceId}-${timestamp}`));
-const handoffDir = resolve(process.env.IMAGE_COCKPIT_SOURCE_BROWSER_HANDOFF_DIR || join(reportDir, "handoff"));
-const tempRoot = await mkdtemp(join(tmpdir(), "image-cockpit-source-browser-"));
+const reportDir = resolve(process.env.ZAI_COCKPIT_SOURCE_BROWSER_REPORT_DIR || join("docs", "qa", "image-source-browser-smoke", `${sourceId}-${timestamp}`));
+const handoffDir = resolve(process.env.ZAI_COCKPIT_SOURCE_BROWSER_HANDOFF_DIR || join(reportDir, "handoff"));
+const tempRoot = await mkdtemp(join(tmpdir(), "zai-cockpit-source-browser-"));
 const chromeProfileDir = join(tempRoot, "chrome-profile");
 const apiPort = await getOpenPort();
 const vitePort = await getOpenPort();
@@ -30,7 +30,7 @@ let report;
 let lastSnapshot = null;
 
 if (!browserCommand) {
-  console.error("Image source browser smoke requires Chrome or Edge. Set IMAGE_COCKPIT_BROWSER_COMMAND to a browser executable.");
+  console.error("Image source browser smoke requires Chrome or Edge. Set ZAI_COCKPIT_BROWSER_COMMAND to a browser executable.");
   process.exit(1);
 }
 
@@ -42,7 +42,7 @@ try {
   await waitForHttp(`http://127.0.0.1:${apiPort}/api/providers`, "local API");
 
   viteServer = startProcess(nodeCommand, ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", String(vitePort), "--strictPort"], {
-    IMAGE_COCKPIT_API_TARGET: `http://127.0.0.1:${apiPort}`
+    ZAI_COCKPIT_API_TARGET: `http://127.0.0.1:${apiPort}`
   });
   await waitForHttp(`http://127.0.0.1:${vitePort}/`, "Vite app");
 
@@ -78,19 +78,19 @@ try {
   const before = await pageSnapshot();
   const startedAt = new Date().toISOString();
   await clickButtonByText("Generate Pixel Art");
-  await waitForEval(() => `document.body?.innerText.includes("Codex Jobs")`, "Codex job shelf appears");
+  await waitForEval(() => `document.body?.innerText.includes("Zai Jobs")`, "Zai job shelf appears");
   const jobId = await waitForRunningJobId();
   const beforeScreenshotPath = join(reportDir, "source-before-terminal.png");
   await captureScreenshot(beforeScreenshotPath);
 
-  await waitForSourceTerminal(jobId, before.historyItems, before.codexFailureCards);
+  await waitForSourceTerminal(jobId, before.historyItems, before.zaiFailureCards);
   await delay(800);
 
   const after = await pageSnapshot();
   lastSnapshot = after;
   const screenshotPath = join(reportDir, "source-after-terminal.png");
   await captureScreenshot(screenshotPath);
-  const resultsList = await getJson(apiPort, "/api/codex/results").catch((error) => ({ error: error.message, results: [] }));
+  const resultsList = await getJson(apiPort, "/api/zai/results").catch((error) => ({ error: error.message, results: [] }));
   const matchingImages = Array.isArray(resultsList.results)
     ? resultsList.results.filter((result) => result.name.startsWith(jobId) && /^image\//.test(result.mimeType ?? ""))
     : [];
@@ -100,12 +100,12 @@ try {
   const deliveredToPreview = after.canvasPreviewMode === "result" && Boolean(after.canvasPreviewName);
   const outboxFinalPresent = Boolean(finalImage);
   const falseSuccess = deliveredToHistory && !outboxFinalPresent;
-  const blockedReason = after.codexFailureTexts.join(" | ");
+  const blockedReason = after.zaiFailureTexts.join(" | ");
   const resultStatus = deliveredToHistory && deliveredToPreview && outboxFinalPresent && !falseSuccess ? "pass" : "fail";
   const finishedAt = new Date().toISOString();
 
   report = {
-    schema: "image-cockpit.source-browser-smoke.v1",
+    schema: "zai-cockpit.source-browser-smoke.v1",
     createdAt: finishedAt,
     source: {
       sourceId,
@@ -158,7 +158,7 @@ try {
 } catch (error) {
   if (!report) {
     report = {
-      schema: "image-cockpit.source-browser-smoke.v1",
+      schema: "zai-cockpit.source-browser-smoke.v1",
       createdAt: new Date().toISOString(),
       source: {
         sourceId,
@@ -193,10 +193,10 @@ try {
 
 function apiEnv() {
   return {
-    IMAGE_COCKPIT_API_PORT: String(apiPort),
-    IMAGE_COCKPIT_HANDOFF_DIR: handoffDir,
-    IMAGE_COCKPIT_CODEX_AUTORUN: "1",
-    IMAGE_COCKPIT_ARTIFACT_STABLE_MS: "0"
+    ZAI_COCKPIT_API_PORT: String(apiPort),
+    ZAI_COCKPIT_HANDOFF_DIR: handoffDir,
+    ZAI_COCKPIT_RUNNER_AUTORUN: "1",
+    ZAI_COCKPIT_ARTIFACT_STABLE_MS: "0"
   };
 }
 
@@ -210,8 +210,8 @@ async function installBrowserPrelude() {
       window.addEventListener("unhandledrejection", (event) => {
         window.__sourceBrowserErrors.push(String(event.reason?.message || event.reason || "unhandled rejection"));
       });
-      localStorage.setItem("image-cockpit.language", "en");
-      localStorage.removeItem("image-cockpit.pendingCodexJob");
+      localStorage.setItem("zai-cockpit.language", "en");
+      localStorage.removeItem("zai-cockpit.pendingZaiJob");
     `
   });
 }
@@ -234,9 +234,9 @@ async function waitForRunningJobId() {
   const deadline = Date.now() + 15000;
   while (Date.now() < deadline) {
     const jobId = await evaluate(`(() => {
-      const texts = Array.from(document.querySelectorAll(".codex-job-row small"))
+      const texts = Array.from(document.querySelectorAll(".zai-job-row small"))
         .map((item) => item.innerText.trim());
-      return texts.find((text) => /^codex-job-/.test(text)) || "";
+      return texts.find((text) => /^zai-job-/.test(text)) || "";
     })()`);
     if (jobId) return jobId;
     await delay(200);
@@ -250,8 +250,8 @@ async function waitForSourceTerminal(jobId, historyCountBefore, failureCountBefo
     const snapshot = await pageSnapshot();
     lastSnapshot = snapshot;
     const delivered = snapshot.historyItems > historyCountBefore && snapshot.canvasPreviewMode === "result";
-    const failed = snapshot.codexFailureCards > failureCountBefore;
-    const jobRowsCleared = snapshot.codexJobRows === 0 || !snapshot.text.includes(jobId);
+    const failed = snapshot.zaiFailureCards > failureCountBefore;
+    const jobRowsCleared = snapshot.zaiJobRows === 0 || !snapshot.text.includes(jobId);
     if ((delivered || failed) && jobRowsCleared) return;
     await delay(1000);
   }
@@ -259,7 +259,7 @@ async function waitForSourceTerminal(jobId, historyCountBefore, failureCountBefo
 }
 
 async function writeReturnedImage(apiPort, resultName, outputPath) {
-  const imported = await getJson(apiPort, `/api/codex/results/${encodeURIComponent(resultName)}`);
+  const imported = await getJson(apiPort, `/api/zai/results/${encodeURIComponent(resultName)}`);
   const match = imported.dataUrl.match(/^data:image\/(?:png|webp);base64,(.+)$/);
   if (!match) throw new Error(`Returned source result was not a PNG/WebP data URL: ${resultName}`);
   await writeFile(outputPath, Buffer.from(match[1], "base64"));
@@ -289,9 +289,9 @@ async function pageSnapshot() {
       buttons: Array.from(document.querySelectorAll("button")).map((button) => button.innerText.replace(/\\s+/g, " ").trim()).filter(Boolean),
       disabledButtons: Array.from(document.querySelectorAll("button:disabled")).map((button) => button.innerText.replace(/\\s+/g, " ").trim()).filter(Boolean),
       historyItems: document.querySelectorAll(".history-item").length,
-      codexJobRows: document.querySelectorAll(".codex-job-row").length,
-      codexFailureCards: document.querySelectorAll(".codex-failure-card").length,
-      codexFailureTexts: Array.from(document.querySelectorAll(".codex-failure-card"))
+      zaiJobRows: document.querySelectorAll(".zai-job-row").length,
+      zaiFailureCards: document.querySelectorAll(".zai-failure-card").length,
+      zaiFailureTexts: Array.from(document.querySelectorAll(".zai-failure-card"))
         .map((card) => card.innerText.replace(/\\s+/g, " ").trim())
         .filter(Boolean),
       canvasPreviewMode: document.querySelector("canvas")?.dataset.previewMode || "",

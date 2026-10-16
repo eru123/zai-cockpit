@@ -1,6 +1,6 @@
 import type { AnimationLibraryItem, AnimationPackManifest } from "../types";
 
-const CREATED_WITH = "Image Cockpit for Codex Workflows";
+const CREATED_WITH = "Zai Cockpit";
 const DIRECTIONS = ["front", "front three-quarter", "side", "back three-quarter", "back"];
 const STANDARD_GRID = { columns: 8, rows: 5, gutter: 0 };
 const STANDARD_CELL = { width: 256, height: 256 };
@@ -152,7 +152,7 @@ function createOfficialAnimation({
   tags: string[];
 }): AnimationLibraryItem {
   const manifest: AnimationPackManifest = {
-    schema: "image-cockpit.animation.v1",
+    schema: "zai-cockpit.animation.v1",
     title,
     kind: "official",
     action,
@@ -164,7 +164,7 @@ function createOfficialAnimation({
     createdAt: "2026-06-25T00:00:00.000Z",
     createdWith: CREATED_WITH,
     license: "sample",
-    sourceNote: "Bundled official sample for Image Cockpit animation workflows.",
+    sourceNote: "Bundled official sample for Zai Cockpit animation workflows.",
     promptSummary: "",
     tags,
     files: {

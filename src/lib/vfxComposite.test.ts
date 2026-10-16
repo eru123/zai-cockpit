@@ -83,7 +83,7 @@ function effect(): HistoryItem & { effectAnimation: EffectAnimationMetadata } {
       loopMode: "one-shot", fps: 12, anchor: { x: 64, y: 64, mode: "center" }, blendMode: "additive",
       background: "transparent", alphaPremultiplied: false, qualityRank: "gold", warnings: [],
       qualityV2: {
-        metricVersion: "image-cockpit.effect-quality.v2", policyVersion: "shadow-v1", recordedAt: "2026-07-15T00:00:00.000Z",
+        metricVersion: "zai-cockpit.effect-quality.v2", policyVersion: "shadow-v1", recordedAt: "2026-07-15T00:00:00.000Z",
         loopSeamScore: null, alphaContinuityScore: 90, energyCentroidScore: 90, brightnessEnvelopeScore: 90,
         clippingOverdrawScore: 90, paletteConsistencyScore: 90, peakFrameIndex: 2, eventPeakDeltaFrames: 0, shadowWarnings: []
       }
@@ -93,7 +93,7 @@ function effect(): HistoryItem & { effectAnimation: EffectAnimationMetadata } {
 
 function animationPack(): AnimationPackV2 {
   return {
-    schema: "image-cockpit.animation.v2", schemaVersion: 2, title: "Hero attack", kind: "user", actionId: "attack",
+    schema: "zai-cockpit.animation.v2", schemaVersion: 2, title: "Hero attack", kind: "user", actionId: "attack",
     recipeId: "attack", recipeVersion: 1, compilerVersion: "1.1.0", sourceFingerprint: "test", directions: ["front"],
     frames: Array.from({ length: 8 }, (_, index) => ({ id: `f${index}`, direction: "front", sourceFrameIndex: index, sheetRect: { x: index * 128, y: 0, width: 128, height: 128 } })),
     frameOrder: [0, 1, 2, 3, 4, 5, 6, 7], frameDurations: Array(8).fill(83), defaultFps: 12, loopMode: "one-shot",

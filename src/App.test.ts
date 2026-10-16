@@ -10,9 +10,9 @@ import {
   canUseMotionPilot,
   motionPilotAvailabilityText,
   buildImageCockpitEnvironmentReport,
-  codexJobProgressPhase,
+  zaiJobProgressPhase,
   directionSplitJobIdFromOutboxResultName,
-  estimateCodexJobProgress,
+  estimateZaiJobProgress,
   findLatestReadyDirectionSplitArtifact,
   findReadyDirectionSplitArtifacts,
   findSessionAllowedAnimationTournamentInitialCandidates,
@@ -45,11 +45,11 @@ import {
   settingsTabFromSearch,
   shouldIgnoreOutboxResultName,
   shouldOpenSettingsFromSearch,
-  shouldReportCompletedCodexImportFailure,
+  shouldReportCompletedZaiImportFailure,
   shouldWaitForAnimationTournamentArtifacts,
-  shouldWaitForCodexRunner,
+  shouldWaitForZaiRunner,
   summarizeCockpitHealthStatus,
-  summarizeCodexImportFailureReason,
+  summarizeZaiImportFailureReason,
   SUPPORTED_LANGUAGE_IDS
 } from "./App";
 import { createAnimationPackV2 } from "./lib/animationPackV2";
@@ -60,37 +60,37 @@ import {
   dedupeLocalInboxHistory,
   FRAME_RETENTION_LIMIT,
   HISTORY_RETENTION_LIMIT,
-  IMAGE_COCKPIT_LOCAL_STATE_KEYS,
+  ZAI_COCKPIT_LOCAL_STATE_KEYS,
   isStorageSafeModeSearch,
-  PENDING_CODEX_JOB_STORAGE_KEY,
+  PENDING_ZAI_JOB_STORAGE_KEY,
   prependHistoryItemWithDedupe,
   remapFrameSourceIds,
   STORAGE_AUTO_SAFE_BYTES,
   STORAGE_HARD_BLOCK_BYTES,
   STORAGE_WARNING_BYTES
 } from "./lib/storage";
-import type { AnimationPackManifest, Annotation, CodexArtifactStatus, CodexRunnerStatus, HistoryItem, SpriteFrame } from "./types";
+import type { AnimationPackManifest, Annotation, ZaiArtifactStatus, ZaiRunnerStatus, HistoryItem, SpriteFrame } from "./types";
 
-describe("Codex runner wait state", () => {
+describe("Zai runner wait state", () => {
   it("keeps waiting only when the runner is actively running or status is not loaded yet", () => {
-    expect(shouldWaitForCodexRunner()).toBe(true);
-    expect(shouldWaitForCodexRunner(makeStatus("running"))).toBe(true);
+    expect(shouldWaitForZaiRunner()).toBe(true);
+    expect(shouldWaitForZaiRunner(makeStatus("running"))).toBe(true);
   });
 
   it("unlocks stale or terminal runner states", () => {
-    expect(shouldWaitForCodexRunner(makeStatus("unknown"))).toBe(false);
-    expect(shouldWaitForCodexRunner(makeStatus("disabled"))).toBe(false);
-    expect(shouldWaitForCodexRunner(makeStatus("unavailable"))).toBe(false);
-    expect(shouldWaitForCodexRunner(makeStatus("failed"))).toBe(false);
-    expect(shouldWaitForCodexRunner(makeStatus("completed"))).toBe(false);
+    expect(shouldWaitForZaiRunner(makeStatus("unknown"))).toBe(false);
+    expect(shouldWaitForZaiRunner(makeStatus("disabled"))).toBe(false);
+    expect(shouldWaitForZaiRunner(makeStatus("unavailable"))).toBe(false);
+    expect(shouldWaitForZaiRunner(makeStatus("failed"))).toBe(false);
+    expect(shouldWaitForZaiRunner(makeStatus("completed"))).toBe(false);
   });
 
   it("reports completed jobs as import failures when no import succeeded", () => {
-    expect(shouldReportCompletedCodexImportFailure(makeStatus("completed"), false)).toBe(true);
-    expect(shouldReportCompletedCodexImportFailure(makeStatus("completed"), true)).toBe(false);
-    expect(shouldReportCompletedCodexImportFailure(makeStatus("running"), false)).toBe(false);
+    expect(shouldReportCompletedZaiImportFailure(makeStatus("completed"), false)).toBe(true);
+    expect(shouldReportCompletedZaiImportFailure(makeStatus("completed"), true)).toBe(false);
+    expect(shouldReportCompletedZaiImportFailure(makeStatus("running"), false)).toBe(false);
     expect(
-      shouldReportCompletedCodexImportFailure(
+      shouldReportCompletedZaiImportFailure(
         {
           ...makeStatus("completed"),
           diagnostic: {
@@ -105,13 +105,13 @@ describe("Codex runner wait state", () => {
   });
 
   it("summarizes import failures without leaking local absolute paths or stack traces", () => {
-    const reason = summarizeCodexImportFailureReason(
-      new Error("Direction split import failed for codex-job-test: missing side at D:\\codex\\secret\\outbox\\file.png\nstack line")
+    const reason = summarizeZaiImportFailureReason(
+      new Error("Direction split import failed for zai-job-test: missing side at D:\\zai\\secret\\outbox\\file.png\nstack line")
     );
 
     expect(reason).toContain("Direction split import failed");
     expect(reason).toContain("local file");
-    expect(reason).not.toContain("D:\\codex");
+    expect(reason).not.toContain("D:\\zai");
     expect(reason).not.toContain("stack line");
   });
 });
@@ -248,29 +248,29 @@ describe("Cockpit health status", () => {
   it("reports a broken state when API health is missing", () => {
     expect(summarizeCockpitHealthStatus(false, [], 0)).toEqual({
       state: "broken",
-      message: "Cockpit connection issue: API route is not Image Cockpit."
+      message: "Cockpit connection issue: API route is not Zai Cockpit."
     });
   });
 });
 
-describe("Codex job progress estimate", () => {
+describe("Zai job progress estimate", () => {
   it("keeps visual progress below complete while the job is still running", () => {
     const startedAt = "2026-06-29T00:00:00.000Z";
     const afterThirtyMinutes = Date.parse("2026-06-29T00:30:00.000Z");
     const afterTwoHours = Date.parse("2026-06-29T02:00:00.000Z");
 
-    expect(estimateCodexJobProgress(startedAt, afterThirtyMinutes, "sprite-generate")).toBe(90);
-    expect(estimateCodexJobProgress(startedAt, afterTwoHours, "sprite-generate")).toBeLessThan(100);
+    expect(estimateZaiJobProgress(startedAt, afterThirtyMinutes, "sprite-generate")).toBe(90);
+    expect(estimateZaiJobProgress(startedAt, afterTwoHours, "sprite-generate")).toBeLessThan(100);
   });
 
   it("reports coarse phases without exposing a fake percentage", () => {
     const startedAt = "2026-06-29T00:00:00.000Z";
 
-    expect(codexJobProgressPhase("queued", startedAt, Date.parse("2026-06-29T00:30:00.000Z"), "sprite-generate")).toBe("queued");
-    expect(codexJobProgressPhase("running", startedAt, Date.parse("2026-06-29T00:01:00.000Z"), "sprite-generate")).toBe("starting");
-    expect(codexJobProgressPhase("running", startedAt, Date.parse("2026-06-29T00:12:00.000Z"), "sprite-generate")).toBe("generating");
-    expect(codexJobProgressPhase("running", startedAt, Date.parse("2026-06-29T00:25:00.000Z"), "sprite-generate")).toBe("checking");
-    expect(codexJobProgressPhase("running", startedAt, Date.parse("2026-06-29T00:45:00.000Z"), "sprite-generate")).toBe("extended");
+    expect(zaiJobProgressPhase("queued", startedAt, Date.parse("2026-06-29T00:30:00.000Z"), "sprite-generate")).toBe("queued");
+    expect(zaiJobProgressPhase("running", startedAt, Date.parse("2026-06-29T00:01:00.000Z"), "sprite-generate")).toBe("starting");
+    expect(zaiJobProgressPhase("running", startedAt, Date.parse("2026-06-29T00:12:00.000Z"), "sprite-generate")).toBe("generating");
+    expect(zaiJobProgressPhase("running", startedAt, Date.parse("2026-06-29T00:25:00.000Z"), "sprite-generate")).toBe("checking");
+    expect(zaiJobProgressPhase("running", startedAt, Date.parse("2026-06-29T00:45:00.000Z"), "sprite-generate")).toBe("extended");
   });
 });
 
@@ -316,22 +316,22 @@ describe("animation source selection", () => {
   it("does not allow generated animation result sheets as the next body source", () => {
     const directionSplitSheet = makeHistoryItem("direction-split", {
       source: "generate",
-      name: "codex-job-test-direction-split-animation-sheet.png",
+      name: "zai-job-test-direction-split-animation-sheet.png",
       outboxImportKey: buildOutboxImportKey("direction-split", {
-        jobId: "codex-job-test",
-        filenames: ["codex-job-test-front.png"],
-        manifestName: "codex-job-test-manifest.json"
+        jobId: "zai-job-test",
+        filenames: ["zai-job-test-front.png"],
+        manifestName: "zai-job-test-manifest.json"
       })
     });
     const legacyAnimationSheet = makeHistoryItem("animation-sheet", {
       source: "generate",
-      name: "codex-job-legacy.png",
-      outboxImportKey: buildOutboxImportKey("animation-sheet", { jobId: "codex-job-legacy", filenames: ["codex-job-legacy.png"] })
+      name: "zai-job-legacy.png",
+      outboxImportKey: buildOutboxImportKey("animation-sheet", { jobId: "zai-job-legacy", filenames: ["zai-job-legacy.png"] })
     });
     const bronzeCandidate = makeHistoryItem("bronze", {
       source: "generate",
-      name: "codex-job-bronze-front.png",
-      outboxImportKey: buildOutboxImportKey("bronze-candidate", { jobId: "codex-job-bronze", filenames: ["codex-job-bronze-front.png"] })
+      name: "zai-job-bronze-front.png",
+      outboxImportKey: buildOutboxImportKey("bronze-candidate", { jobId: "zai-job-bronze", filenames: ["zai-job-bronze-front.png"] })
     });
 
     expect(isAnimationResultHistoryItem(directionSplitSheet)).toBe(true);
@@ -388,11 +388,11 @@ describe("settings recovery environment report", () => {
       timezoneOffsetMinutes: -540,
       localTime: "2026-06-27T02:41:00.000Z",
       apiHealth: {
-        app: "image-cockpit",
+        app: "zai-cockpit",
         version: "0.2.1",
         role: "api",
         port: 8794,
-        handoffRoot: ["C:", "Users", "alice", "project", "codex-handoff"].join("\\"),
+        handoffRoot: ["C:", "Users", "alice", "project", "zai-handoff"].join("\\"),
         inboxReadable: true,
         outboxReadable: true,
         statusReadable: true,
@@ -402,20 +402,20 @@ describe("settings recovery environment report", () => {
       runner: {
         state: "ready",
         message: "ok",
-        command: "codex",
+        command: "node",
         checkedAt: "now",
         autorun: true,
-        sandbox: "workspace-write",
-        approval: "never"
+        runnerScript: "scripts/zai-agent-runner.mjs",
+        endpointMode: "auto"
       },
-      providerId: "codex-handoff",
+      providerId: "zai-handoff",
       workflowMode: "image-generate",
       safeMode: false,
       skipStorage: false,
       activeJobCount: 0,
       queuedJobCount: 0,
       lastFailure: {
-        jobId: "codex-job-test",
+        jobId: "zai-job-test",
         label: "Image",
         diagnostic: {
           kind: "imagegen_unavailable",
@@ -437,7 +437,7 @@ describe("settings recovery environment report", () => {
     });
 
     const json = JSON.stringify(report.json);
-    expect(report.markdown).toContain("Image Cockpit Environment Report");
+    expect(report.markdown).toContain("Zai Cockpit Environment Report");
     expect(report.markdown).toContain("imagegen_unavailable");
     expect(report.markdown).toContain("Local procedural result: yes");
     expect(json).toContain("localProcedural");
@@ -530,8 +530,8 @@ describe("local state safe mode and retention", () => {
     expect(retained.some((frame) => frame.id === `frame-${FRAME_RETENTION_LIMIT + 19}`)).toBe(true);
   });
 
-  it("includes pending Codex jobs in the formal local reset key list", () => {
-    expect(IMAGE_COCKPIT_LOCAL_STATE_KEYS).toContain(PENDING_CODEX_JOB_STORAGE_KEY);
+  it("includes pending Zai jobs in the formal local reset key list", () => {
+    expect(ZAI_COCKPIT_LOCAL_STATE_KEYS).toContain(PENDING_ZAI_JOB_STORAGE_KEY);
   });
 });
 
@@ -559,7 +559,7 @@ describe("Local Inbox import dedupe", () => {
   });
 
   it("keeps one bronze candidate per job even when candidate filenames differ", () => {
-    const jobId = "codex-job-2026-06-27T00-57-56-534Z";
+    const jobId = "zai-job-2026-06-27T00-57-56-534Z";
     const first = makeHistoryItem("bronze-1", {
       provider: "local-inbox",
       source: "inbox",
@@ -646,7 +646,7 @@ describe("Local Inbox import dedupe", () => {
   });
 
   it("allows a final direction-split import after a bronze candidate for the same job", () => {
-    const jobId = "codex-job-2026-06-27T00-57-56-534Z";
+    const jobId = "zai-job-2026-06-27T00-57-56-534Z";
     const bronze = makeHistoryItem("bronze", {
       provider: "local-inbox",
       source: "inbox",
@@ -675,7 +675,7 @@ describe("Local Inbox import dedupe", () => {
   });
 
   it("fingerprints outbox changes with name, size, and modified time", () => {
-    const jobId = "codex-job-2026-06-27T00-57-56-534Z";
+    const jobId = "zai-job-2026-06-27T00-57-56-534Z";
     const initial = fingerprintOutboxResults([makeOutboxResult(`${jobId}-front.png`)], jobId, "2026-06-26T00:00:00.000Z");
     const changed = fingerprintOutboxResults(
       [{ ...makeOutboxResult(`${jobId}-front.png`), modifiedAt: "2026-06-27T00:01:00.000Z" }],
@@ -688,9 +688,9 @@ describe("Local Inbox import dedupe", () => {
   });
 });
 
-describe("Codex outbox job result matching", () => {
+describe("Zai outbox job result matching", () => {
   it("accepts exact job-id image names and suffixed image names", () => {
-    const jobId = "codex-job-2026-06-25T13-01-42-060Z";
+    const jobId = "zai-job-2026-06-25T13-01-42-060Z";
 
     expect(isOutboxResultForJob(`${jobId}.png`, jobId)).toBe(true);
     expect(isOutboxResultForJob(`${jobId}.meta.png`, jobId)).toBe(true);
@@ -699,7 +699,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("recognizes only the direction split manifest for the matching job id", () => {
-    const jobId = "codex-job-2026-06-25T13-01-42-060Z";
+    const jobId = "zai-job-2026-06-25T13-01-42-060Z";
 
     expect(isDirectionSplitAnimationManifestName(`${jobId}-manifest.json`, jobId)).toBe(true);
     expect(isDirectionSplitAnimationManifestName(`${jobId}-blocked.json`, jobId)).toBe(false);
@@ -708,7 +708,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("ignores temp, contact sheet, QA, and debug outbox names without blocking final assets", () => {
-    const jobId = "codex-job-2026-06-25T13-01-42-060Z";
+    const jobId = "zai-job-2026-06-25T13-01-42-060Z";
     [
       `${jobId}-candidate-contact.tmp.png`,
       `${jobId}-candidate-contact.tmp_transparent.png`,
@@ -745,7 +745,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("treats partial direction files without a manifest as waiting, not ready", () => {
-    const jobId = "codex-job-2026-06-25T13-01-42-060Z";
+    const jobId = "zai-job-2026-06-25T13-01-42-060Z";
     const selection = selectDirectionSplitAnimationResults(
       [
         makeOutboxResult(`${jobId}-front.png`),
@@ -762,7 +762,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("keeps ignored QA and contact files out of direction split imports", () => {
-    const jobId = "codex-job-2026-06-25T13-01-42-060Z";
+    const jobId = "zai-job-2026-06-25T13-01-42-060Z";
     const directionNames = [
       `${jobId}-front.png`,
       `${jobId}-front-three-quarter.png`,
@@ -779,7 +779,7 @@ describe("Codex outbox job result matching", () => {
     ];
 
     const selection = selectDirectionSplitAnimationResults(results, jobId, {
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       files: {
         front: `${jobId}-front.png`,
         "front-three-quarter": `${jobId}-front-three-quarter.png`,
@@ -794,7 +794,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("does not treat direction split raw direction files as generic static image imports", () => {
-    const jobId = "codex-job-2026-06-27T02-11-47-290Z";
+    const jobId = "zai-job-2026-06-27T02-11-47-290Z";
 
     expect(directionSplitJobIdFromOutboxResultName(`${jobId}-front.png`)).toBe(jobId);
     expect(directionSplitJobIdFromOutboxResultName(`${jobId}-manifest.json`)).toBe(jobId);
@@ -805,7 +805,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("quarantines bronze candidate names instead of treating them as final generic imports", () => {
-    const jobId = "codex-job-2026-06-27T02-11-47-290Z";
+    const jobId = "zai-job-2026-06-27T02-11-47-290Z";
     const candidate = makeOutboxResult(`${jobId}-bronze-candidate-front.png`);
 
     expect(shouldIgnoreOutboxResultName(candidate.name)).toBe(false);
@@ -814,7 +814,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("requires the direction split manifest plus all five direction images before import is ready", () => {
-    const jobId = "codex-job-2026-06-25T13-01-42-060Z";
+    const jobId = "zai-job-2026-06-25T13-01-42-060Z";
     const results = [
       makeOutboxResult(`${jobId}-manifest.json`, "application/json"),
       makeOutboxResult(`${jobId}-front.png`),
@@ -825,7 +825,7 @@ describe("Codex outbox job result matching", () => {
     ];
 
     const selection = selectDirectionSplitAnimationResults(results, jobId, {
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       files: {
         front: `${jobId}-front.png`,
         "front-three-quarter": `${jobId}-front-three-quarter.png`,
@@ -842,7 +842,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("imports selected one- and three-direction standard animation manifests without waiting for five rows", () => {
-    const jobId = "codex-job-2026-07-08T01-00-00-000Z";
+    const jobId = "zai-job-2026-07-08T01-00-00-000Z";
     const threeDirectionResults = [
       makeOutboxResult(`${jobId}-manifest.json`, "application/json"),
       makeOutboxResult(`${jobId}-front.png`),
@@ -850,7 +850,7 @@ describe("Codex outbox job result matching", () => {
       makeOutboxResult(`${jobId}-back.png`)
     ];
     const threeDirectionManifest = {
-      schema: "image-cockpit.direction-split-animation.v1" as const,
+      schema: "zai-cockpit.direction-split-animation.v1" as const,
       directions: ["front", "side", "back"],
       files: {
         front: `${jobId}-front.png`,
@@ -879,7 +879,7 @@ describe("Codex outbox job result matching", () => {
       [makeOutboxResult(`${jobId}-manifest.json`, "application/json"), makeOutboxResult(`${jobId}-side.png`)],
       jobId,
       {
-        schema: "image-cockpit.direction-split-animation.v1",
+        schema: "zai-cockpit.direction-split-animation.v1",
         directions: ["side"],
         files: { side: `${jobId}-side.png` }
       },
@@ -894,7 +894,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("waits for server verified artifacts even when manifest and direction images are visible", () => {
-    const jobId = "codex-job-2026-06-25T13-01-42-060Z";
+    const jobId = "zai-job-2026-06-25T13-01-42-060Z";
     const artifact = makeDirectionSplitArtifact(jobId, {
       ready: false,
       verified: false,
@@ -911,7 +911,7 @@ describe("Codex outbox job result matching", () => {
     ];
 
     const selection = selectDirectionSplitAnimationResults(results, jobId, {
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       files: Object.fromEntries(["front", "front-three-quarter", "side", "back-three-quarter", "back"].map((slug) => [slug, `${jobId}-${slug}.png`]))
     });
 
@@ -921,7 +921,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("allows import once the server marks the direction split artifact verified", () => {
-    const jobId = "codex-job-2026-06-25T13-01-42-060Z";
+    const jobId = "zai-job-2026-06-25T13-01-42-060Z";
     const artifact = makeDirectionSplitArtifact(jobId, {
       ready: true,
       verified: true,
@@ -938,7 +938,7 @@ describe("Codex outbox job result matching", () => {
     ];
 
     const selection = selectDirectionSplitAnimationResults(results, jobId, {
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       files: Object.fromEntries(["front", "front-three-quarter", "side", "back-three-quarter", "back"].map((slug) => [slug, `${jobId}-${slug}.png`]))
     });
 
@@ -947,7 +947,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("blocks direction split import when the server quality gate marks the artifact failed", () => {
-    const jobId = "codex-job-2026-06-25T13-01-42-060Z";
+    const jobId = "zai-job-2026-06-25T13-01-42-060Z";
     const artifact = makeDirectionSplitArtifact(jobId, {
       ready: false,
       verified: false,
@@ -972,7 +972,7 @@ describe("Codex outbox job result matching", () => {
     ];
 
     const selection = selectDirectionSplitAnimationResults(results, jobId, {
-      schema: "image-cockpit.direction-split-animation.v1",
+      schema: "zai-cockpit.direction-split-animation.v1",
       files: Object.fromEntries(["front", "front-three-quarter", "side", "back-three-quarter", "back"].map((slug) => [slug, `${jobId}-${slug}.png`]))
     });
 
@@ -983,8 +983,8 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("finds ready direction split artifacts without a pending job", () => {
-    const olderJobId = "codex-job-2026-06-27T01-11-47-290Z";
-    const newerJobId = "codex-job-2026-06-27T02-11-47-290Z";
+    const olderJobId = "zai-job-2026-06-27T01-11-47-290Z";
+    const newerJobId = "zai-job-2026-06-27T02-11-47-290Z";
     const readyArtifact = makeDirectionSplitArtifact(newerJobId, {
       ready: true,
       verified: true,
@@ -1028,7 +1028,7 @@ describe("Codex outbox job result matching", () => {
   });
 
   it("recovers a server-verified three-direction artifact before parsing its manifest", () => {
-    const jobId = "codex-job-2026-07-15T00-00-00-000Z-three";
+    const jobId = "zai-job-2026-07-15T00-00-00-000Z-three";
     const files = [`${jobId}-front.png`, `${jobId}-side.png`, `${jobId}-back.png`];
     const artifact = makeDirectionSplitArtifact(jobId, {
       ready: true,
@@ -1117,18 +1117,18 @@ function makeAnnotation(points: Annotation["points"]): Annotation {
   };
 }
 
-function makeStatus(state: CodexRunnerStatus["state"]): CodexRunnerStatus {
+function makeStatus(state: ZaiRunnerStatus["state"]): ZaiRunnerStatus {
   return {
-    jobId: "codex-job-test",
+    jobId: "zai-job-test",
     state,
     message: `${state} runner`
   };
 }
 
-function makeOutboxResult(name: string, mimeType = "image/png", artifact?: CodexArtifactStatus) {
+function makeOutboxResult(name: string, mimeType = "image/png", artifact?: ZaiArtifactStatus) {
   return {
     name,
-    path: `D:\\codex\\outbox\\${name}`,
+    path: `D:\\zai\\outbox\\${name}`,
     size: 123,
     modifiedAt: "2026-06-27T00:00:00.000Z",
     mimeType,
@@ -1138,15 +1138,15 @@ function makeOutboxResult(name: string, mimeType = "image/png", artifact?: Codex
 
 function makeDirectionSplitArtifact(
   jobId: string,
-  overrides: Partial<CodexArtifactStatus> = {}
-): CodexArtifactStatus {
+  overrides: Partial<ZaiArtifactStatus> = {}
+): ZaiArtifactStatus {
   return {
     ...makeDirectionSplitArtifactBase(jobId),
     ...overrides
   };
 }
 
-function makeDirectionSplitArtifactBase(jobId: string): CodexArtifactStatus {
+function makeDirectionSplitArtifactBase(jobId: string): ZaiArtifactStatus {
   return {
     jobId,
     artifactKind: "direction-split" as const,
@@ -1234,7 +1234,7 @@ describe("motion frame-budget presentation", () => {
   it.each([4, 6, 8, 12, 16, 20] as const)("slices %i-frame manifests into complete direction previews", (frameCount) => {
     const directions = ["front", "front three-quarter", "side", "back three-quarter", "back"];
     const manifest: AnimationPackManifest = {
-      schema: "image-cockpit.animation.v1",
+      schema: "zai-cockpit.animation.v1",
       title: `Dash ${frameCount}`,
       kind: "user",
       action: "dash",

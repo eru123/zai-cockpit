@@ -1,4 +1,4 @@
-export type ProviderId = "local-file" | "local-generator" | "codex-handoff" | "local-inbox";
+export type ProviderId = "local-file" | "local-generator" | "zai-handoff" | "local-inbox";
 
 export type ToolMode = "select" | "brush" | "rect" | "arrow";
 
@@ -89,7 +89,7 @@ export interface AnimationNormalizationCorrection {
 }
 
 export interface AnimationQualityReportV2 {
-  metricVersion: "image-cockpit.animation-quality.v2";
+  metricVersion: "zai-cockpit.animation-quality.v2";
   policyVersion: "shadow-v1";
   recordedAt: string;
   action: string;
@@ -129,7 +129,7 @@ export type EffectQualityRank = "gold" | "silver" | "bronze" | "failed" | "block
 export type EffectLoopMode = "one-shot" | "loop" | "ping-pong-loop";
 
 export interface EffectQualityReportV2 {
-  metricVersion: "image-cockpit.effect-quality.v2";
+  metricVersion: "zai-cockpit.effect-quality.v2";
   policyVersion: "shadow-v1";
   recordedAt: string;
   loopSeamScore: number | null;
@@ -260,7 +260,7 @@ export interface GridSettings {
 export type AnimationLibraryKind = "official" | "user";
 
 export interface AnimationPackManifest {
-  schema: "image-cockpit.animation.v1";
+  schema: "zai-cockpit.animation.v1";
   title: string;
   kind: AnimationLibraryKind;
   action: string;
@@ -345,7 +345,7 @@ export interface AnimationPackV2DirectionOverride {
 }
 
 export interface AnimationPackV2 {
-  schema: "image-cockpit.animation.v2";
+  schema: "zai-cockpit.animation.v2";
   schemaVersion: 2;
   title: string;
   kind: AnimationLibraryKind;
@@ -380,7 +380,7 @@ export interface AnimationPackV2 {
     createdWith: string;
     sourceName?: string;
     sourceJobId?: string;
-    migratedFrom?: "image-cockpit.animation.v1";
+    migratedFrom?: "zai-cockpit.animation.v1";
   };
   grid: GridSettings;
   cell: { width: number; height: number };
@@ -420,19 +420,19 @@ export interface ProviderStatus {
   path?: string;
 }
 
-export interface CodexJobResponse {
+export interface ZaiJobResponse {
   id: string;
   path: string;
   inboxPath: string;
   outboxPath?: string;
   createdAt: string;
-  runner?: CodexRunnerStatus;
+  runner?: ZaiRunnerStatus;
 }
 
-export type CodexRunnerState = "running" | "completed" | "failed" | "unavailable" | "disabled" | "unknown";
-export type CodexRunnerPreflightState = "ready" | "disabled" | "unavailable";
-export type CodexRunnerMode = "codex" | "custom" | "mock";
-export type CodexFailureKind =
+export type ZaiRunnerState = "running" | "completed" | "failed" | "unavailable" | "disabled" | "unknown";
+export type ZaiRunnerPreflightState = "ready" | "disabled" | "unavailable";
+export type ZaiRunnerMode = "zai" | "custom" | "mock";
+export type ZaiFailureKind =
   | "policy_or_safety"
   | "usage_limit"
   | "imagegen_unavailable"
@@ -441,8 +441,8 @@ export type CodexFailureKind =
   | "no_image_returned"
   | "unknown";
 
-export interface CodexJobDiagnostic {
-  kind: CodexFailureKind;
+export interface ZaiJobDiagnostic {
+  kind: ZaiFailureKind;
   title: string;
   userMessage: string;
   suggestion?: string;
@@ -450,9 +450,9 @@ export interface CodexJobDiagnostic {
   logPath?: string;
 }
 
-export interface CodexRunnerStatus {
+export interface ZaiRunnerStatus {
   jobId: string;
-  state: CodexRunnerState;
+  state: ZaiRunnerState;
   message: string;
   command?: string;
   startedAt?: string;
@@ -462,31 +462,31 @@ export interface CodexRunnerStatus {
   logPath?: string;
   statusPath?: string;
   outboxDir?: string;
-  diagnostic?: CodexJobDiagnostic;
+  diagnostic?: ZaiJobDiagnostic;
 }
 
-export interface CodexRunnerPreflight {
-  state: CodexRunnerPreflightState;
+export interface ZaiRunnerPreflight {
+  state: ZaiRunnerPreflightState;
   message: string;
   command: string;
   launchCommand?: string;
-  mode?: CodexRunnerMode;
+  mode?: ZaiRunnerMode;
   mockRunnerAllowed?: boolean;
   checkedAt: string;
   autorun: boolean;
-  sandbox: string;
-  approval: string;
+  runnerScript?: string;
+  endpointMode?: string;
   resolvedCommandPaths?: string[];
   errorCode?: string;
   setupHint?: string;
 }
 
-export interface CodexRunnerPreflightResponse {
-  runner: CodexRunnerPreflight;
+export interface ZaiRunnerPreflightResponse {
+  runner: ZaiRunnerPreflight;
 }
 
 export interface ImageCockpitApiHealth {
-  app: "image-cockpit";
+  app: "zai-cockpit";
   version: string;
   role: "api";
   port: number;
@@ -495,11 +495,11 @@ export interface ImageCockpitApiHealth {
   outboxReadable: boolean;
   statusReadable: boolean;
   logsReadable: boolean;
-  runner: Pick<CodexRunnerPreflight, "state" | "message" | "checkedAt" | "autorun" | "mode" | "mockRunnerAllowed">;
+  runner: Pick<ZaiRunnerPreflight, "state" | "message" | "checkedAt" | "autorun" | "mode" | "mockRunnerAllowed">;
 }
 
 export interface ImageCockpitDevSupervisorHealth {
-  app: "image-cockpit";
+  app: "zai-cockpit";
   role: "supervisor";
   devOnly: true;
   checkedAt: string;
@@ -527,9 +527,9 @@ export interface ImageCockpitDevSupervisorHealth {
   mismatches: string[];
 }
 
-export type CodexArtifactQuality = "gold" | "silver" | "bronze" | "blocked" | "waiting";
+export type ZaiArtifactQuality = "gold" | "silver" | "bronze" | "blocked" | "waiting";
 
-export type CodexResultQualityClassification =
+export type ZaiResultQualityClassification =
   | "usable-final"
   | "quality-failed"
   | "quarantined-candidate"
@@ -537,8 +537,8 @@ export type CodexResultQualityClassification =
   | "running"
   | "failed";
 
-export interface CodexResultQualityGate {
-  classification: CodexResultQualityClassification;
+export interface ZaiResultQualityGate {
+  classification: ZaiResultQualityClassification;
   reason: string;
   code?: string;
   historyAllowed: boolean;
@@ -547,13 +547,13 @@ export interface CodexResultQualityGate {
   warnings?: string[];
 }
 
-export interface CodexArtifactStatus {
+export interface ZaiArtifactStatus {
   jobId: string;
   artifactKind: "direction-split" | "effect-animation";
   detected: boolean;
   ready: boolean;
   verified: boolean;
-  quality: CodexArtifactQuality;
+  quality: ZaiArtifactQuality;
   reason: string;
   missingDirections: string[];
   warnings: string[];
@@ -561,7 +561,7 @@ export interface CodexArtifactStatus {
   manifestName?: string;
   stable: boolean;
   candidateCount: number;
-  qualityGate?: CodexResultQualityGate;
+  qualityGate?: ZaiResultQualityGate;
   animationQuality?: AnimationQualityReportV2;
   chromaKey?: {
     expected?: string;
@@ -570,11 +570,11 @@ export interface CodexArtifactStatus {
   };
 }
 
-export interface CodexJobStatusResponse {
-  status: CodexRunnerStatus;
+export interface ZaiJobStatusResponse {
+  status: ZaiRunnerStatus;
 }
 
-export interface CodexJobLogResponse {
+export interface ZaiJobLogResponse {
   jobId: string;
   exists: boolean;
   path: string;
@@ -585,21 +585,21 @@ export interface CodexJobLogResponse {
   text: string;
 }
 
-export interface CodexOutboxResult {
+export interface ZaiOutboxResult {
   name: string;
   path: string;
   size: number;
   modifiedAt: string;
   mimeType: string;
-  qualityGate?: CodexResultQualityGate;
-  artifact?: CodexArtifactStatus;
+  qualityGate?: ZaiResultQualityGate;
+  artifact?: ZaiArtifactStatus;
 }
 
-export interface CodexOutboxImportResponse extends CodexOutboxResult {
+export interface ZaiOutboxImportResponse extends ZaiOutboxResult {
   dataUrl: string;
 }
 
-export interface LocalGenerationResult extends CodexOutboxImportResponse {}
+export interface LocalGenerationResult extends ZaiOutboxImportResponse {}
 
 export interface LocalGenerationResponse {
   id: string;

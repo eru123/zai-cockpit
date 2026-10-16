@@ -9,7 +9,7 @@ import type {
 import { createApngBlob, createGifBlob } from "./exporters";
 import { canvasToBlob, dataUrlToBlob, loadImage } from "./image";
 
-export const VFX_COMPOSITE_SCHEMA = "image-cockpit.vfx-composite.v1" as const;
+export const VFX_COMPOSITE_SCHEMA = "zai-cockpit.vfx-composite.v1" as const;
 export const VFX_COMPOSITE_SOCKETS = ["hand", "weapon-tip", "feet", "body-center", "projectile-origin", "impact-point"] as const;
 export const VFX_COMPOSITE_EVENTS = ["startup", "charge", "active", "impact", "recovery"] as const;
 
@@ -38,7 +38,7 @@ export interface VfxCompositeManifest {
     historyId: string;
     name: string;
     sheet: string;
-    packSchema: "image-cockpit.effect-animation.v1";
+    packSchema: "zai-cockpit.effect-animation.v1";
     packRef: string;
     sourceJobId?: string;
     category: string;
@@ -149,7 +149,7 @@ export function createVfxCompositeManifest(input: CreateVfxCompositeInput): VfxC
       historyId: input.effect.id,
       name: effect.name,
       sheet: "layers/effect.png",
-      packSchema: "image-cockpit.effect-animation.v1",
+      packSchema: "zai-cockpit.effect-animation.v1",
       packRef: "effect.json",
       sourceJobId: effect.sourceJobId,
       category: effect.category,
@@ -384,7 +384,7 @@ export function buildVfxCompositeEngineExports(manifest: VfxCompositeManifest) {
     timing: manifest.timing
   };
   return {
-    generic: { schema: "image-cockpit.vfx-composite.generic.v1", ...reference },
+    generic: { schema: "zai-cockpit.vfx-composite.generic.v1", ...reference },
     godot: { resourceType: "ImageCockpitVfxComposite", characterTexture: manifest.files.characterSheet, effectTexture: manifest.files.effectSheet, attachment: reference },
     phaser: { key: slug(manifest.title), textures: { character: manifest.files.characterSheet, effect: manifest.files.effectSheet }, attachment: reference }
   };

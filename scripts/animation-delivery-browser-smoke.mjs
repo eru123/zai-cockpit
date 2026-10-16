@@ -6,12 +6,12 @@ import { tmpdir } from "node:os";
 import { delimiter, join, relative, resolve } from "node:path";
 
 const nodeCommand = process.execPath;
-const browserCommand = process.env.IMAGE_COCKPIT_BROWSER_COMMAND || findBrowserCommand();
-const runnerMode = (process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_RUNNER || "mock").toLowerCase();
-const timeoutMs = Number(process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_TIMEOUT_MS ?? (runnerMode === "real" ? 1800000 : 90000));
-const headless = process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_HEADLESS !== "0";
-const animationPresetId = process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_PRESET_ID || "idle-breathing";
-const animationPresetTitle = process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_PRESET_TITLE || "";
+const browserCommand = process.env.ZAI_COCKPIT_BROWSER_COMMAND || findBrowserCommand();
+const runnerMode = (process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_RUNNER || "mock").toLowerCase();
+const timeoutMs = Number(process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_TIMEOUT_MS ?? (runnerMode === "real" ? 1800000 : 90000));
+const headless = process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_HEADLESS !== "0";
+const animationPresetId = process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_PRESET_ID || "idle-breathing";
+const animationPresetTitle = process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_PRESET_TITLE || "";
 const animationPresetCatalog = {
   "idle-breathing": { id: "idle-breathing", title: "Idle Breathing" },
   "walk-cycle": { id: "walk-cycle", title: "Walk Cycle" },
@@ -25,9 +25,9 @@ const animationPresetCatalog = {
   "talk": { id: "talk", title: "Talk / NPC Reaction" }
 };
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-const reportDir = resolve(process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_REPORT_DIR || join("docs", "qa", "animation-delivery-reliability", timestamp));
-const handoffDir = resolve(process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_HANDOFF_DIR || join(reportDir, "handoff"));
-const tempRoot = await mkdtemp(join(tmpdir(), "image-cockpit-animation-delivery-"));
+const reportDir = resolve(process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_REPORT_DIR || join("docs", "qa", "animation-delivery-reliability", timestamp));
+const handoffDir = resolve(process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_HANDOFF_DIR || join(reportDir, "handoff"));
+const tempRoot = await mkdtemp(join(tmpdir(), "zai-cockpit-animation-delivery-"));
 const chromeProfileDir = join(tempRoot, "chrome-profile");
 const mockRunnerPath = join(tempRoot, "mock-animation-delivery-runner.mjs");
 const apiPort = await getOpenPort();
@@ -42,7 +42,7 @@ let report;
 let lastSnapshot = null;
 
 if (!browserCommand) {
-  console.error("Animation delivery browser smoke requires Chrome or Edge. Set IMAGE_COCKPIT_BROWSER_COMMAND to a browser executable.");
+  console.error("Animation delivery browser smoke requires Chrome or Edge. Set ZAI_COCKPIT_BROWSER_COMMAND to a browser executable.");
   process.exit(1);
 }
 
@@ -59,7 +59,7 @@ try {
   await waitForHttp(`http://127.0.0.1:${apiPort}/api/providers`, "local API");
 
   viteServer = startProcess(nodeCommand, ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", String(vitePort), "--strictPort"], {
-    IMAGE_COCKPIT_API_TARGET: `http://127.0.0.1:${apiPort}`
+    ZAI_COCKPIT_API_TARGET: `http://127.0.0.1:${apiPort}`
   });
   await waitForHttp(`http://127.0.0.1:${vitePort}/`, "Vite app");
 
@@ -100,12 +100,12 @@ try {
   const historyCountBefore = before.historyItems;
   await clickButtonByText("Generate Animation");
   lastSnapshot = await pageSnapshot();
-  await waitForEval(() => `document.body?.innerText.includes("Codex Jobs")`, "Codex job shelf appears");
+  await waitForEval(() => `document.body?.innerText.includes("Zai Jobs")`, "Zai job shelf appears");
   await waitForDeliveryTerminal();
   await delay(500);
 
   const after = await pageSnapshot();
-  const resultsList = await getJson(apiPort, "/api/codex/results").catch((error) => ({ error: error.message, results: [] }));
+  const resultsList = await getJson(apiPort, "/api/zai/results").catch((error) => ({ error: error.message, results: [] }));
   const screenshotPath = join(reportDir, "browser-final-1280x720.png");
   const screenshot = await cdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
   await writeFile(screenshotPath, Buffer.from(screenshot.data, "base64"));
@@ -134,13 +134,13 @@ try {
         !outboxFinalPresent ? "outbox_final_missing" : "",
         falseSuccess ? "false_success" : ""
       ].filter(Boolean);
-  const uiFailureText = Array.isArray(after.codexFailureTexts) ? after.codexFailureTexts.join(" | ") : "";
+  const uiFailureText = Array.isArray(after.zaiFailureTexts) ? after.zaiFailureTexts.join(" | ") : "";
   const failureReason = deliverySucceeded
     ? ""
     : `${failureCodes.join(", ")}${uiFailureText ? `; ui: ${uiFailureText}` : ""}`;
 
   report = {
-    schema: "image-cockpit.animation-delivery-browser-smoke.v1",
+    schema: "zai-cockpit.animation-delivery-browser-smoke.v1",
     createdAt: finishedAt,
     runnerMode,
     browserUrl,
@@ -163,7 +163,7 @@ try {
       downloadableFinal,
       outboxFinalPresent,
       falseSuccess,
-      stuckRunning: after.codexJobRows > 0,
+      stuckRunning: after.zaiJobRows > 0,
       failureCodes,
       failureReason,
       uiFailureText,
@@ -196,7 +196,7 @@ try {
 } catch (error) {
   if (!report) {
     report = {
-      schema: "image-cockpit.animation-delivery-browser-smoke.v1",
+      schema: "zai-cockpit.animation-delivery-browser-smoke.v1",
       createdAt: new Date().toISOString(),
       runnerMode,
       viewport: "1280x720",
@@ -233,26 +233,26 @@ try {
 
 function apiEnv() {
   const env = {
-    IMAGE_COCKPIT_API_PORT: String(apiPort),
-    IMAGE_COCKPIT_HANDOFF_DIR: handoffDir,
-    IMAGE_COCKPIT_CODEX_AUTORUN: "1",
-    IMAGE_COCKPIT_ARTIFACT_STABLE_MS: "0"
+    ZAI_COCKPIT_API_PORT: String(apiPort),
+    ZAI_COCKPIT_HANDOFF_DIR: handoffDir,
+    ZAI_COCKPIT_RUNNER_AUTORUN: "1",
+    ZAI_COCKPIT_ARTIFACT_STABLE_MS: "0"
   };
   if (runnerMode === "mock") {
     return {
       ...env,
-      IMAGE_COCKPIT_ALLOW_MOCK_RUNNER: "1",
-      IMAGE_COCKPIT_CODEX_COMMAND: nodeCommand,
-      IMAGE_COCKPIT_CODEX_HELP_ARGS_JSON: JSON.stringify([mockRunnerPath, "--help"]),
-      IMAGE_COCKPIT_CODEX_EXEC_ARGS_JSON: JSON.stringify([mockRunnerPath]),
-      IMAGE_COCKPIT_MOCK_RUNNER_DELAY_MS: process.env.IMAGE_COCKPIT_MOCK_RUNNER_DELAY_MS || "900"
+      ZAI_COCKPIT_ALLOW_MOCK_RUNNER: "1",
+      ZAI_COCKPIT_RUNNER_COMMAND: nodeCommand,
+      ZAI_COCKPIT_RUNNER_HELP_ARGS_JSON: JSON.stringify([mockRunnerPath, "--help"]),
+      ZAI_COCKPIT_RUNNER_EXEC_ARGS_JSON: JSON.stringify([mockRunnerPath]),
+      ZAI_COCKPIT_MOCK_RUNNER_DELAY_MS: process.env.ZAI_COCKPIT_MOCK_RUNNER_DELAY_MS || "900"
     };
   }
   return env;
 }
 
 async function loadSourceImageDataUrl() {
-  const sourcePath = process.env.IMAGE_COCKPIT_ANIMATION_DELIVERY_SOURCE || "public/prompt-examples/basic-young-male-hero.png";
+  const sourcePath = process.env.ZAI_COCKPIT_ANIMATION_DELIVERY_SOURCE || "public/prompt-examples/basic-young-male-hero.png";
   const bytes = await readFile(sourcePath);
   return `data:image/png;base64,${bytes.toString("base64")}`;
 }
@@ -267,8 +267,8 @@ async function installBrowserPrelude() {
       window.addEventListener("unhandledrejection", (event) => {
         window.__animationDeliveryErrors.push(String(event.reason?.message || event.reason || "unhandled rejection"));
       });
-      localStorage.setItem("image-cockpit.language", "en");
-      localStorage.removeItem("image-cockpit.pendingCodexJob");
+      localStorage.setItem("zai-cockpit.language", "en");
+      localStorage.removeItem("zai-cockpit.pendingZaiJob");
     `
   });
 }
@@ -293,7 +293,7 @@ async function waitForDeliveryTerminal() {
     const hasFailureSignal =
       snapshot.text.includes("Animation tournament failed") ||
       snapshot.text.includes("no history or final download item was added") ||
-      snapshot.codexFailureCards > 0;
+      snapshot.zaiFailureCards > 0;
     if (hasPassSignal || hasFailureSignal) {
       if (snapshot.resultDownloadPanelComplete) {
         await openDownloadModal().catch(() => null);
@@ -398,12 +398,12 @@ async function pageSnapshot() {
     buttons: Array.from(document.querySelectorAll("button")).map((button) => button.innerText.replace(/\\s+/g, " ").trim()).filter(Boolean),
     disabledButtons: Array.from(document.querySelectorAll("button:disabled")).map((button) => button.innerText.replace(/\\s+/g, " ").trim()).filter(Boolean),
     historyItems: document.querySelectorAll(".history-item").length,
-    codexJobRows: document.querySelectorAll(".codex-job-row").length,
-    codexFailureCards: document.querySelectorAll(".codex-failure-card").length,
-    codexFailureTexts: Array.from(document.querySelectorAll(".codex-failure-card"))
+    zaiJobRows: document.querySelectorAll(".zai-job-row").length,
+    zaiFailureCards: document.querySelectorAll(".zai-failure-card").length,
+    zaiFailureTexts: Array.from(document.querySelectorAll(".zai-failure-card"))
       .map((card) => card.innerText.replace(/\\s+/g, " ").trim())
       .filter(Boolean),
-    codexLogCards: document.querySelectorAll(".codex-log-card").length,
+    zaiLogCards: document.querySelectorAll(".zai-log-card").length,
     canvasPreviewMode: document.querySelector("canvas")?.dataset.previewMode || "",
     canvasPreviewName: document.querySelector("canvas")?.dataset.previewName || "",
     resultPreviewImages: document.querySelectorAll(".result-preview-image").length,
@@ -424,7 +424,7 @@ async function pageSnapshot() {
 async function writeReports(currentReport) {
   const trial = currentReport.trial;
   const summary = {
-    schema: "image-cockpit.animation-delivery-rate-summary.v1",
+    schema: "zai-cockpit.animation-delivery-rate-summary.v1",
     createdAt: currentReport.createdAt,
     runnerMode: currentReport.runnerMode,
     totalTrials: 1,
@@ -710,17 +710,17 @@ if (!stdin.includes("built-in image_gen")) {
   process.exit(2);
 }
 
-const jobId = process.env.IMAGE_COCKPIT_JOB_ID;
-const jobPath = process.env.IMAGE_COCKPIT_JOB_PATH;
-const outboxDir = process.env.IMAGE_COCKPIT_OUTBOX_DIR;
+const jobId = process.env.ZAI_COCKPIT_JOB_ID;
+const jobPath = process.env.ZAI_COCKPIT_JOB_PATH;
+const outboxDir = process.env.ZAI_COCKPIT_OUTBOX_DIR;
 if (!jobId || !jobPath || !outboxDir) {
-  console.error("missing Image Cockpit runner environment");
+  console.error("missing Zai Cockpit runner environment");
   process.exit(3);
 }
 const job = JSON.parse(await readFile(jobPath, "utf8"));
 await mkdir(outboxDir, { recursive: true });
 console.log(\`mock animation delivery accepted \${jobId}\`);
-await new Promise((resolve) => setTimeout(resolve, Number(process.env.IMAGE_COCKPIT_MOCK_RUNNER_DELAY_MS || 900)));
+await new Promise((resolve) => setTimeout(resolve, Number(process.env.ZAI_COCKPIT_MOCK_RUNNER_DELAY_MS || 900)));
 
 if (job.workflowMode !== "sprite-generate" || job.spriteContext?.variant !== "standard") {
   await writeFile(join(outboxDir, \`\${jobId}.png\`), makeSpriteSheetPng(512, 512, 1, 1, 512, 512, [0, 255, 0, 255]));
@@ -739,7 +739,7 @@ for (const [index, slug] of directionSlugs.entries()) {
   await writeFile(join(outboxDir, \`\${jobId}-\${slug}.png\`), png);
 }
 await writeFile(join(outboxDir, \`\${jobId}-manifest.json\`), JSON.stringify({
-  schema: "image-cockpit.direction-split-animation.v1",
+  schema: "zai-cockpit.direction-split-animation.v1",
   jobId,
   action: job.spriteContext?.action || "idle",
   directions: directionNames,

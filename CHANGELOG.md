@@ -1,331 +1,37 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 - 2026-10-16
 
-No unreleased changes yet.
-
-## v0.2.1 - 2026-07-28
-
-Approachable prompt discovery and a broader production-ready pixel-art preset catalog after v0.1.8.
-
-### Added
-
-- Added 30 detailed prompt presets with transparent preview assets: 10 animals, 5 chibi boys, 5 chibi girls, and 10 beastfolk.
-- Added nine short starting prompts for an elderly man, elderly woman, man, woman, girl, boy, cat, dog, and monster.
-- Added related-example navigation, full-catalog access, 15-language layer UI copy, responsive layouts, focus trapping, Escape handling, and focus return.
-- Added machine-readable QA for all 30 generated preview assets, including dimensions, transparency, padding, centering, edge contact, debris, and SHA-256 checks.
+Initial release of Zai Cockpit, a fork of
+[image-cockpit-for-codex-workflows](https://github.com/dreiachse-cyber/image-cockpit-for-codex-workflows)
+(v0.2.1, MIT) with the Codex CLI provider fully replaced by the Z.ai model
+ecosystem.
 
 ### Changed
 
-- Moved the existing 137 detailed Prompt Examples behind a lighter first layer so users can begin with a short editable idea instead of a nearly finished prompt.
-- Short-prompt use now updates only the main prompt and preserves the user's Negative Prompt and Generation Notes.
-- Refreshed the four README workflow screenshots and isolated screenshot capture from unrelated local Supervisor instances.
-
-### Verification
-
-- The owner reviewed and accepted the generated preset results before authorizing this release.
-- All 30 preview assets are 1254 x 1254 RGBA PNGs and pass the checked transparency, padding, centering, edge, and debris contracts.
-- Release validation covers syntax, doctor, typecheck, 227 Vitest tests, production build, API smoke, release audit, full browser UI smoke, README capture, and Git diff checks.
-
-## v0.1.8 - 2026-07-24
-
-Safer and faster Best-profile animation tournaments after v0.1.7.
-
-### Added
-
-- Added First Qualified Wins for Best tournaments, allowing the first completed candidate to win only when every direction is verified, warnings are zero, score is at least 3300, identity is at least 85, and the shadow gate is clear.
-- Added server-side revalidation and a distinct persisted `first-qualified` decision mode.
-- Added unit and API smoke coverage for strict-gate rejection, immediate acceptance, and cancellation of both remaining candidates.
-
-### Changed
-
-- Runs requested animation directions concurrently inside each candidate, with capacity-aware wave reduction and failed-direction-only retry.
-- Keeps the existing two-candidate Smart Race and full three-candidate comparison as fallbacks when the strict solo gate does not pass.
-- Requires the global three-runner pool to be idle before atomically starting an animation tournament initial wave.
-
-### Fixed
-
-- Prevented restored queued tournaments from automatically starting without a current-session Generate action.
-- Deduplicated semantically identical unfinished tournament registrations even when clients submit different random IDs.
-- Prevented double-click Generate races and kept register-and-start admission failures from leaving phantom queued manifests.
-
-## v0.1.7bugfix - 2026-07-24
-
-Maintenance update for the v0.1.7 code line. Package, App, and API versions remain `0.1.7`.
-
-### Fixed
-
-- Prevented restored jobless Animation Generation tournaments from starting initial candidates or Balanced candidate C without an explicit current-session Generate or confirmed Batch Matrix action.
-- Added a synchronous Generate in-flight guard to stop repeated clicks from registering duplicate tournaments before the busy state renders.
-- Added server-side semantic deduplication and a process-wide registration lock so concurrent equivalent requests with different random tournament IDs return one canonical unfinished tournament.
-- Refreshed stale running manifests before semantic reuse and preserved canonical Motion Pilot fallback IDs.
-
-### Verification
-
-- Passed typecheck, all 205 Vitest tests, production build, API smoke, local doctor, release audit, full browser UI smoke, and Git diff checks.
-- API smoke verified eight concurrent equivalent registrations create one canonical tournament, meaningful frame-contract changes remain separate, and cancellation permits a later equivalent run.
-
-## v0.1.7 - 2026-07-23
-
-Selectable single-direction animation generation and Experimental extended frame budgets after v0.1.6.
-
-### Added
-
-- Added a 1 direction Animation Generation preset with a second selector for front, front three-quarter, side, back three-quarter, or back while keeping side as its default.
-- Added arbitrary single-direction tournament, manifest, one-row sheet, Animation Pack v2 round-trip, responsive selector, and Motion Pilot guard coverage.
-- Added Experimental 16f and 20f Motion Recipe budgets to Animation Generation, including 4x4 and 4x5 direction-image contracts, Pack round trips, and max-path browser coverage.
-
-### Changed
-
-- Kept 8f as the default and 4f / 6f / 8f / 12f as Stable while clearly warning that 16f / 20f take longer, create larger outputs, and may exceed some engine texture limits.
-- Generalized the single-direction Motion Pilot guard and scale-reference wording so they apply to every selectable direction rather than only side.
-
-### Fixed
-
-- Preserved direction, Motion Recipe, frame-budget, and Pack v2 metadata when an imported Animation Pack is used, preventing 16f / 20f packs from falling back to 8f.
-- Hardened full UI smoke coverage against slow recovery-page navigation and the short three-runner queue-capacity window.
-
-## v0.1.6 - 2026-07-16
-
-Animation generation efficiency, repertoire, quality tooling, and workflow readability release after v0.1.5.
-
-### Added
-
-- Added Quality Gate v2 shadow metrics for raw/normalized comparison, correction amount, identity, palette, silhouette, phase, action-profile, and loop-seam review without changing the existing hard gate.
-- Added resumable Fast / Balanced / Best adaptive tournaments, Direction Repair, a 2x2 Batch Matrix, and global three-runner concurrency control.
-- Added the versioned Motion Recipe compiler with 22 recipes, six body topologies, nine structured modifiers, and variable 4 / 6 / 8 / 12-frame budgets.
-- Added non-destructive Animation Timeline editing, Animation Pack v2 round-trip metadata, and Generic / Godot / Phaser / Aseprite / Unity export support.
-- Added Animation Review Cockpit A/B/C comparison, eight review axes, Direction x Frame QC matrices, visual diff modes, overlays, and persisted human review decisions.
-- Added VFX Composite Stage character/effect layers, sockets, events, depth/blend/transform/timing controls, expanded effect repertoire, and combined export packs.
-- Added the opt-in Motion Pilot Tournament benchmark flow with side-only review, remaining-direction expansion, and Balanced fallback.
-
-### Changed
-
-- Animation Generation and Effect Animation now keep only their primary choices and generate action visible in the left column; optional controls live in focused modals or collapsible tools.
-- The four primary workflow switches now appear at the top of the left column in a large 2x2 control.
-- Base UI typography is now 16px, major targets are 48-60px high, and narrow layouts stack without horizontal overflow.
-- Motion Pilot remains Experimental, Best-only, default OFF because final benchmarks were materially slower than the standard Fast path.
-- The public repository excludes heavy local QA outputs and includes smaller optimized sample PNGs.
-
-### Fixed
-
-- Preserved real-runner visibility and Cockpit health while guarding production imagegen flows from mock-runner output.
-- Restored the three-candidate parallel default, removed the low-value one-direction mode, and balanced the five/three-direction control.
-- Prevented enlarged result-card text from overflowing normal and Effect result cards while keeping the center preview width intact.
-- Stabilized full UI smoke timing around queued fourth jobs and Effect completion.
-
-### Verification
-
-- v0.1.6 release prep tracks package/app/API version `0.1.6`.
-- Final release validation covers syntax, doctor, typecheck, 184 Vitest tests, build, smoke, release audit, full browser UI smoke, and Git diff checks.
-- The app remains local-first and does not call the OpenAI API directly or require an API key.
-
-## v0.1.5 - 2026-07-04
-
-Monster Girl Chibi prompt catalog and animation QA release after v0.1.4.
-
-### Added
-
-- Added 20 cute two-head-tall monster girl prompt examples under the new Monster Girl Chibi category.
-- Added 20 generated transparent source preview PNGs for the new prompt examples.
-- Added release QA notes for the MG01-MG20 source preview and animation-generation batch.
-
-### Changed
-
-- Prompt Examples now contain 107 cards and include Monster Girl Chibi alongside Basic Character, Profession Character, and Monster catalogs.
-- Direction-split manifest publishing preserves the expected animation action when final tournament winners are promoted.
-- Direction-split client QA now treats moderate interior alpha holes as warnings, while still blocking severe transparency damage.
-
-### Verification
-
-- v0.1.5 release prep tracks package/app/API version `0.1.5`.
-- The MG01-MG20 batch completed source-preview acceptance and 20x5 animation acceptance through Image Cockpit browser import.
-- The public repository includes the lightweight prompt preview assets, while large generated job outputs and local comparison artifacts remain outside the release.
-
-## v0.1.4 - 2026-07-01
-
-Experimental Effect Animation MVP release after v0.1.3.
-
-### Added
-
-- Added the Effect Animation workflow with Slash Arc, Hit Spark, Magic Cast, Projectile, and Impact categories.
-- Added effect controls for type, style, palette, frame count, canvas size, sheet layout, loop mode, anchor, and preview background.
-- Added effect-specific preview surfaces for transparent sheet review, looping GIF preview, frame timeline, quality rank, and history metadata.
-- Added effect export options for Effect GIF, Effect APNG / Animated APNG, Sheet PNG, Frames ZIP, Metadata JSON, and Effect Pack ZIP.
-- Added QA evidence for deterministic browser trials and real Codex/imagegen trials across all five MVP categories.
-
-### Changed
-
-- The Vite watcher now handles the new effect workflow files without losing the local dev-server session during iteration.
-- Effect result cards are compact, showing the category and rank/frame/size summary instead of long sheet filenames and metadata.
-- Download and history handling now treats effect results as final export assets while keeping image-edit numbered regions disabled for them.
-
-### Verification
-
-- v0.1.4 release prep tracks package/app/API version `0.1.4`.
-- Effect Animation QA passed five-category browser coverage, real imagegen import coverage, GIF loop preview checks, Animated APNG export checks, and compact Effect result card screenshot checks.
-- The app still does not call OpenAI APIs directly, and no model weights, API keys, tokens, generated handoff folders, or license-unclear assets are included.
-
-## v0.1.3 - 2026-06-30
-
-Recursive animation QA and review-gallery update after v0.1.2.
-
-### Added
-
-- Recursive browser-test QA artifacts for the animation matrix under `docs/qa/image-animation-recursive-browser-test-loop/20260630-0150/`.
-- Source and trial overview gallery at `index.html`, plus failed sprite review gallery at `failed-sprite-sheets.html`.
-- Animated GIF previews for failed 5-direction sprite rows so rejected candidates can be reviewed frame-by-frame.
-- Recursive source restoration and rerun coverage for repeated animation trials from the same generated source image.
-
-### Changed
-
-- Animation preset identity prompts and runner contracts now stress that generated direction PNGs are animation sheets, not still references.
-- Idle Breathing quality gates now accept readable subtle breathing across two directions while keeping hard static-copy guards.
-- Run Cycle and Walk Cycle motion checks use calibrated thresholds so readable back-run and small-character walk loops are not blocked by generic motion gates.
-- Generated-output rights are documented more clearly for local Codex/imagegen handoff workflows.
-
-### Fixed
-
-- Animation Generation restores the original source when returning from an animation result, keeping repeat trials enabled.
-- Direction-split and generic single-image outbox detection now preserve useful diagnostics instead of collapsing recoverable outputs into no-image failures.
-- The recursive QA loop no longer records false successes for quality-gated failed animation candidates.
-
-### Verification
-
-- v0.1.3 release prep tracks package/app/API version `0.1.3`.
-- Recursive animation QA verification passed typecheck, tests, build, smoke, release audit, and browser UI smoke after the threshold fixes.
-- The failed sprite gallery local-link and GIF metadata checks passed.
-
-## v0.1.2 - 2026-06-29
-
-Animation delivery reliability and operator-feedback update after v0.1.1.
-
-### Added
-
-- Animation delivery browser smoke, baseline, and rollup scripts for measuring real browser delivery success.
-- QA evidence for animation delivery reliability, including current-regime rollups and long-timeout real browser trials.
-- Running Codex job progress indicators in the right job panel, compact log cards, and fullscreen log header.
-- Settings recovery environment reporting for user-copyable diagnostics.
-
-### Changed
-
-- Standard animation generation now quarantines low-quality candidate artifacts instead of importing debug, raw, bronze, contact-sheet, or partial outputs as final results.
-- Animation tournament handling adopts the first two usable candidates for AB scoring and publishes only the winning final artifact.
-- Animation delivery waits longer for real Codex/imagegen runs before treating jobs as stale, reducing false failures on slow but successful jobs.
-- Recovery and import filters are stricter about detached direction-split outputs, local-generator artifacts, and stale intermediate files.
-
-### Fixed
-
-- Detached direction-split outputs can be recovered into final sheets when manifest and direction PNGs are available.
-- Completed Codex jobs with hidden or staged animation artifacts no longer leave the UI in misleading success/running states.
-- Animation results with chroma, transparency, bbox, or motion-quality problems are blocked from normal history/download flows until they pass the quality gate.
-- The UI now shows motion progress for long-running jobs without pretending the job is complete.
-
-### Verification
-
-- v0.1.2 release prep tracks package/app/API version `0.1.2`.
-- Current-regime animation delivery rollup reached the documented delivery SLO before release prep.
-- Browser UI smoke covers the running-job progress indicator with a mock runner.
-
-## v0.1.1 - 2026-06-27
-
-Stability, recovery, and animation workflow update after the v0.1.0 public baseline.
-
-### Added
-
-- Prompt Examples modal with preview images, copy buttons, and one-click loading into Pixel Art Generation.
-- Basic, profession-oriented, and monster prompt examples with generated preview assets.
-- Pixel-art-to-animation workflow with selected source images, motion presets, 5-direction previews, GIF/WebP/sprite-sheet downloads, and direction-split artifact handling.
-- Official animation preset coverage expanded to 16 sample sheets with QA galleries, transparency audits, mechanical QA artifacts, and direction GIFs.
-- Cockpit health diagnostics and loopback-only dev supervisor repair actions for local API/Vite target mismatches.
-- Recover Results and Local Inbox dedupe controls for outbox imports and polluted browser history.
-- Local animation library pack import/export foundations.
-- Public launch materials, refreshed README screenshots, current demo GIF, and X/Twitter launch copy.
-- `POST /api/generate` local generation endpoint and optional real imagegen smoke through `npm run imagegen:smoke`.
-- Public privacy guard in release audit and environment-neutral Codex CLI evidence paths in public docs.
-
-### Changed
-
-- The app opens directly into the working cockpit instead of a guided-start screen.
-- Workflow controls, preview toolbar behavior, selected result previewing, and download behavior were simplified across Pixel Art Generation, Image Editing, and Animation Generation.
-- Codex job status moved above the results list for easier scanning.
-- Codex generation concurrency increased to 3 active jobs.
-- Codex log cards now match the 3-job concurrency limit, with latest-line following and fullscreen log viewing.
-- Animation final artifacts are kept out of editable image-source flows.
-- Large history and frame state moved toward IndexedDB-backed persistence with lightweight localStorage summaries.
-
-### Fixed
-
-- Completed Codex job import failures now release the active job slot instead of leaving jobs stuck as running.
-- Job completion and auto-import matching now use exact job IDs to avoid importing unrelated results.
-- Stale Codex runner jobs are handled more gracefully.
-- Direction-split imports now wait for usable manifests and verified artifacts instead of treating partial files as complete.
-- Temporary, staging, contact-sheet, debug, work, and QA artifacts are filtered out from normal Local Inbox imports.
-- Image Editing now keeps full-body source images visible, records source-image annotation coordinates, and reinforces no-crop / no-zoom handoff prompts.
-- Local Inbox imports now use stable import keys and exact duplicate cleanup, preventing unchanged bronze-candidate snapshots from being imported repeatedly.
-- Dev supervisor repair skips API restart when a running Codex job is present.
-- Static result previews, animation persistence, exports, chroma-key handling, and walk/run sample alignment were tightened.
-
-### Recovery
-
-- Added safe local recovery mode at `http://127.0.0.1:<port>/?safe=1`.
-- Added static browser-state reset page at `http://127.0.0.1:<port>/reset-local-state.html`.
-- Added storage preflight and a recovery screen for oversized Image Cockpit browser state.
-- Reset and safe-mode routes clear or bypass only Image Cockpit browser-side state; they do not delete repository files or `codex-handoff/outbox` artifacts.
-
-### Known limitations
-
-- Image generation and image editing still depend on the local Codex/imagegen environment available to the user.
-- Direct OpenAI API, ComfyUI, AUTOMATIC1111, Replicate, and other provider adapters are still not part of the shipped baseline.
-- Advanced game-engine exporters, full background removal, and deeper sprite QC remain future work.
-- The dev supervisor is limited to local development repair operations and is not part of packaged builds.
-
-## 0.1.0 - 2026-06-23
-
-First public local-first Image Cockpit release.
-
-### Added
-
-- Workspace tabs for pixel art generation, image editing, and animation generation.
-- Local-only Codex handoff through `codex-handoff/inbox/`, `assets/`, `outbox/`, `status/`, and `logs/`.
-- Optional `codex exec` runner launched by the local server when `IMAGE_COCKPIT_CODEX_AUTORUN=1`.
-- Optional JSON arg overrides for Codex runner wrappers and smoke coverage for a mock autorun runner reaching completed state.
-- Windows Codex command diagnostics and automatic preference for the terminal-runnable `%LOCALAPPDATA%\OpenAI\Codex\bin\...\codex.exe` CLI when the WindowsApps desktop shim is also present.
-- Current Codex CLI runner args using `-c approval_policy="<approval>"` instead of the removed `--ask-for-approval` flag.
-- Real no-image `codex exec` runner smoke confirming the installed Codex CLI can complete a local handoff job and write a Markdown sidecar to outbox.
-- Re-runnable real Codex runner smoke through `npm run codex:smoke`.
-- Owner-review local sweep through `npm run review:local`, running verify, browser UI smoke, and real no-image Codex runner smoke in sequence.
-- Pending-job lock so the Codex job button cannot create duplicate handoff jobs while waiting for a result.
-- Orphaned pending Codex jobs with missing runner status now unlock instead of waiting forever.
-- Handoff job context including workflow mode, edit notes, selected image asset, annotations, grid, and sprite context.
-- Smoke coverage for sprite generation and sprite editing handoff payloads.
-- Local Inbox import for returned outbox images.
-- Visible `Import Latest` action in the simplified workflow screen for manual handoff returns.
-- Simplified local-file workflows avoid duplicate `Import File` actions.
-- Desktop and mobile QA screenshots for the simplified image generation screen with `Import Latest` visible.
-- Manual handoff Browser QA screenshot showing an outbox return imported through `Import Latest`.
-- Smoke coverage for Local Inbox outbox listing and data URL import.
-- Smoke coverage for runner preflight `ready`, autorun `running -> completed`, and mock outbox PNG import.
-- Canvas annotation tools for select, brush, rectangle, and arrow.
-- Grid split into sprite frames, frame timeline editing, frame size controls, anchor controls, chroma key cleanup, and PNG / ZIP / GIF / metadata exports.
-- Japanese / English language selector, with core workflow panel labels, canvas controls, sprite controls, and export actions following the selected language.
-- Desktop and mobile QA screenshots plus MVP review report.
-- MVP demo GIF linked from README.
-- Release audit script for local-first boundaries, required docs, workflow IDs, and tracked-file safety checks.
-- v0.1.0 release notes for the public OSS baseline.
-- v0.1.0 owner review guide with the short path through `review:local`, manual workflow review, and approval gates.
-- v0.1.0 final audit mapping the completion definition and explicit user requirements to concrete evidence and remaining approval gates.
-- GitHub Actions CI workflow for the same `npm run verify` release-check path.
-- One-command local verification through `npm run verify`.
-- Browser UI smoke through `npm run ui:smoke`, covering workspace tabs, main actions, language switching, prompt examples, animation presets, and download flows.
-- Local doctor script for required files, handoff folder writability, and Codex command availability.
-- Manual handoff guide for inbox / assets / outbox workflows when `codex exec` is unavailable.
-- Manual handoff status copy now points users back to `Import Latest` after returning an outbox image.
-- v0.1.0 acceptance evidence mapping the public baseline workflows, local-first boundary, manual handoff path, and release gates to review artifacts.
-- v0.1.0 owner decision record separating local-first baseline acceptance from owner approval gates for merge, public visibility, tag, and release.
-
-### Notes
-
-- The app itself does not call OpenAI APIs directly and does not require an API key.
-- Repository visibility is public for v0.1.0; upstream pull request intake is disabled or limited while the direction is owner-curated.
-- In the current Windows test environment, the WindowsApps Codex desktop shim cannot be launched as a subprocess, while the terminal-runnable `%LOCALAPPDATA%\OpenAI\Codex\bin\...\codex.exe` path passes runner preflight and no-image runner completion. Image generation/editing availability still depends on the Codex environment.
+- Generation provider is now the built-in Z.ai agent runner
+  (`scripts/zai-agent-runner.mjs`) instead of the `codex` CLI subprocess.
+- The runner drives GLM chat models through an OpenAI-compatible tool loop
+  with `read_file`, `list_dir`, `write_file`, `generate_image`, `image_info`,
+  `report_blocker` and `finish` tools.
+- Chat completions use the GLM Coding Plan endpoint
+  (`https://api.z.ai/api/coding/paas/v4`) by default so subscription traffic
+  is billed to the coding plan; `ZAI_ENDPOINT_MODE=auto` falls back to the
+  pay-as-you-go endpoint (`https://api.z.ai/api/paas/v4`) when no coding
+  plan is active on the key.
+- Image generation uses Z.ai image models (default `cogview-4`) through the
+  pay-as-you-go endpoint, the only endpoint where Z.ai serves image
+  generation.
+- All Codex CLI discovery, sandbox/approval flags, and WindowsApps launcher
+  workarounds were removed together with the `codex` naming across the API,
+  UI, scripts, and environment variables (`ZAI_COCKPIT_*`).
+- Historical Codex session QA evidence under `docs/` was pruned; product
+  docs and prompt examples were kept and updated.
+
+### Migration notes
+
+- Set `ZAI_API_KEY` in `.env` (required for autorun).
+- Optional knobs: `ZAI_ENDPOINT_MODE`, `ZAI_CHAT_MODEL`, `ZAI_IMAGE_MODEL`,
+  `ZAI_CODING_BASE_URL`, `ZAI_API_BASE_URL`, `ZAI_IMAGE_API_BASE_URL`.
+- Old `IMAGE_COCKPIT_CODEX_*` settings no longer exist; use the
+  `ZAI_COCKPIT_RUNNER_*` variables documented in the README.

@@ -1,5 +1,5 @@
 {
-  "schema": "image-cockpit.image-animation-recursive-browser-test-loop.summary.v1",
+  "schema": "zai-cockpit.image-animation-recursive-browser-test-loop.summary.v1",
   "createdAt": "2026-06-29T21:33:35.512Z",
   "baseDir": "docs/qa/image-animation-recursive-browser-test-loop/20260630-0150",
   "sourceImageTotal": 6,

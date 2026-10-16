@@ -1,5 +1,5 @@
 {
-  "schema": "image-cockpit.animation-delivery-rollup.v1",
+  "schema": "zai-cockpit.animation-delivery-rollup.v1",
   "createdAt": "2026-06-28T21:11:51.218Z",
   "qaDir": "docs/qa/animation-delivery-reliability",
   "runnerMode": "real",
