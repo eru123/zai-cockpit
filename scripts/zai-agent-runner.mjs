@@ -73,12 +73,6 @@ function positiveInt(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
-if (process.argv.includes("--preflight")) {
-  runPreflight();
-} else {
-  await runJob();
-}
-
 function runPreflight() {
   const problems = [];
   if (!apiKey) problems.push("ZAI_API_KEY is not configured for the Z.ai agent runner.");
@@ -628,4 +622,13 @@ function summarizeArgs(name, args) {
 
 function delay(ms) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+}
+
+// Dispatch last: runJob reads module-scope bindings (activeChatBase, runnerTools,
+// toolHandlers), and a top-level await above their declarations would leave
+// them in the temporal dead zone when the job loop starts.
+if (process.argv.includes("--preflight")) {
+  runPreflight();
+} else {
+  await runJob();
 }
