@@ -476,6 +476,8 @@ export interface ZaiRunnerPreflight {
   autorun: boolean;
   runnerScript?: string;
   endpointMode?: string;
+  chatModel?: string;
+  imageModel?: string;
   resolvedCommandPaths?: string[];
   errorCode?: string;
   setupHint?: string;

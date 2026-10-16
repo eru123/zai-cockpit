@@ -3114,7 +3114,7 @@ async function checkZaiRunnerPreflight(): Promise<ZaiRunnerPreflight> {
               zaiRunnerMode === "mock"
                 ? "Mock/test runner is executable. This does not prove that Z.ai image generation is available."
                 : zaiRunnerMode === "zai"
-                  ? "Built-in Z.ai agent runner is configured and passed preflight."
+                  ? `Built-in Z.ai agent runner is configured and passed preflight (chat=${process.env.ZAI_CHAT_MODEL ?? "glm-4.7"}, images=${process.env.ZAI_IMAGE_MODEL ?? "glm-image"}, mode=${resolveZaiEndpointMode()}).`
                   : `${zaiLaunchCommand} is executable from the local handoff server.`
           });
           return;
@@ -3150,6 +3150,8 @@ function createRunnerPreflightBase() {
     autorun: zaiAutoRun,
     runnerScript: zaiRunnerMode === "zai" ? zaiAgentRunnerScript : undefined,
     endpointMode: zaiRunnerMode === "zai" ? resolveZaiEndpointMode() : undefined,
+    chatModel: zaiRunnerMode === "zai" ? (process.env.ZAI_CHAT_MODEL ?? "glm-4.7") : undefined,
+    imageModel: zaiRunnerMode === "zai" ? (process.env.ZAI_IMAGE_MODEL ?? "glm-image") : undefined,
     resolvedCommandPaths: zaiCommandCandidates.slice(0, 8)
   };
 }
