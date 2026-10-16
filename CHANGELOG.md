@@ -19,7 +19,7 @@ ecosystem.
   is billed to the coding plan; `ZAI_ENDPOINT_MODE=auto` falls back to the
   pay-as-you-go endpoint (`https://api.z.ai/api/paas/v4`) when no coding
   plan is active on the key.
-- Image generation uses Z.ai image models (default `cogview-4`) through the
+- Image generation uses Z.ai image models (default `glm-image`) through the
   pay-as-you-go endpoint, the only endpoint where Z.ai serves image
   generation.
 - All Codex CLI discovery, sandbox/approval flags, and WindowsApps launcher

@@ -119,7 +119,7 @@ function checkZaiApiConfig() {
   const codingBase = process.env.ZAI_CODING_BASE_URL || "https://api.z.ai/api/coding/paas/v4";
   const apiBase = process.env.ZAI_API_BASE_URL || "https://api.z.ai/api/paas/v4";
   const chatModel = process.env.ZAI_CHAT_MODEL || "glm-4.7";
-  const imageModel = process.env.ZAI_IMAGE_MODEL || "cogview-4";
+  const imageModel = process.env.ZAI_IMAGE_MODEL || "glm-image";
 
   note(`endpointMode=${endpointMode} (chat: ${endpointMode === "api" ? apiBase : `${codingBase} first`})`);
   note(`chatModel=${chatModel} imageModel=${imageModel}`);

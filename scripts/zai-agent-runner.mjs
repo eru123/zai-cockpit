@@ -34,7 +34,9 @@ const runnerScript = fileURLToPath(import.meta.url);
 const CODING_BASE_URL_DEFAULT = "https://api.z.ai/api/coding/paas/v4";
 const API_BASE_URL_DEFAULT = "https://api.z.ai/api/paas/v4";
 const CHAT_MODEL_DEFAULT = "glm-4.7";
-const IMAGE_MODEL_DEFAULT = "cogview-4";
+const IMAGE_MODEL_DEFAULT = "glm-image";
+const IMAGE_SIZE_DEFAULT = "1280x1280";
+const IMAGE_SIZE_PRESETS = new Set(["1280x1280", "1568x1056", "1056x1568", "1472x1088", "1088x1472", "1728x960", "960x1728"]);
 const MAX_TURNS_DEFAULT = 40;
 const REQUEST_TIMEOUT_MS_DEFAULT = 180000;
 const IMAGE_GENERATION_ATTEMPTS = 3;
@@ -278,6 +280,24 @@ async function inspectImage(path) {
     const h = ((bits >> 14) & 0x3fff) + 1;
     return { name, format: "webp", width: w, height: h, hasAlpha: true, bytes: handle.length };
   }
+  if (handle.length >= 4 && handle[0] === 0xff && handle[1] === 0xd8) {
+    // JPEG: Z.ai sometimes serves JPEG bytes under a .png name, so detect real format.
+    for (let offset = 2; offset + 9 < handle.length; offset += 1) {
+      if (handle[offset] !== 0xff) continue;
+      const marker = handle[offset + 1];
+      const isSof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+      if (isSof) {
+        const height = handle.readUInt16BE(offset + 5);
+        const width = handle.readUInt16BE(offset + 7);
+        return { name, format: "jpeg", width, height, hasAlpha: false, bytes: handle.length };
+      }
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+      const segmentLength = handle.readUInt16BE(offset + 2);
+      if (segmentLength <= 0) break;
+      offset += 1 + segmentLength;
+    }
+    return { name, format: "jpeg", width: null, height: null, hasAlpha: false, bytes: handle.length };
+  }
   return { name, format: extname(name).replace(".", "") || "unknown", bytes: handle.length, width: null, height: null, hasAlpha: null };
 }
 
@@ -359,10 +379,19 @@ async function decodeImagePayload(item) {
 }
 
 function normalizeImageSize(size) {
-  if (typeof size !== "string") return "1024x1024";
+  if (typeof size !== "string") return IMAGE_SIZE_DEFAULT;
   const match = size.match(/^(\d{2,5})x(\d{2,5})$/);
-  if (!match) return "1024x1024";
-  return `${match[1]}x${match[2]}`;
+  if (!match) return IMAGE_SIZE_DEFAULT;
+  const candidate = `${match[1]}x${match[2]}`;
+  if (IMAGE_SIZE_PRESETS.has(candidate)) return candidate;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  const inCustomRange = width >= 1024 && width <= 2048 && height >= 1024 && height <= 2048;
+  const divisibleBy32 = width % 32 === 0 && height % 32 === 0;
+  const withinPixelBudget = width * height <= 2 ** 22;
+  if (inCustomRange && divisibleBy32 && withinPixelBudget) return candidate;
+  log(`Requested image size ${candidate} is not supported by ${imageModel}; falling back to ${IMAGE_SIZE_DEFAULT}.`);
+  return IMAGE_SIZE_DEFAULT;
 }
 
 async function toolReportBlocker(args) {

@@ -8,7 +8,7 @@ Zai Cockpit is a local workspace for generating pixel art with Z.ai image models
 
 ## How Generation Runs
 
-Zai Cockpit writes a local handoff job (a JSON contract) into `zai-handoff/inbox/`, then spawns the built-in **Z.ai agent runner** (`scripts/zai-agent-runner.mjs`). The runner drives a GLM chat model through an OpenAI-compatible tool loop and gives it a `generate_image` tool backed by Z.ai image models (CogView and friends). Final images land in `zai-handoff/outbox/` and are imported back into the UI automatically.
+Zai Cockpit writes a local handoff job (a JSON contract) into `zai-handoff/inbox/`, then spawns the built-in **Z.ai agent runner** (`scripts/zai-agent-runner.mjs`). The runner drives a GLM chat model through an OpenAI-compatible tool loop and gives it a `generate_image` tool backed by Z.ai GLM-Image. Final images land in `zai-handoff/outbox/` and are imported back into the UI automatically.
 
 ```text
 zai-handoff/
@@ -57,7 +57,7 @@ ZAI_ENDPOINT_MODE=auto             # auto | coding | api (auto = coding plan fir
 ZAI_CODING_BASE_URL=https://api.z.ai/api/coding/paas/v4
 ZAI_API_BASE_URL=https://api.z.ai/api/paas/v4
 ZAI_CHAT_MODEL=glm-4.7            # agent model (coding-plan billed)
-ZAI_IMAGE_MODEL=cogview-4          # image model (pay-as-you-go billed)
+ZAI_IMAGE_MODEL=glm-image          # image model (pay-as-you-go billed)
 ZAI_COCKPIT_API_PORT=8787
 ZAI_COCKPIT_HANDOFF_DIR=zai-handoff
 ZAI_COCKPIT_RUNNER_AUTORUN=1        # 0 disables autorun and keeps manual handoff only
