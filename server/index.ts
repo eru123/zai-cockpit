@@ -3272,7 +3272,7 @@ function buildZaiRunnerPrompt(job: { id: string; path: string; outboxDir: string
   return [
     "You are processing a Zai Cockpit handoff job using the provided runner tools.",
     "",
-    `Read this local JSON job file with the read_file tool: ${job.path}`,
+    `Read the handoff job JSON with the read_file tool using path "job" (file: ${job.path}).`,
     ...(resumed ? [
       "This is a resumable retry after the API process restarted. Inspect the exact job outbox and its .staging subtree with list_dir before generating anything new.",
       "Reuse direction sheets and intermediate files that already belong to this job and pass the job contract. Continue only missing or invalid directions, then verify the full set and write the final manifest last.",

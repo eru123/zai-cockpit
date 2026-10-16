@@ -11,9 +11,10 @@
 //   - ZAI_ENDPOINT_MODE=auto (default) falls back to the pay-as-you-go
 //     endpoint https://api.z.ai/api/paas/v4 only when the coding endpoint
 //     rejects the request because no coding plan is active.
-//   - Image generation only exists on the standard endpoint, so
-//     generate_image always posts to ZAI_IMAGE_API_BASE_URL (default
-//     https://api.z.ai/api/paas/v4) and is billed per image.
+//   - Image generation follows the same base by default (ZAI_API_BASE_URL,
+//     coding plan first) and auto-falls back to the pay-as-you-go endpoint
+//     when the coding base cannot serve /images/generations. Pin a specific
+//     base with ZAI_IMAGE_API_BASE_URL when needed.
 //
 // The server spawns this script as:
 //   node scripts/zai-agent-runner.mjs            (job mode, prompt on stdin)
@@ -40,12 +41,14 @@ const IMAGE_SIZE_PRESETS = new Set(["1280x1280", "1568x1056", "1056x1568", "1472
 const MAX_TURNS_DEFAULT = 40;
 const REQUEST_TIMEOUT_MS_DEFAULT = 180000;
 const IMAGE_GENERATION_ATTEMPTS = 3;
+const IMAGE_DOWNLOAD_ATTEMPTS = 6;
+const IMAGE_DOWNLOAD_RETRY_DELAY_MS = 5000;
 
 const env = process.env;
 const apiKey = env.ZAI_API_KEY || env.ZAI_COCKPIT_API_KEY || env.Z_AI_API_KEY || "";
 const codingBase = (env.ZAI_CODING_BASE_URL || CODING_BASE_URL_DEFAULT).replace(/\/+$/, "");
 const apiBase = (env.ZAI_API_BASE_URL || API_BASE_URL_DEFAULT).replace(/\/+$/, "");
-const imageBase = (env.ZAI_IMAGE_API_BASE_URL || apiBase).replace(/\/+$/, "");
+const imageBase = (env.ZAI_IMAGE_API_BASE_URL || env.ZAI_API_BASE_URL || CODING_BASE_URL_DEFAULT).replace(/\/+$/, "");
 const endpointMode = normalizeEndpointMode(env.ZAI_ENDPOINT_MODE);
 const chatModel = env.ZAI_CHAT_MODEL || CHAT_MODEL_DEFAULT;
 const imageModel = env.ZAI_IMAGE_MODEL || IMAGE_MODEL_DEFAULT;
@@ -102,6 +105,8 @@ async function readStdin() {
 
 let activeChatBase = endpointMode === "api" ? apiBase : codingBase;
 let fellBackToApiBase = false;
+let activeImageBase = imageBase;
+let imageFellBackFromCoding = false;
 
 function shouldFallbackToApiBase(status, bodyText) {
   if (endpointMode !== "auto") return false;
@@ -229,8 +234,10 @@ async function toolReadFile(args) {
 
 function resolveToolReadTarget(requested) {
   if (typeof requested !== "string" || !requested.trim()) throw new Error("read_file requires a path.");
-  if (jobPath && resolve(requested) === resolve(jobPath)) return resolve(jobPath);
-  return sandboxPath(requested, { mustExist: true });
+  const normalized = requested.trim();
+  if (jobPath && normalized.toLowerCase() === "job") return resolve(jobPath);
+  if (jobPath && resolve(normalized).toLowerCase() === resolve(jobPath).toLowerCase()) return resolve(jobPath);
+  return sandboxPath(normalized, { mustExist: true });
 }
 
 async function toolListDir(args) {
@@ -301,6 +308,23 @@ async function inspectImage(path) {
   return { name, format: extname(name).replace(".", "") || "unknown", bytes: handle.length, width: null, height: null, hasAlpha: null };
 }
 
+async function postImageGeneration(payload) {
+  let response = await zaiFetch(`${activeImageBase}/images/generations`, payload, requestTimeoutMs);
+  if (
+    !response.ok &&
+    !imageFellBackFromCoding &&
+    (response.status === 403 || response.status === 404 || response.status === 400) &&
+    activeImageBase === codingBase
+  ) {
+    const fallbackBase = apiBase !== codingBase ? apiBase : API_BASE_URL_DEFAULT;
+    log(`Coding endpoint ${activeImageBase} cannot serve image generation (HTTP ${response.status}); falling back to ${fallbackBase}.`);
+    activeImageBase = fallbackBase;
+    imageFellBackFromCoding = true;
+    response = await zaiFetch(`${activeImageBase}/images/generations`, payload, requestTimeoutMs);
+  }
+  return response;
+}
+
 async function toolGenerateImage(args) {
   if (typeof args.prompt !== "string" || !args.prompt.trim()) throw new Error("generate_image requires a non-empty prompt.");
   if (typeof args.filename !== "string" || !args.filename.trim()) throw new Error("generate_image requires a filename relative to the outbox.");
@@ -314,16 +338,12 @@ async function toolGenerateImage(args) {
   let lastError = null;
   for (let attempt = 1; attempt <= IMAGE_GENERATION_ATTEMPTS; attempt += 1) {
     log(`generate_image attempt ${attempt}/${IMAGE_GENERATION_ATTEMPTS} model=${imageModel} size=${size} -> ${args.filename}`);
-    const response = await zaiFetch(
-      `${imageBase}/images/generations`,
-      {
-        model: imageModel,
-        prompt: args.prompt,
-        size,
-        n: 1
-      },
-      requestTimeoutMs
-    );
+    const response = await postImageGeneration({
+      model: imageModel,
+      prompt: args.prompt,
+      size,
+      n: 1
+    });
     if (response.ok) {
       let payload = null;
       try {
@@ -359,20 +379,23 @@ async function decodeImagePayload(item) {
   if (!item) return null;
   if (typeof item.b64_json === "string" && item.b64_json) return Buffer.from(item.b64_json, "base64");
   if (typeof item.url === "string" && item.url) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
-    try {
-      const response = await fetch(item.url, { signal: controller.signal });
-      if (!response.ok) {
-        log(`Downloading generated image failed (HTTP ${response.status}).`);
-        return null;
+    // Z.ai publishes the file to its CDN shortly after the generation response,
+    // so the first download can 404 while the file lands. Retry with backoff.
+    for (let attempt = 1; attempt <= IMAGE_DOWNLOAD_ATTEMPTS; attempt += 1) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
+      try {
+        const response = await fetch(item.url, { signal: controller.signal });
+        if (response.ok) return Buffer.from(await response.arrayBuffer());
+        log(`Downloading generated image failed (HTTP ${response.status}); attempt ${attempt}/${IMAGE_DOWNLOAD_ATTEMPTS}.`);
+      } catch (error) {
+        log(
+          `Downloading generated image failed: ${error instanceof Error ? error.message : String(error)}; attempt ${attempt}/${IMAGE_DOWNLOAD_ATTEMPTS}.`
+        );
+      } finally {
+        clearTimeout(timer);
       }
-      return Buffer.from(await response.arrayBuffer());
-    } catch (error) {
-      log(`Downloading generated image failed: ${error instanceof Error ? error.message : String(error)}`);
-      return null;
-    } finally {
-      clearTimeout(timer);
+      if (attempt < IMAGE_DOWNLOAD_ATTEMPTS) await delay(IMAGE_DOWNLOAD_RETRY_DELAY_MS);
     }
   }
   return null;
@@ -416,11 +439,11 @@ const runnerTools = [
     type: "function",
     function: {
       name: "read_file",
-      description: "Read a UTF-8 text file. Allowed targets: the handoff job JSON file, or any file inside the job outbox tree (paths are relative to the outbox root).",
+      description: 'Read a UTF-8 text file. Use path "job" to read the handoff job JSON; any other path must be inside the job outbox tree (relative to the outbox root).',
       parameters: {
         type: "object",
         properties: {
-          path: { type: "string", description: "Job file absolute path, or a path relative to the outbox root." }
+          path: { type: "string", description: '"job" for the handoff job file, or a path relative to the outbox root.' }
         },
         required: ["path"]
       }

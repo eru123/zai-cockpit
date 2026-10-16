@@ -20,8 +20,8 @@ ecosystem.
   pay-as-you-go endpoint (`https://api.z.ai/api/paas/v4`) when no coding
   plan is active on the key.
 - Image generation uses Z.ai image models (default `glm-image`) through the
-  pay-as-you-go endpoint, the only endpoint where Z.ai serves image
-  generation.
+  configured base, coding plan first, with automatic fallback to the
+  pay-as-you-go endpoint when the coding base cannot serve it.
 - All Codex CLI discovery, sandbox/approval flags, and WindowsApps launcher
   workarounds were removed together with the `codex` naming across the API,
   UI, scripts, and environment variables (`ZAI_COCKPIT_*`).

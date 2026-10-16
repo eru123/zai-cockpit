@@ -133,7 +133,7 @@ function checkZaiApiConfig() {
     warn("ZAI_API_KEY is not configured; the Z.ai agent runner cannot start.");
     note("Create an API key at https://z.ai/model-api (or from your GLM Coding Plan page) and set ZAI_API_KEY in .env.");
   }
-  note("Image generation always uses the pay-as-you-go endpoint because Z.ai serves image models only there.");
+  note("Image generation follows ZAI_API_BASE_URL (coding plan first) and auto-falls back to the pay-as-you-go endpoint when needed.");
 }
 
 function normalizeEndpointMode(value) {

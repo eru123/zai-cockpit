@@ -24,7 +24,7 @@ Z.ai bills the two endpoints differently, so the runner picks them deliberately:
 
 - **Chat completions** (the agent brain — nearly all tokens) go to the **GLM Coding Plan endpoint** by default: `https://api.z.ai/api/coding/paas/v4`. If you have an active coding plan subscription, this traffic is covered by the plan instead of per-token billing.
 - With `ZAI_ENDPOINT_MODE=auto` (the default), the runner falls back to the pay-as-you-go endpoint `https://api.z.ai/api/paas/v4` only when the coding endpoint rejects the request because no coding plan is active on the key.
-- **Image generation** always goes to the pay-as-you-go endpoint, because Z.ai serves image models only there. Each generated image is billed per image.
+- **Image generation** follows the same base by default (coding plan first) and automatically falls back to `https://api.z.ai/api/paas/v4` when the coding endpoint cannot serve `/images/generations`. Pin a specific base with `ZAI_IMAGE_API_BASE_URL`.
 
 Set `ZAI_ENDPOINT_MODE=coding` or `ZAI_ENDPOINT_MODE=api` to pin a single endpoint instead of using the coding-first fallback.
 
@@ -57,7 +57,7 @@ ZAI_ENDPOINT_MODE=auto             # auto | coding | api (auto = coding plan fir
 ZAI_CODING_BASE_URL=https://api.z.ai/api/coding/paas/v4
 ZAI_API_BASE_URL=https://api.z.ai/api/paas/v4
 ZAI_CHAT_MODEL=glm-4.7            # agent model (coding-plan billed)
-ZAI_IMAGE_MODEL=glm-image          # image model (pay-as-you-go billed)
+ZAI_IMAGE_MODEL=glm-image          # image model (follows the image base above)
 ZAI_COCKPIT_API_PORT=8787
 ZAI_COCKPIT_HANDOFF_DIR=zai-handoff
 ZAI_COCKPIT_RUNNER_AUTORUN=1        # 0 disables autorun and keeps manual handoff only
